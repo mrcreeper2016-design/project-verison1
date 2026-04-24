@@ -1,0 +1,14 @@
+{% extends 'accounts/auth_base.html' %}
+
+{% block title %}Email подтверждён — StarLift{% endblock %}
+
+{% block content %}
+<h1 class="auth-title"><i class="fa-solid fa-circle-check" style="color:var(--sber-green);"></i> Email подтверждён</h1>
+{% if initial_verification %}
+<p class="auth-subtitle">Аккаунт активирован{% if email %} для адреса <strong>{{ email }}</strong>{% endif %}. Теперь можно войти. После входа вам будет доступна сводная статистика; полный доступ подтвердит администратор.</p>
+{% else %}
+<p class="auth-subtitle">Ваш email обновлён{% if email %}: <strong>{{ email }}</strong>{% endif %}.</p>
+{% endif %}
+
+<a href="{% url 'accounts:login' %}" class="btn-primary" style="text-decoration:none; display:inline-flex; justify-content:center; align-items:center; gap:8px;"><i class="fa-solid fa-right-to-bracket"></i> Войти</a>
+{% endblock %}

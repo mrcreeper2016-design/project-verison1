@@ -1,19 +1,21 @@
 ﻿from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 from django.conf import settings
 from django.conf.urls.static import static
 from starlift import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', include('accounts.urls')),
     path('', views.index_view, name='home'),
     path('index/', views.index_view, name='index'),
+    path('explore/', views.explore_view, name='explore'),
     path('speakers/', views.speakers_view, name='speakers'),
     path('events/', views.events_view, name='events'),
     path('analytics/', views.analytics_view, name='analytics'),
-    path('profile/', views.profile_view, name='profile'),
     path('api/speakers/', views.speakers_api, name='speakers_api'),
     path('api/events/', views.events_api, name='events_api'),
+    path('api/home/', views.home_api, name='home_api'),
     path('speakers/add/', views.speaker_add, name='speaker_add'),
     path('speakers/edit/<int:pk>/', views.speaker_edit, name='speaker_edit'),
     path('speakers/delete/<int:pk>/', views.speaker_delete, name='speaker_delete'),

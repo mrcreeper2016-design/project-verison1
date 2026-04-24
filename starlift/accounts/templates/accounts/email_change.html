@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="content-block animate-fade" style="max-width:560px; margin:0 auto; padding:28px;">
+    <h1 style="margin:0 0 8px; font-size:26px; font-weight:800; letter-spacing:-0.02em;">Смена email</h1>
+    <p style="color:var(--text-muted); margin:0 0 20px; font-size:14px; line-height:1.5;">Мы отправим ссылку на новый адрес. Текущий email останется активным до подтверждения.</p>
+
+    {% if profile.pending_email %}
+    <div style="padding:12px 14px; background:rgba(224,165,0,0.1); color:#B87C00; border:1px solid rgba(224,165,0,0.3); border-radius:12px; margin-bottom:16px;">
+        Ожидает подтверждения: <strong>{{ profile.pending_email }}</strong>.
+        <form method="post" action="{% url 'accounts:email_change_cancel' %}" style="display:inline; margin-left:10px;">{% csrf_token %}<button type="submit" style="background:none; border:none; color:#B87C00; text-decoration:underline; cursor:pointer; font-size:13px;">Отменить запрос</button></form>
+    </div>
+    {% endif %}
+
+    {% if form.non_field_errors %}
+    <div style="padding:12px 14px; background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3); border-radius:12px; margin-bottom:16px;">
+        {% for e in form.non_field_errors %}<p style="margin:2px 0;">{{ e }}</p>{% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" novalidate style="display:grid; gap:14px;">
+        {% csrf_token %}
+        {% for field in form %}
+        <div style="display:grid; gap:6px;">
+            <label for="{{ field.id_for_label }}" style="font-size:13px; font-weight:700; color:var(--text-muted);">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<div style="color:#D93E4E; font-size:12px;">{% for e in field.errors %}<p style="margin:2px 0;">{{ e }}</p>{% endfor %}</div>{% endif %}
+        </div>
+        {% endfor %}
+        <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;">
+            <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-paper-plane"></i> Отправить ссылку</button>
+            <a href="{% url 'accounts:profile' %}" class="btn-action" style="background:var(--white); color:var(--text-main); border:1px solid var(--border-color); text-decoration:none;">Отмена</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

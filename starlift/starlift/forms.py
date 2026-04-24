@@ -31,7 +31,10 @@ class SpeakerForm(forms.ModelForm):
 
     class Meta:
         model = Speaker
-        exclude = ['sub', 'nps','status']
+        # Whitelist-style: only fields explicitly listed are editable from this
+        # admin-only form. `bio` is edited by speakers themselves via /profile/,
+        # `user` is linked via the admin console, and `nps` is derived.
+        fields = ['name', 'stack', 'city', 'img', 'recommended']
         labels = {
             'name': 'Имя и Фамилия',
             'stack': 'Стек (через запятую)',
@@ -112,3 +115,29 @@ class SpeakerForm(forms.ModelForm):
             cleaned_data['img'] = str(random.randint(1, 70))
 
         return cleaned_data
+
+
+class SpeakerSelfEditForm(SpeakerForm):
+    """Form for speaker-owned profile edits.
+
+    The speaker can update profile details, but not ownership, NPS, feedback,
+    or admin flags. Name is controlled from the linked auth user.
+    """
+
+    class Meta(SpeakerForm.Meta):
+        fields = ['sub', 'stack', 'city', 'status', 'bio', 'img']
+        labels = {
+            'sub': 'Подзаголовок',
+            'stack': 'Стек (через запятую)',
+            'city': 'Город',
+            'status': 'Статус',
+            'bio': 'О себе',
+        }
+        widgets = {
+            'sub': forms.TextInput(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border);'}),
+            'stack': forms.TextInput(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border);'}),
+            'city': forms.TextInput(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border);'}),
+            'status': forms.TextInput(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border);'}),
+            'bio': forms.Textarea(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border); min-height: 120px;'}),
+            'img': forms.HiddenInput(),
+        }

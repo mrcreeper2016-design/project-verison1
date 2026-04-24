@@ -1,0 +1,70 @@
+{% extends 'accounts/auth_base.html' %}
+
+{% block title %}Вход — StarLift{% endblock %}
+
+{% block content %}
+<h1 class="auth-title">Вход в систему</h1>
+<p class="auth-subtitle">StarLift — внутренняя система для сотрудников.</p>
+
+{% if error_message %}
+<div class="alert alert-error"><i class="fa-solid fa-circle-exclamation"></i> {{ error_message }}</div>
+{% endif %}
+
+{% if messages %}
+    {% for msg in messages %}
+    <div class="alert {% if msg.tags == 'error' %}alert-error{% else %}alert-info{% endif %}">{{ msg }}</div>
+    {% endfor %}
+{% endif %}
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+    <div class="form-field">
+        <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+        {{ form.username }}
+        {% if form.username.errors %}<div class="field-errors">{% for e in form.username.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+    </div>
+
+    <div class="form-field">
+        <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+        {{ form.password }}
+        {% if form.password.errors %}<div class="field-errors">{% for e in form.password.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+    </div>
+
+    <button type="submit" class="btn-primary" {% if lockout_remaining %}disabled data-lockout="{{ lockout_remaining }}"{% endif %}>
+        <i class="fa-solid fa-right-to-bracket"></i> Войти
+    </button>
+
+    <div class="auth-links">
+        <a href="{% url 'accounts:password_reset' %}">Забыли пароль?</a>
+        <a href="{% url 'accounts:register' %}">Создать аккаунт</a>
+    </div>
+</form>
+
+<div class="auth-footer-note">
+    Нет аккаунта? <a href="{% url 'accounts:register' %}" style="color: var(--accent-green); font-weight: 600;">Зарегистрируйтесь</a> — админ подтвердит вашу роль позже.
+</div>
+
+{% if lockout_remaining %}
+<script>
+    (function lockoutCountdown() {
+        const btn = document.querySelector('button[data-lockout]');
+        if (!btn) return;
+        let remaining = parseInt(btn.dataset.lockout, 10) || 0;
+        const origHtml = btn.innerHTML;
+        function tick() {
+            if (remaining <= 0) {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+                return;
+            }
+            btn.innerHTML = '<i class="fa-solid fa-hourglass-half"></i> Попробуйте через ' + remaining + ' с';
+            remaining -= 1;
+            setTimeout(tick, 1000);
+        }
+        tick();
+    })();
+</script>
+{% endif %}
+{% endblock %}

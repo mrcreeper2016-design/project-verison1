@@ -1,0 +1,95 @@
+{% extends 'accounts/console/_base.html' %}
+
+{% block title %}Приглашения — StarLift{% endblock %}
+
+{% block console_content %}
+{% if messages %}
+    {% for msg in messages %}
+    <div style="padding:10px 12px; border-radius:10px; margin-bottom:12px; font-size:13px;
+                {% if msg.tags == 'error' %}background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3);
+                {% elif msg.tags == 'warning' %}background:rgba(224,165,0,0.15); color:#B87C00; border:1px solid rgba(224,165,0,0.3);
+                {% else %}background:var(--light-green); color:var(--sber-green); border:1px solid rgba(10,128,59,0.25);{% endif %}">
+        {{ msg|linebreaksbr }}
+    </div>
+    {% endfor %}
+{% endif %}
+
+<div class="content-block" style="padding:22px; display:grid; gap:16px;">
+    <h2 style="margin:0; font-size:16px; font-weight:700;"><i class="fa-solid fa-plus"></i> Новое приглашение</h2>
+    <form method="post" style="display:grid; grid-template-columns: 1fr 180px 1fr; gap:12px; align-items:end;">
+        {% csrf_token %}
+        <div style="display:grid; gap:6px;">
+            <label style="font-size:12px; font-weight:700; color:var(--text-muted);">Email</label>
+            {{ form.email }}
+            {% if form.email.errors %}<div style="color:#D93E4E; font-size:12px;">{% for e in form.email.errors %}<p style="margin:2px 0;">{{ e }}</p>{% endfor %}</div>{% endif %}
+        </div>
+        <div style="display:grid; gap:6px;">
+            <label style="font-size:12px; font-weight:700; color:var(--text-muted);">Роль</label>
+            {{ form.role }}
+        </div>
+        <div style="display:grid; gap:6px;">
+            <label style="font-size:12px; font-weight:700; color:var(--text-muted);">Привязать к спикеру (опционально)</label>
+            {{ form.speaker }}
+        </div>
+        <div style="grid-column: 1 / -1; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;">{{ form.send_email }} Отправить письмо</label>
+            <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-paper-plane"></i> Создать инвайт</button>
+        </div>
+    </form>
+</div>
+
+<div class="content-block" style="padding:22px; display:grid; gap:12px;">
+    <div class="filter-bar">
+        <span style="font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Фильтр:</span>
+        <a href="?status=active" class="chip {% if status_filter == 'active' %}chip-green{% else %}chip-gray{% endif %}" style="text-decoration:none;">Активные</a>
+        <a href="?status=consumed" class="chip {% if status_filter == 'consumed' %}chip-green{% else %}chip-gray{% endif %}" style="text-decoration:none;">Использованные</a>
+        <a href="?status=expired" class="chip {% if status_filter == 'expired' %}chip-amber{% else %}chip-gray{% endif %}" style="text-decoration:none;">Просроченные</a>
+        <a href="?status=revoked" class="chip {% if status_filter == 'revoked' %}chip-red{% else %}chip-gray{% endif %}" style="text-decoration:none;">Отозванные</a>
+        <a href="?status=all" class="chip {% if status_filter == 'all' %}chip-green{% else %}chip-gray{% endif %}" style="text-decoration:none;">Все</a>
+    </div>
+
+    {% if invites %}
+    <table class="console-table">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Роль</th>
+                <th>Спикер</th>
+                <th>Создал</th>
+                <th>Истекает</th>
+                <th>Статус</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for inv in invites %}
+            <tr>
+                <td style="font-weight:600;">{{ inv.email }}</td>
+                <td><span class="chip chip-green">{{ inv.get_role_display }}</span></td>
+                <td>{% if inv.speaker %}{{ inv.speaker.name }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+                <td>{{ inv.created_by.username }}<br><span style="color:var(--text-muted); font-size:11px;">{{ inv.created_at|date:"d.m.Y H:i" }}</span></td>
+                <td>{{ inv.expires_at|date:"d.m.Y H:i" }}</td>
+                <td>
+                    {% if inv.revoked_at %}<span class="chip chip-red">Отозван</span>
+                    {% elif inv.used_at %}<span class="chip chip-gray">Использован{% if inv.consumed_by %} ({{ inv.consumed_by.username }}){% endif %}</span>
+                    {% elif inv.expires_at <= now %}<span class="chip chip-amber">Просрочен</span>
+                    {% else %}<span class="chip chip-green">Активен</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if not inv.revoked_at and not inv.used_at and inv.expires_at > now %}
+                    <form method="post" action="{% url 'accounts:invite_revoke' inv.pk %}" class="inline-form" onsubmit="return confirm('Отозвать приглашение для {{ inv.email }}?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-action" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3); padding:6px 10px; font-size:12px;"><i class="fa-solid fa-ban"></i> Отозвать</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state"><i class="fa-regular fa-envelope-open" style="font-size:22px; display:block; margin-bottom:8px;"></i>В этой категории приглашений нет</div>
+    {% endif %}
+</div>
+{% endblock %}

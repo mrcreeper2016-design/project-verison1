@@ -8,6 +8,17 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='50,5 61,35 95,35 68,55 78,85 50,65 22,85 32,55 5,35 39,35' fill='%230A803B'/%3E%3Cpath d='M20,80 L55,45 L65,55 L90,20' fill='none' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        (function applyThemeBeforePaint() {
+            try {
+                const savedTheme = localStorage.getItem('theme');
+                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.setAttribute('data-theme', savedTheme || (systemDark ? 'dark' : 'light'));
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
     <style>
         :root {
             --sber-green: #0A803B;
@@ -847,12 +858,19 @@
                 <div class="logo-text">STARLIFT</div>
             </div>
             <nav class="nav-menu">
+                {% if user.is_superuser or user.profile.role == 'admin' or user.profile.role == 'speaker' %}
                 <a href="{% url 'home' %}" class="nav-item"><i class="fa-solid fa-house"></i> <span>Главная</span></a>
                 <a href="{% url 'speakers' %}" class="nav-item"><i class="fa-solid fa-user-group"></i> <span>Спикеры</span></a>
                 <a href="{% url 'events' %}" class="nav-item"><i class="fa-regular fa-calendar-days"></i> <span>Мероприятия</span></a>
                 <a href="{% url 'analytics' %}" class="nav-item"><i class="fa-solid fa-chart-simple"></i> <span>Аналитика</span></a>
                 <a href="{% url 'qr_generator' %}" class="nav-item"><i class="fa-solid fa-qrcode"></i> <span>QR-код</span></a>
-                <a href="{% url 'profile' %}" class="nav-item"><i class="fa-solid fa-gear"></i> <span>Настройки</span></a>
+                {% else %}
+                <a href="{% url 'explore' %}" class="nav-item"><i class="fa-solid fa-compass"></i> <span>Обзор</span></a>
+                {% endif %}
+                {% if user.is_superuser or user.profile.role == 'admin' %}
+                <a href="{% url 'accounts:console_home' %}" class="nav-item"><i class="fa-solid fa-sliders"></i> <span>Админ-консоль</span></a>
+                {% endif %}
+                <a href="{% url 'accounts:profile' %}" class="nav-item"><i class="fa-solid fa-gear"></i> <span>Настройки</span></a>
             </nav>
         </div>
         <div class="sidebar-bottom-logo animate-fade" style="animation-delay: 0.5s;">
@@ -868,17 +886,25 @@
             <div class="admin-profile-container">
                 <div class="admin-profile" id="profileTrigger">
                     <div class="admin-info">
-                        <span class="admin-name">Анастасия Сберская</span>
-                        <span class="admin-role">Администратор</span>
+                        <span class="admin-name">{{ user.get_full_name|default:user.username }}</span>
+                        <span class="admin-role">{% if user.is_superuser %}Суперпользователь{% elif user.profile.role == 'admin' %}Администратор{% elif user.profile.role == 'speaker' %}Спикер{% else %}Гость{% endif %}</span>
                     </div>
-                    <img src="https://i.pravatar.cc/150?u=admin" alt="Admin" class="admin-avatar">
+                    <div class="admin-avatar" style="display:flex; align-items:center; justify-content:center; background:var(--light-green); color:var(--sber-green); font-weight:700;">
+                        {{ user.first_name.0|default:user.username.0|upper }}{{ user.last_name.0|upper }}
+                    </div>
                     <i class="fa-solid fa-chevron-down" style="font-size: 12px; color: #70757a;"></i>
                 </div>
                 <div class="dropdown-menu" id="dropdownMenu">
-                    <a href="{% url 'profile' %}" class="dropdown-item"><i class="fa-regular fa-user"></i> Мой профиль</a>
-                    <a href="#" class="dropdown-item"><i class="fa-solid fa-headset"></i> Поддержка</a>
+                    <a href="{% url 'accounts:profile' %}" class="dropdown-item"><i class="fa-regular fa-user"></i> Мой профиль</a>
+                    {% if user.is_superuser or user.profile.role == 'admin' %}
+                    <a href="{% url 'accounts:console_home' %}" class="dropdown-item"><i class="fa-solid fa-sliders"></i> Админ-консоль</a>
+                    {% endif %}
+                    <a href="{% url 'accounts:password_change' %}" class="dropdown-item"><i class="fa-solid fa-key"></i> Сменить пароль</a>
                     <hr style="margin: 5px 0; border: 0; border-top: 1px solid var(--border-color);">
-                    <a href="#" class="dropdown-item" style="color: #EB5757;"><i class="fa-solid fa-power-off"></i> Выход</a>
+                    <form method="post" action="{% url 'accounts:logout' %}" style="margin:0;">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item" style="color: #EB5757; background:none; border:none; width:100%; text-align:left; cursor:pointer; font:inherit;"><i class="fa-solid fa-power-off"></i> Выход</button>
+                    </form>
                 </div>
             </div>
         </header>
@@ -1045,7 +1071,14 @@
                     await new Promise(resolve => setTimeout(resolve, 300)); 
 
                     // 2. Загрузка новой страницы
-                    const response = await fetch(url);
+                    const response = await fetch(url, { redirect: 'follow', credentials: 'same-origin' });
+                    // Если сервер завернул на логин (302 → /auth/login/), делаем полный reload
+                    // так как SPA-вставка HTML логина в текущий layout ломает верстку и CSRF.
+                    const landed = new URL(response.url, window.location.origin);
+                    if (response.redirected || landed.pathname.startsWith('/auth/')) {
+                        window.location.href = response.url;
+                        return;
+                    }
                     if (!response.ok) throw new Error('Network response was not ok');
                     const htmlString = await response.text();
 

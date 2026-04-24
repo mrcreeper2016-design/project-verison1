@@ -30,7 +30,7 @@ SECRET_KEY = 'django-insecure-$!y7q&gyioy-19s!8_5+vlbf@czrczz^v!w8#bd35!f)%(bxh!
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['192.168.1.126', '127.0.0.1', 'localhost']
 
 
 # Application definition
@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'accounts',
     'starlift',
 ]
 
@@ -100,6 +101,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {'min_length': 8},
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -107,7 +109,51 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
+    {
+        'NAME': 'accounts.password_validators.NotOnlySpecialCharsValidator',
+    },
 ]
+
+AUTHENTICATION_BACKENDS = [
+    'accounts.auth_backends.UsernameOrEmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+LOGIN_URL = '/auth/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/auth/login/'
+
+PASSWORD_RESET_TIMEOUT = 60 * 60  # 1 hour
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False  # CSRF cookie is read by JS for AJAX
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '25'))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'false').lower() == 'true'
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'false').lower() == 'true'
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'no-reply@starlift.local')
+SITE_URL = os.getenv('SITE_URL', 'http://127.0.0.1:8000')
+SITE_NAME = 'StarLift'
+
+# Prefer SSL if both flags are set by mistake.
+if EMAIL_USE_SSL and EMAIL_USE_TLS:
+    EMAIL_USE_TLS = False
+
+# Auth tuning — exposed for tests and ops
+ACCOUNTS_LOCKOUT_THRESHOLD = int(os.getenv('ACCOUNTS_LOCKOUT_THRESHOLD', '6'))
+ACCOUNTS_LOCKOUT_WINDOW_SECONDS = int(os.getenv('ACCOUNTS_LOCKOUT_WINDOW_SECONDS', '60'))
+ACCOUNTS_INVITE_TTL_DAYS = int(os.getenv('ACCOUNTS_INVITE_TTL_DAYS', '7'))
+ACCOUNTS_EMAIL_CHANGE_TTL_HOURS = int(os.getenv('ACCOUNTS_EMAIL_CHANGE_TTL_HOURS', '24'))
+ACCOUNTS_RESET_EMAIL_MIN_INTERVAL_SECONDS = int(os.getenv('ACCOUNTS_RESET_EMAIL_MIN_INTERVAL_SECONDS', '300'))
 
 
 # Internationalization

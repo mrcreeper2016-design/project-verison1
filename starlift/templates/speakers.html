@@ -160,7 +160,9 @@
             <p class="page-subtitle-xl">Управление базой экспертов, фильтрами и массовыми действиями</p>
         </div>
         <div class="speakers-meta">
+            {% if user.is_superuser or user.profile.role == 'admin' %}
             <span class="badge-inactive"><i class="fa-solid fa-shield-halved"></i> Доступ администратора</span>
+            {% endif %}
         </div>
     </div>
 
@@ -173,7 +175,7 @@
                     <input type="text" id="searchInput" placeholder="Поиск по имени, стеку или городу">
                 </div>
 
-                {% if user.is_superuser %}
+                {% if user.is_superuser or user.profile.role == 'admin' %}
                 <a href="{% url 'speaker_add' %}" class="btn-action btn-contact" style="flex: none; display: inline-flex; padding: 10px 20px; white-space: nowrap; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-plus"></i> Добавить спикера
                 </a>
@@ -268,7 +270,8 @@
 </div>
 
 <script>
-    window.isSuperuser = {% if user.is_superuser %}true{% else %}false{% endif %};
+    window.isAdmin = {% if user.is_superuser or user.profile.role == 'admin' %}true{% else %}false{% endif %};
+    window.editableSpeakerId = {% if editable_speaker_id %}{{ editable_speaker_id }}{% else %}null{% endif %};
     var speakersData = window.speakersData || [];
     window.speakersData = speakersData;
     window.__speakersGlobalListenersBound = window.__speakersGlobalListenersBound || false;
@@ -406,7 +409,7 @@
 
         const actionsHeader = document.getElementById('actionsHeader');
         if (actionsHeader) {
-            if (window.isSuperuser) {
+            if (window.isAdmin || window.editableSpeakerId) {
                 actionsHeader.innerText = 'Действия';
             } else {
                 actionsHeader.innerText = '';
@@ -425,7 +428,7 @@
                 <td onclick="showEvents(${s.id})">${s.city}</td>
                 <td onclick="showEvents(${s.id})"><span class="${s.status === 'Активен' ? 'badge-active' : 'badge-inactive'}">${s.status}</span></td>
                 <td onclick="showEvents(${s.id})"><div class="nps-val">${s.nps}${s.nps > 0 ? '%' : ''}</div></td>
-                ${window.isSuperuser ? `
+                ${window.isAdmin ? `
                 <td class="actions-cell" onclick="event.stopPropagation()">
                     <a href="/speakers/edit/${s.id}/" class="btn-action" style="color: var(--text-main); text-decoration: none;" title="Редактировать"><i class="fa-solid fa-pen"></i></a>
                     <form method="POST" action="/speakers/delete/${s.id}/" style="display:inline;" onsubmit="return confirm('Вы уверены, что хотите удалить этого спикера?');">
@@ -433,7 +436,11 @@
                         <button type="submit" class="btn-action btn-danger" style="background: none; border: none; cursor: pointer; color: var(--text-main);" title="Удалить"><i class="fa-solid fa-trash"></i></button>
                     </form>
                 </td>
-                ` : '<td></td>'}
+                ` : (window.editableSpeakerId === s.id ? `
+                <td class="actions-cell" onclick="event.stopPropagation()">
+                    <a href="/speakers/edit/${s.id}/" class="btn-action" style="color: var(--text-main); text-decoration: none;" title="Редактировать профиль"><i class="fa-solid fa-pen"></i></a>
+                </td>
+                ` : '<td></td>')}
             </tr>
         `).join('');
     }

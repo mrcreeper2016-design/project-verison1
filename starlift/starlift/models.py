@@ -1,6 +1,8 @@
 import uuid
+from django.conf import settings
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+
 
 class Speaker(models.Model):
     name = models.CharField(max_length=200)
@@ -10,6 +12,32 @@ class Speaker(models.Model):
     status = models.CharField(max_length=50)
     nps = models.IntegerField(default=0)
     img = models.CharField(max_length=100)
+    recommended = models.BooleanField(
+        default=False,
+        verbose_name="Рекомендую к выдвижению",
+        help_text="Флаг, выставляемый DevRel для кандидатов на выдвижение",
+    )
+    bio = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="О себе",
+        help_text="Редактируется самим спикером из личного кабинета.",
+    )
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="speaker",
+        verbose_name="Привязанный пользователь",
+        help_text="Связка устанавливается вручную администратором.",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        null=True,
+        verbose_name="Создан",
+        help_text="Время добавления спикера (для KPI новых спикеров и ленты активности).",
+    )
 
     class Meta:
         db_table = 'starlift_speaker'
@@ -26,39 +54,77 @@ class Speaker(models.Model):
         qs = self.feedbacks.all()
         if event_id:
             qs = qs.filter(event_id=event_id)
-        
+
         from django.db.models import Count, Q
         stats = qs.aggregate(
             total=Count('id'),
             promoters=Count('id', filter=Q(score__gte=9)),
-            detractors=Count('id', filter=Q(score__lte=6))
+            detractors=Count('id', filter=Q(score__lte=6)),
         )
         total = stats['total']
 
         if total == 0:
-            return 0  # Возвращаем 0, если нет отзывов
-            
+            return 0
+
         nps_score = ((stats['promoters'] - stats['detractors']) / total) * 100
         return int(round(nps_score))
 
     def __str__(self):
         return self.name
 
+
 class Event(models.Model):
+    SOURCE_CHOICES = [
+        ('internal', 'Внутренний отчёт'),
+        ('self', 'Самовыдвижение'),
+        ('external', 'Внешняя площадка'),
+        ('parser', 'Автопарсинг'),
+    ]
+
     title = models.CharField(max_length=200)
-    status = models.CharField(max_length=50) # 'past' or 'future'
+    status = models.CharField(max_length=50)  # 'past' or 'future'
     date = models.CharField(max_length=100, null=True, blank=True)
+    event_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Дата события (машиночитаемая)",
+        help_text="Используется для расчётов периода. Если не заполнено — берётся дата отзывов.",
+    )
     location = models.CharField(max_length=200, null=True, blank=True)
     link = models.CharField(max_length=500, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     schedule = models.TextField(null=True, blank=True)
+    topic = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name="Тема/стек события",
+    )
+    is_external = models.BooleanField(
+        default=False,
+        verbose_name="Внешнее мероприятие",
+        help_text="True — внешняя конференция/подкаст/митап вне периметра компании.",
+    )
+    source = models.CharField(
+        max_length=32,
+        choices=SOURCE_CHOICES,
+        default='internal',
+        verbose_name="Источник данных",
+    )
     speakers = models.ManyToManyField(Speaker, related_name='events')
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        null=True,
+        verbose_name="Создано",
+        help_text="Время создания записи о мероприятии (для ленты активности).",
+    )
 
     class Meta:
         db_table = 'starlift_event'
 
     def __str__(self):
         return f"{self.title} ({self.status})"
+
 
 class Feedback(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, verbose_name="ID")
@@ -83,7 +149,6 @@ class Feedback(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        # Пересчитываем NPS для спикера при каждом новом отзыве
         nps_value = self.speaker.calculate_nps()
         if nps_value is not None:
             self.speaker.nps = nps_value

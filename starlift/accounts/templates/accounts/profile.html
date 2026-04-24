@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .profile-page { display: grid; gap: 20px; max-width: 980px; }
+    .profile-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .profile-title { margin: 0; font-size: clamp(26px, 3vw, 36px); font-weight: 800; letter-spacing: -0.03em; color: var(--text-main); }
+    .profile-subtitle { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; line-height: 1.5; }
+    .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    @media (max-width: 900px) { .profile-grid { grid-template-columns: 1fr; } }
+    .profile-card { display: grid; gap: 16px; padding: 24px; }
+    .section-title { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+    .form-row { display: grid; gap: 6px; }
+    .form-row label { font-size: 13px; font-weight: 700; color: var(--text-muted); }
+    .form-row input, .form-row textarea { width: 100%; background: var(--white); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 12px; font-size: 14px; font-family: inherit; outline: none; transition: var(--transition); }
+    .form-row input:focus, .form-row textarea:focus { border-color: var(--sber-green); box-shadow: 0 0 0 4px var(--light-green); }
+    .form-row textarea { min-height: 110px; resize: vertical; }
+    .field-errors { color: #D93E4E; font-size: 12px; }
+    .field-errors p { margin: 2px 0; }
+    .alert-inline { padding: 10px 12px; border-radius: 10px; font-size: 13px; border: 1px solid transparent; }
+    .alert-success { background: var(--light-green); color: var(--sber-green); border-color: rgba(10,128,59,0.25); }
+    .alert-warning { background: rgba(224,165,0,0.1); color: #B87C00; border-color: rgba(224,165,0,0.3); }
+    .alert-error { background: rgba(217,62,78,0.1); color: #D93E4E; border-color: rgba(217,62,78,0.3); }
+    .readonly-box { padding: 12px 14px; background: var(--white); border: 1px solid var(--border-color); border-radius: 12px; font-size: 14px; color: var(--text-main); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .role-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; background: var(--light-green); color: var(--sber-green); border: 1px solid var(--border-color); }
+</style>
+
+<div class="profile-page">
+    <div class="profile-header animate-fade">
+        <div>
+            <h1 class="profile-title">Личный кабинет</h1>
+            <p class="profile-subtitle">Имя, фамилия, email, пароль и краткое био. Изменения сохраняются сразу.</p>
+        </div>
+        <span class="role-badge"><i class="fa-solid fa-id-badge"></i> {{ profile.get_role_display }}</span>
+    </div>
+
+    {% if messages %}
+        {% for msg in messages %}
+        <div class="alert-inline {% if msg.tags == 'error' %}alert-error{% elif msg.tags == 'success' %}alert-success{% else %}alert-warning{% endif %}">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="profile-grid">
+        <div style="display:grid; gap:20px;">
+        <div class="content-block profile-card animate-fade">
+            <div class="section-title"><i class="fa-solid fa-user"></i> Основное</div>
+
+            <form method="post" style="display:grid; gap:12px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="profile">
+                <div class="form-row">
+                    <label for="{{ form.first_name.id_for_label }}">Имя</label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}<div class="field-errors">{% for e in form.first_name.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                <div class="form-row">
+                    <label for="{{ form.last_name.id_for_label }}">Фамилия</label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}<div class="field-errors">{% for e in form.last_name.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                <div class="form-row">
+                    <label>Имя пользователя</label>
+                    <div class="readonly-box">
+                        <span>{{ user.username }}</span>
+                        <span style="font-size:12px; color:var(--text-muted);">Неизменно</span>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <label for="{{ form.bio.id_for_label }}">О себе</label>
+                    {{ form.bio }}
+                    {% if form.bio.errors %}<div class="field-errors">{% for e in form.bio.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                <div style="display:flex; gap:10px; margin-top:4px;">
+                    <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-floppy-disk"></i> Сохранить</button>
+                </div>
+            </form>
+        </div>
+
+        {% if is_speaker_role %}
+        <div class="content-block profile-card animate-fade">
+            <div class="section-title"><i class="fa-solid fa-microphone-lines"></i> Профиль спикера</div>
+            {% if linked_speaker %}
+            <div class="alert-inline alert-warning">
+                Имя и "О себе" синхронизируются из блока "Основное". Здесь редактируются поля карточки спикера.
+            </div>
+            <form method="post" enctype="multipart/form-data" style="display:grid; gap:12px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="speaker_profile">
+                {{ speaker_form.img }}
+                <div class="form-row">
+                    <label>Текущее фото</label>
+                    <div class="readonly-box">
+                        {% if linked_speaker.img|slice:':4' == 'http' or linked_speaker.img|slice:':6' == '/media' %}
+                        <img src="{{ linked_speaker.img }}" alt="Фото спикера" style="width:56px; height:56px; border-radius:12px; object-fit:cover; border:1px solid var(--border-color);">
+                        {% else %}
+                        <img src="https://i.pravatar.cc/120?img={{ linked_speaker.img }}" alt="Фото спикера" style="width:56px; height:56px; border-radius:12px; object-fit:cover; border:1px solid var(--border-color);">
+                        {% endif %}
+                        <span style="font-size:12px; color:var(--text-muted);">Можно загрузить файл или указать URL ниже</span>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <label for="{{ speaker_form.upload_image.id_for_label }}">Загрузить фото (JPG/PNG/WEBP, до 10 МБ)</label>
+                    {{ speaker_form.upload_image }}
+                    {% if speaker_form.upload_image.errors %}<div class="field-errors">{% for e in speaker_form.upload_image.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                <div class="form-row">
+                    <label for="{{ speaker_form.image_url.id_for_label }}">Или ссылка на фото</label>
+                    {{ speaker_form.image_url }}
+                    {% if speaker_form.image_url.errors %}<div class="field-errors">{% for e in speaker_form.image_url.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                <div class="form-row">
+                    <label for="{{ speaker_form.sub.id_for_label }}">Подзаголовок</label>
+                    {{ speaker_form.sub }}
+                    {% if speaker_form.sub.errors %}<div class="field-errors">{% for e in speaker_form.sub.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                <div class="form-row">
+                    <label for="{{ speaker_form.stack.id_for_label }}">Стек</label>
+                    {{ speaker_form.stack }}
+                    {% if speaker_form.stack.errors %}<div class="field-errors">{% for e in speaker_form.stack.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                <div class="form-row">
+                    <label for="{{ speaker_form.city.id_for_label }}">Город</label>
+                    {{ speaker_form.city }}
+                    {% if speaker_form.city.errors %}<div class="field-errors">{% for e in speaker_form.city.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                <div class="form-row">
+                    <label for="{{ speaker_form.status.id_for_label }}">Статус</label>
+                    {{ speaker_form.status }}
+                    {% if speaker_form.status.errors %}<div class="field-errors">{% for e in speaker_form.status.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                <div style="display:flex; gap:10px; margin-top:4px;">
+                    <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-floppy-disk"></i> Сохранить карточку</button>
+                </div>
+            </form>
+            {% else %}
+            <div class="alert-inline alert-warning">
+                Ваш аккаунт спикера ещё не привязан к карточке в базе. Обратитесь к администратору, чтобы выполнить привязку.
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        </div>
+
+        <div style="display:grid; gap:20px;">
+            <div class="content-block profile-card animate-fade" style="animation-delay:0.08s;">
+                <div class="section-title"><i class="fa-solid fa-envelope"></i> Email</div>
+                <div class="readonly-box">
+                    <span>{{ user.email|default:"Не указан" }}</span>
+                    {% if profile.email_verified %}<span class="role-badge" style="background:var(--light-green);"><i class="fa-solid fa-check"></i> Подтверждён</span>{% else %}<span class="role-badge" style="background:rgba(224,165,0,0.15); color:#B87C00;"><i class="fa-solid fa-triangle-exclamation"></i> Не подтверждён</span>{% endif %}
+                </div>
+                {% if pending_email %}
+                <div class="alert-inline alert-warning">Ожидает подтверждения: <strong>{{ pending_email }}</strong>. Проверьте почту и перейдите по ссылке.</div>
+                {% endif %}
+                <div>
+                    <a href="{% url 'accounts:email_change' %}" class="btn-action" style="background:var(--white); color:var(--text-main); border:1px solid var(--border-color); text-decoration:none;"><i class="fa-solid fa-pen"></i> Сменить email</a>
+                </div>
+            </div>
+
+            <div class="content-block profile-card animate-fade" style="animation-delay:0.12s;">
+                <div class="section-title"><i class="fa-solid fa-shield-halved"></i> Пароль</div>
+                <p style="margin:0; color:var(--text-muted); font-size:13px;">Не менее 8 символов, не только цифры и не только специальные символы.</p>
+                <div>
+                    <a href="{% url 'accounts:password_change' %}" class="btn-action btn-contact" style="text-decoration:none;"><i class="fa-solid fa-key"></i> Сменить пароль</a>
+                </div>
+            </div>
+
+            <div class="content-block profile-card animate-fade" style="animation-delay:0.16s;">
+                <div class="section-title"><i class="fa-solid fa-arrow-right-from-bracket"></i> Сессия</div>
+                <p style="margin:0; color:var(--text-muted); font-size:13px;">Выход завершает текущую сессию и возвращает на страницу входа.</p>
+                <form method="post" action="{% url 'accounts:logout' %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-action" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3);"><i class="fa-solid fa-power-off"></i> Выйти из системы</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

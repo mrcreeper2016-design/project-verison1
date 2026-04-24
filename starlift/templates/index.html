@@ -1,43 +1,52 @@
 {% extends 'base.html' %}
 {% block content %}
 <style>
-    .dashboard-shell {
-        display: grid;
-        gap: 24px;
+    .home-shell { display: flex; flex-direction: column; gap: 24px; }
+
+    /* ---------- Top bar ---------- */
+    .home-top {
+        display: flex; align-items: flex-end; justify-content: space-between;
+        gap: 16px; flex-wrap: wrap;
+    }
+    .home-title {
+        margin: 0; font-size: clamp(26px, 3vw, 36px); font-weight: 800;
+        color: var(--text-main); letter-spacing: -0.03em;
+    }
+    .home-subtitle {
+        margin: 6px 0 0; color: var(--text-muted);
+        font-size: 14px; line-height: 1.5;
+    }
+    .home-live {
+        display: inline-flex; align-items: center; gap: 10px;
+        font-size: 12px; font-weight: 600; color: var(--text-muted);
+        padding: 8px 14px; border-radius: 999px;
+        background: var(--glass-bg); border: 1px solid var(--glass-border);
+        backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    .home-live .pulse {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--sber-green);
+        box-shadow: 0 0 0 0 rgba(10, 128, 59, 0.4);
+        animation: homePulse 2s infinite;
+    }
+    .home-live[data-state="error"] .pulse { background: #EB5757; box-shadow: 0 0 0 0 rgba(235, 87, 87, 0.4); }
+    .home-live[data-state="error"] { color: #B53030; }
+    [data-theme="dark"] .home-live[data-state="error"] { color: #EB5757; }
+    @keyframes homePulse {
+        0%   { box-shadow: 0 0 0 0 rgba(10, 128, 59, 0.35); }
+        70%  { box-shadow: 0 0 0 10px rgba(10, 128, 59, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(10, 128, 59, 0); }
     }
 
-    .dashboard-top {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: space-between;
-        gap: 16px;
-        align-items: flex-end;
-    }
-
-    .dashboard-title {
-        margin: 0;
-        font-size: clamp(28px, 3vw, 40px);
-        font-weight: 800;
-        color: var(--text-main);
-        letter-spacing: -0.04em;
-    }
-
-    .dashboard-subtitle {
-        margin: 8px 0 0;
-        color: var(--text-muted);
-        font-size: 15px;
-        line-height: 1.5;
-    }
-
+    /* ---------- Hero ---------- */
     .hero-section {
         text-align: center;
-        padding: 8vh 20px 4vh; 
+        padding: 4vh 20px 2vh;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: flex-start;
         position: relative;
-        margin-bottom: 0;
         overflow: hidden;
     }
 
@@ -51,20 +60,30 @@
         background-clip: text;
         -webkit-text-fill-color: transparent;
         text-shadow: 0 10px 30px rgba(10, 128, 59, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+    }
+
+    .hero-logo {
+        width: 1em;
+        height: 1em;
+        flex: 0 0 auto;
     }
 
     .hero-subtitle {
         margin: 16px 0 0;
         color: var(--text-muted);
         font-size: 18px;
-        max-width: 600px;
+        max-width: 680px;
         line-height: 1.6;
     }
 
     .prompt-container {
         margin-top: 24px;
         width: 100%;
-        max-width: 600px;
+        max-width: 640px;
         position: relative;
         display: flex;
         align-items: center;
@@ -72,7 +91,7 @@
 
     .prompt-input {
         width: 100%;
-        padding: 16px 50px 16px 20px;
+        padding: 16px 54px 16px 20px;
         border-radius: 999px;
         border: 1px solid var(--border-color);
         background: var(--panel-bg);
@@ -109,510 +128,672 @@
         background: rgba(10, 128, 59, 0.1);
     }
 
-    .kpi-grid {
+    /* ---------- KPI cards ---------- */
+    .home-kpi-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 20px;
-    }
-
-    .kpi-grid .stat-card {
-        align-items: flex-start;
         gap: 14px;
-        min-height: 50px;
     }
-
-    .kpi-value {
-        font-size: 30px;
-        font-weight: 800;
-        letter-spacing: -0.04em;
-        color: var(--text-main);
-        margin-top: 4px;
+    .home-kpi-card {
+        background: var(--glass-bg); border: 1px solid var(--glass-border);
+        border-radius: 20px; padding: 16px 18px;
+        display: flex; flex-direction: column; gap: 6px; min-width: 0;
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        transition: var(--transition);
     }
-
-    .kpi-note {
-        font-size: 12px;
-        color: var(--text-muted);
-        margin-top: 6px;
+    .home-kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
+    .home-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .home-kpi-icon {
+        width: 34px; height: 34px; border-radius: 12px;
+        background: var(--light-green); color: var(--sber-green);
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 15px;
     }
+    .home-kpi-label {
+        font-size: 11px; font-weight: 700; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .home-kpi-value {
+        font-size: 26px; font-weight: 800; color: var(--text-main);
+        letter-spacing: -0.03em; line-height: 1.1;
+    }
+    .home-kpi-card.accent .home-kpi-value { color: var(--sber-green); }
+    .home-kpi-hint { font-size: 11px; color: var(--text-muted); }
 
-    .dashboard-grid {
+    @media (max-width: 1200px) { .home-kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 720px) { .home-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 420px) { .home-kpi-grid { grid-template-columns: 1fr; } }
+
+    /* ---------- Dashboard grid ---------- */
+    .home-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
-        gap: 20px;
-        align-items: start;
+        grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+        gap: 20px; align-items: start;
+    }
+    @media (max-width: 1100px) { .home-grid { grid-template-columns: 1fr; } }
+
+    .home-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+    .home-panel {
+        background: var(--glass-bg); border: 1px solid var(--glass-border);
+        border-radius: 20px; padding: 22px;
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    }
+    .home-panel-header {
+        display: flex; justify-content: space-between; align-items: center;
+        gap: 12px; margin-bottom: 16px;
+    }
+    .home-panel-title {
+        margin: 0; font-size: 18px; font-weight: 700; color: var(--text-main);
+        display: flex; align-items: center; gap: 10px;
+    }
+    .home-panel-title i { color: var(--sber-green); }
+    .home-panel-sub {
+        margin: 2px 0 0; font-size: 12px; color: var(--text-muted);
+    }
+    .home-panel-tag {
+        font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+        background: var(--light-green); color: var(--sber-green-hover);
+        border: 1px solid var(--sber-green); white-space: nowrap;
     }
 
-    .section-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 16px;
-        margin-bottom: 18px;
-    }
-
-    .section-title {
-        margin: 0;
-        font-size: 20px;
-        font-weight: 700;
-        color: var(--text-main);
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .event-grid {
+    /* ---------- Events ---------- */
+    .home-event-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 14px;
     }
-
-    .event-card {
-        position: relative;
-        padding: 18px;
-        border-radius: 18px;
-        border: 1px solid var(--border-color);
-        background: var(--panel-bg);
-        cursor: pointer;
+    @media (max-width: 720px) { .home-event-grid { grid-template-columns: 1fr; } }
+    .home-event-card {
+        position: relative; padding: 16px; border-radius: 18px;
+        border: 1px solid var(--border-color); background: var(--panel-bg);
         transition: var(--transition);
-        /* overflow: hidden удален, чтобы не обрезались края при размытии */
+        display: flex; flex-direction: column; gap: 10px; min-width: 0;
     }
-
-    .event-card::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        background: radial-gradient(circle at top right, rgba(10,128,59,0.12), transparent 50%);
-        opacity: 0;
-        transition: var(--transition);
-        pointer-events: none;
-    }
-
-    .event-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 18px 34px rgba(10, 128, 59, 0.08);
+    .home-event-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 14px 28px rgba(10, 128, 59, 0.08);
         border-color: rgba(10, 128, 59, 0.22);
     }
-
-    .event-card:active {
-        transform: scale(0.98);
-        backdrop-filter: blur(24px);
-        -webkit-backdrop-filter: blur(24px);
-        background: rgba(0, 0, 0, 0.1);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    .home-event-meta {
+        display: flex; justify-content: space-between; align-items: center; gap: 10px;
     }
-
-    .event-card:hover::after {
-        opacity: 1;
+    .home-event-date {
+        font-size: 12px; font-weight: 700; color: var(--sber-green);
+        text-transform: uppercase; letter-spacing: 0.06em;
     }
-
-    .event-card > * {
-        position: relative;
-        z-index: 1;
+    .home-event-name {
+        margin: 0; font-size: 16px; line-height: 1.3;
+        font-weight: 700; color: var(--text-main);
+        word-break: break-word;
     }
-
-    .event-meta {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        align-items: center;
-        margin-bottom: 14px;
-    }
-
-    .event-date {
-        font-size: 12px;
-        font-weight: 700;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-    }
-
-    .event-name {
-        margin: 0 0 10px;
-        font-size: 18px;
-        line-height: 1.3;
-        font-weight: 700;
-        color: var(--text-main);
-    }
-
-    .event-description {
-        margin: 0 0 16px;
-        color: var(--text-muted);
-        font-size: 14px;
-        line-height: 1.6;
-    }
-
-    .event-footer {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        align-items: center;
-        margin-top: 16px;
-    }
-
-    .participant-count {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        color: var(--text-main);
-        font-weight: 600;
-        font-size: 13px;
-    }
-
-    .top-speakers-list {
-        display: grid;
-        gap: 10px;
-    }
-
-    .top-speaker-item {
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        gap: 12px;
-        align-items: center;
-        padding: 14px;
-        border-radius: 16px;
-        border: 1px solid var(--border-color);
-        background: var(--panel-bg);
-        transition: var(--transition);
-        cursor: pointer;
-    }
-
-    .top-speaker-item:hover {
-        transform: translateY(-2px);
-        border-color: rgba(10, 128, 59, 0.22);
-        box-shadow: 0 12px 24px rgba(0,0,0,0.05);
-    }
-
-    .top-speaker-item:active {
-        transform: scale(0.98);
-        backdrop-filter: blur(24px);
-        -webkit-backdrop-filter: blur(24px);
-        background: rgba(0, 0, 0, 0.1);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .avatar-stack {
-        display: flex;
-        align-items: center;
-    }
-
-    .avatar-stack .avatar {
-        width: 44px;
-        height: 44px;
-        border: 2px solid var(--panel-bg);
-        box-shadow: 0 8px 18px rgba(0,0,0,0.08);
-        margin-left: -10px;
-    }
-
-    .avatar-stack .avatar:first-child {
-        margin-left: 0;
-    }
-
-    .speaker-line {
-        min-width: 0;
-    }
-
-    .speaker-name {
-        font-size: 15px;
-        font-weight: 700;
-        color: var(--text-main);
-        margin: 0 0 4px;
-    }
-
-    .speaker-stack {
-        font-size: 13px;
-        color: var(--text-muted);
-        margin: 0;
-    }
-
-    .rating-pill {
-        padding: 8px 12px;
-        border-radius: 999px;
-        background: var(--light-green);
-        border: 1px solid var(--sber-green);
-        color: var(--sber-green);
-        font-weight: 700;
-        font-size: 12px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-    }
-
-    .timeline {
-        position: relative;
-        padding-left: 22px;
-        display: grid;
-        gap: 18px;
-    }
-
-    .timeline::before {
-        content: '';
-        position: absolute;
-        left: 8px;
-        top: 0;
-        bottom: 0;
-        width: 2px;
-        background: linear-gradient(180deg, rgba(10,128,59,0.75), rgba(10,128,59,0.08));
-    }
-
-    .timeline-item {
-        position: relative;
-        padding-left: 8px;
-    }
-
-    .timeline-dot {
-        position: absolute;
-        left: -22px;
-        top: 5px;
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        background: var(--sber-green);
-        border: 3px solid var(--panel-bg);
-        box-shadow: 0 0 0 4px rgba(10,128,59,0.1);
-    }
-
-    .timeline-time {
-        font-size: 12px;
-        color: var(--text-muted);
-        font-weight: 600;
-        margin-bottom: 4px;
-    }
-
-    .timeline-text {
-        font-size: 14px;
+    .home-event-desc {
+        margin: 0; color: var(--text-muted); font-size: 13px;
         line-height: 1.55;
-        color: var(--text-main);
+    }
+    .home-event-footer {
+        display: flex; justify-content: space-between; gap: 10px;
+        align-items: center; font-size: 12px; color: var(--text-muted);
+        margin-top: auto;
+    }
+    .home-event-footer .loc {
+        display: inline-flex; align-items: center; gap: 6px;
+        min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .badge-future { background: var(--status-future-bg); color: var(--status-future-color); border: 1px solid var(--status-future-color); padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .badge-external { background: var(--light-green); color: var(--sber-green-hover); border: 1px solid var(--sber-green); padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+
+    /* ---------- Speakers ---------- */
+    .home-speaker-list { display: flex; flex-direction: column; gap: 10px; }
+    .home-speaker-row {
+        display: grid; grid-template-columns: auto 1fr auto; gap: 12px;
+        align-items: center; padding: 12px 14px; border-radius: 16px;
+        border: 1px solid var(--border-color); background: var(--panel-bg);
+        transition: var(--transition);
+    }
+    .home-speaker-row:hover { transform: translateY(-2px); border-color: rgba(10, 128, 59, 0.22); }
+    .home-speaker-avatar {
+        width: 44px; height: 44px; border-radius: 50%; object-fit: cover;
+        background: var(--border-color);
+    }
+    .home-speaker-meta { min-width: 0; }
+    .home-speaker-name {
+        font-size: 14px; font-weight: 700; color: var(--text-main);
+        margin: 0; display: flex; align-items: center; gap: 6px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .home-speaker-sub {
+        font-size: 12px; color: var(--text-muted); margin: 3px 0 0;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .home-speaker-score { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+    .home-nps-pill {
+        padding: 5px 12px; border-radius: 999px;
+        background: var(--light-green); border: 1px solid var(--sber-green);
+        color: var(--sber-green-hover); font-weight: 700; font-size: 12px;
+        display: inline-flex; align-items: center; gap: 5px;
+    }
+    .home-speaker-score small { font-size: 10px; color: var(--text-muted); }
+    .recommended-flag-inline {
+        display: inline-flex; align-items: center; font-size: 10px;
+        padding: 2px 6px; border-radius: 6px;
+        background: var(--sber-green); color: #fff; font-weight: 700;
     }
 
-    .mini-grid {
-        display: grid;
-        gap: 20px;
+    /* ---------- Timeline / activity ---------- */
+    .home-timeline {
+        position: relative; padding-left: 22px;
+        display: flex; flex-direction: column; gap: 14px;
     }
-
-    .section-subtitle {
-        margin: 0;
-        color: var(--text-muted);
-        font-size: 13px;
+    .home-timeline::before {
+        content: ''; position: absolute; left: 8px; top: 4px; bottom: 4px;
+        width: 2px; background: linear-gradient(180deg, rgba(10,128,59,0.75), rgba(10,128,59,0.08));
     }
-
-    @media (max-width: 1100px) {
-        .kpi-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .dashboard-grid {
-            grid-template-columns: 1fr;
-        }
+    .home-timeline-item { position: relative; padding-left: 8px; }
+    .home-timeline-dot {
+        position: absolute; left: -22px; top: 4px;
+        width: 14px; height: 14px; border-radius: 50%;
+        background: var(--sber-green); border: 3px solid var(--panel-bg);
+        box-shadow: 0 0 0 3px rgba(10,128,59,0.1);
+        display: inline-flex; align-items: center; justify-content: center;
     }
-
-    @media (max-width: 720px) {
-        .kpi-grid,
-        .event-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .top-speaker-item {
-            grid-template-columns: auto 1fr;
-        }
-
-        .rating-pill {
-            grid-column: 1 / -1;
-            justify-self: start;
-        }
+    .home-timeline-time {
+        font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 3px;
     }
+    .home-timeline-title {
+        font-size: 13.5px; line-height: 1.5; color: var(--text-main);
+        font-weight: 600;
+    }
+    .home-timeline-sub {
+        font-size: 12px; color: var(--text-muted); margin-top: 2px;
+    }
+    .home-timeline-type-feedback .home-timeline-dot { background: var(--sber-green); }
+    .home-timeline-type-speaker .home-timeline-dot { background: #3B82F6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12); }
+    .home-timeline-type-event .home-timeline-dot { background: #F59E0B; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12); }
+
+    /* ---------- Empty / skeleton ---------- */
+    .home-empty {
+        text-align: center; padding: 28px 14px;
+        color: var(--text-muted); font-size: 13px;
+        border: 1px dashed var(--border-color); border-radius: 14px;
+        background: rgba(0,0,0,0.02);
+    }
+    [data-theme="dark"] .home-empty { background: rgba(255,255,255,0.02); }
+    .home-empty i { display: block; font-size: 26px; color: var(--sber-green); opacity: 0.7; margin-bottom: 8px; }
+
+    @keyframes homeShimmer {
+        0%   { background-position: -400px 0; }
+        100% { background-position: 400px 0; }
+    }
+    .skeleton {
+        background: linear-gradient(90deg,
+            rgba(0,0,0,0.04) 0%,
+            rgba(0,0,0,0.08) 50%,
+            rgba(0,0,0,0.04) 100%);
+        background-size: 400px 100%;
+        animation: homeShimmer 1.4s infinite linear;
+        border-radius: 8px;
+        color: transparent;
+    }
+    [data-theme="dark"] .skeleton {
+        background: linear-gradient(90deg,
+            rgba(255,255,255,0.04) 0%,
+            rgba(255,255,255,0.08) 50%,
+            rgba(255,255,255,0.04) 100%);
+        background-size: 400px 100%;
+    }
+    .skeleton-row { height: 14px; border-radius: 6px; }
 </style>
 
-<div class="dashboard-shell">
+<div class="home-shell animate-fade" id="home-dashboard"
+     data-poll-interval="{{ home_poll_interval_ms }}">
     <div class="hero-section">
-        <h1 class="hero-title" style="display: flex; align-items: center; justify-content: center; gap: 16px;">
-            <img src="data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='50,5 61,35 95,35 68,55 78,85 50,65 22,85 32,55 5,35 39,35' fill='%230A803B'/%3E%3Cpath d='M20,80 L55,45 L65,55 L90,20' fill='none' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E" alt="Starlift Logo" style="width: 1em; height: 1em;">
+        <h1 class="hero-title">
+            <img class="hero-logo" src="data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='50,5 61,35 95,35 68,55 78,85 50,65 22,85 32,55 5,35 39,35' fill='%230A803B'/%3E%3Cpath d='M20,80 L55,45 L65,55 L90,20' fill='none' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E" alt="Starlift Logo">
             STARLIFT
         </h1>
-        <p class="hero-subtitle">Сводка по базе спикеров, ближайшим событиям и активности команды</p>
-        
+        <p class="hero-subtitle">Оперативный центр по спикерам, ближайшим мероприятиям и активности команды</p>
+
         <div class="prompt-container">
-            <input type="text" class="prompt-input" placeholder="Добавьте свои данные или задайте вопрос..." aria-label="Промпт для ИИ">
-            <button class="voice-btn" aria-label="Голосовой ввод">
+            <input type="text" class="prompt-input" placeholder="Добавьте свои данные или задайте вопрос..." aria-label="Будущий ввод для чата">
+            <button class="voice-btn" type="button" aria-label="Голосовой ввод">
                 <i class="fa-solid fa-microphone"></i>
             </button>
         </div>
-    </div>
 
-    <div class="kpi-grid">
-        <div class="stat-card">
-            <div class="stat-icon"><i class="fa-solid fa-users"></i></div>
-            <div>
-                <div class="stat-label">Всего спикеров</div>
-                <div class="kpi-value">142</div>
-                <div class="kpi-note">+12% за квартал</div>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon"><i class="fa-solid fa-calendar-check"></i></div>
-            <div>
-                <div class="stat-label">Мероприятий за месяц</div>
-                <div class="kpi-value">18</div>
-                <div class="kpi-note">План / факт: 16 / 18</div>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon"><i class="fa-solid fa-user-plus"></i></div>
-            <div>
-                <div class="stat-label">Новых спикеров</div>
-                <div class="kpi-value">18</div>
-                <div class="kpi-note">За последние 30 дней</div>
-            </div>
+        <div class="home-live" id="home-live" data-state="idle" title="Статус подключения к данным" style="margin-top: 16px;">
+            <span class="pulse"></span>
+            <span id="home-live-label">Подключение…</span>
         </div>
     </div>
 
-    <div class="dashboard-grid">
-        <div class="mini-grid">
-            <div class="content-block">
-                <div class="section-header">
-                    <div>
-                        <h2 class="section-title"><i class="fa-regular fa-calendar-days"></i> Ближайшие мероприятия</h2>
-                        <p class="section-subtitle">События на горизонте ближайших недель</p>
-                    </div>
-                    <span class="badge-active">4 события</span>
-                </div>
-                <div class="event-grid">
-                    <article class="event-card">
-                        <div class="event-meta">
-                            <span class="event-date">12 мая · 10:00</span>
-                            <span class="badge-active" style="padding:8px 12px; border-radius:999px;">Планируется</span>
-                        </div>
-                        <h3 class="event-name">SberTech Meetup: Python Edition</h3>
-                        <p class="event-description">Практический воркшоп по Python, Django и архитектуре внутренних сервисов.</p>
-                        <div class="event-footer">
-                            <div class="participant-count"><i class="fa-solid fa-people-group"></i> 150+ участников</div>
-                            <span class="badge-inactive">Офлайн</span>
-                        </div>
-                    </article>
-                    <article class="event-card">
-                        <div class="event-meta">
-                            <span class="event-date">15 мая · 17:30</span>
-                            <span class="badge-active" style="padding:8px 12px; border-radius:999px;">Планируется</span>
-                        </div>
-                        <h3 class="event-name">Frontend Masters: React 19</h3>
-                        <p class="event-description">Сессия про новую модель данных, server actions и современные паттерны UI.</p>
-                        <div class="event-footer">
-                            <div class="participant-count"><i class="fa-solid fa-people-group"></i> 80+ участников</div>
-                            <span class="badge-inactive">Онлайн</span>
-                        </div>
-                    </article>
-                    <article class="event-card">
-                        <div class="event-meta">
-                            <span class="event-date">20 мая · 12:00</span>
-                            <span class="badge-active" style="padding:8px 12px; border-radius:999px;">Планируется</span>
-                        </div>
-                        <h3 class="event-name">AI Journey 2026</h3>
-                        <p class="event-description">Тренды прикладного AI, генеративные модели и кейсы внедрения в бизнес.</p>
-                        <div class="event-footer">
-                            <div class="participant-count"><i class="fa-solid fa-people-group"></i> 300+ участников</div>
-                            <span class="badge-inactive">Смешанный формат</span>
-                        </div>
-                    </article>
-                    <article class="event-card">
-                        <div class="event-meta">
-                            <span class="event-date">28 мая · 14:00</span>
-                            <span class="badge-active" style="padding:8px 12px; border-radius:999px;">Планируется</span>
-                        </div>
-                        <h3 class="event-name">DevOps Day: Platform Engineering</h3>
-                        <p class="event-description">Как ускорить релизы и повысить стабильность с помощью платформенной инженерии.</p>
-                        <div class="event-footer">
-                            <div class="participant-count"><i class="fa-solid fa-people-group"></i> 120+ участников</div>
-                            <span class="badge-inactive">Офлайн</span>
-                        </div>
-                    </article>
-                </div>
-            </div>
+    <div class="home-kpi-grid" id="home-kpi-grid"></div>
 
-            <div class="content-block animate-fade" style="animation-delay: 0.24s;">
-                <div class="section-header">
+    <div class="home-grid">
+        <div class="home-col">
+            <section class="home-panel" aria-live="polite">
+                <div class="home-panel-header">
                     <div>
-                        <h2 class="section-title"><i class="fa-solid fa-clock-rotate-left"></i> Лента активности</h2>
-                        <p class="section-subtitle">Последние действия администраторов и события</p>
+                        <h2 class="home-panel-title"><i class="fa-regular fa-calendar-days"></i> Ближайшие мероприятия</h2>
+                        <p class="home-panel-sub">События на горизонте, отсортированы по дате</p>
                     </div>
+                    <span class="home-panel-tag" id="home-upcoming-tag">—</span>
                 </div>
-                <div class="timeline">
-                    <div class="timeline-item">
-                        <span class="timeline-dot"></span>
-                        <div class="timeline-time">Сегодня · 10:45</div>
-                        <div class="timeline-text">Иван добавил новый стек <b>Vue.js</b> в справочник.</div>
+                <div id="home-upcoming" class="home-event-grid"></div>
+            </section>
+
+            <section class="home-panel" aria-live="polite">
+                <div class="home-panel-header">
+                    <div>
+                        <h2 class="home-panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Лента активности</h2>
+                        <p class="home-panel-sub">Отзывы, новые спикеры и мероприятия за последние 60 дней</p>
                     </div>
-                    <div class="timeline-item">
-                        <span class="timeline-dot"></span>
-                        <div class="timeline-time">Сегодня · 09:15</div>
-                        <div class="timeline-text">Прошло мероприятие <b>Backend Meetup</b> — загружены оценки и отзывы.</div>
-                    </div>
-                    <div class="timeline-item">
-                        <span class="timeline-dot"></span>
-                        <div class="timeline-time">Вчера · 18:30</div>
-                        <div class="timeline-text">Анна Каренина утверждена как спикер на <b>AI Journey</b>.</div>
-                    </div>
-                    <div class="timeline-item">
-                        <span class="timeline-dot"></span>
-                        <div class="timeline-time">18 апр · 09:00</div>
-                        <div class="timeline-text">Обновлены данные профиля пользователя <b>Алексей Иванов</b>.</div>
-                    </div>
+                    <span class="home-panel-tag" id="home-activity-tag">—</span>
                 </div>
-            </div>
+                <div id="home-activity" class="home-timeline"></div>
+            </section>
         </div>
 
-        <div class="mini-grid">
-            <div class="content-block animate-fade" style="animation-delay: 0.18s;">
-                <div class="section-header">
+        <div class="home-col">
+            <section class="home-panel" aria-live="polite">
+                <div class="home-panel-header">
                     <div>
-                        <h2 class="section-title"><i class="fa-solid fa-medal"></i> Топ спикеров</h2>
-                        <p class="section-subtitle">Спикеры с самым высоким NPS</p>
+                        <h2 class="home-panel-title"><i class="fa-solid fa-medal"></i> Топ спикеров</h2>
+                        <p class="home-panel-sub">Сортировка: средний балл → количество отзывов</p>
                     </div>
+                    <span class="home-panel-tag" id="home-top-tag">—</span>
                 </div>
-                <div class="top-speakers-list">
-                    <div class="top-speaker-item">
-                        <div class="avatar-stack">
-                            <img class="avatar" src="https://i.pravatar.cc/150?img=12" alt="Алексей Иванов">
-                        </div>
-                        <div class="speaker-line">
-                            <div class="speaker-name">Алексей Иванов</div>
-                            <div class="speaker-stack">Python, Django, Architecture</div>
-                        </div>
-                        <div class="rating-pill"><i class="fa-solid fa-star"></i> 9.8</div>
-                    </div>
-                    <div class="top-speaker-item">
-                        <div class="avatar-stack">
-                            <img class="avatar" src="https://i.pravatar.cc/150?img=32" alt="Елена Смирнова">
-                        </div>
-                        <div class="speaker-line">
-                            <div class="speaker-name">Елена Смирнова</div>
-                            <div class="speaker-stack">Frontend, React, UX</div>
-                        </div>
-                        <div class="rating-pill"><i class="fa-solid fa-star"></i> 9.7</div>
-                    </div>
-                    <div class="top-speaker-item">
-                        <div class="avatar-stack">
-                            <img class="avatar" src="https://i.pravatar.cc/150?img=14" alt="Дмитрий Петров">
-                        </div>
-                        <div class="speaker-line">
-                            <div class="speaker-name">Дмитрий Петров</div>
-                            <div class="speaker-stack">DevOps, Kubernetes, CI/CD</div>
-                        </div>
-                        <div class="rating-pill"><i class="fa-solid fa-star"></i> 9.6</div>
-                    </div>
-                    <div class="top-speaker-item">
-                        <div class="avatar-stack">
-                            <img class="avatar" src="https://i.pravatar.cc/150?img=45" alt="Мария Ковалева">
-                        </div>
-                        <div class="speaker-line">
-                            <div class="speaker-name">Мария Ковалева</div>
-                            <div class="speaker-stack">Data, ML, Analytics</div>
-                        </div>
-                        <div class="rating-pill"><i class="fa-solid fa-star"></i> 9.5</div>
-                    </div>
-                </div>
-            </div>
+                <div id="home-top-speakers" class="home-speaker-list"></div>
+            </section>
         </div>
     </div>
 </div>
 
+<script>
+/*
+ * Home dashboard controller.
+ *
+ * Real-time strategy: simple polling against a dedicated lightweight JSON
+ * endpoint (`/api/home/`). See PR description for rationale. Each response
+ * carries a short `version` hash, and the DOM is only re-rendered when it
+ * changes — this keeps the refresh flicker-free and avoids wasted work.
+ *
+ * The controller is idempotent: it aborts any prior in-flight request and
+ * tears down any previous interval so SPA navigation (base.html) back to
+ * the home page doesn't accumulate pollers.
+ */
+(function initHomeDashboard() {
+    const root = document.getElementById('home-dashboard');
+    if (!root) return;
+
+    // --- Teardown previous instance (SPA re-entry safe) ---
+    if (window.__starliftHomeCtl) {
+        try {
+            window.__starliftHomeCtl.stop();
+        } catch (_) { /* noop */ }
+    }
+
+    const POLL_INTERVAL = Number(root.dataset.pollInterval) || 15000;
+    const DEFAULT_PERIOD = '30';
+
+    const state = {
+        version: null,
+        lastFilters: null,
+        filters: { period: DEFAULT_PERIOD, city: '', topic: '', nps_threshold: '' },
+        timer: null,
+        controller: null,
+        rendered: false,
+        errorStreak: 0,
+    };
+
+    const els = {
+        kpi: document.getElementById('home-kpi-grid'),
+        upcoming: document.getElementById('home-upcoming'),
+        upcomingTag: document.getElementById('home-upcoming-tag'),
+        top: document.getElementById('home-top-speakers'),
+        topTag: document.getElementById('home-top-tag'),
+        activity: document.getElementById('home-activity'),
+        activityTag: document.getElementById('home-activity-tag'),
+        live: document.getElementById('home-live'),
+        liveLabel: document.getElementById('home-live-label'),
+    };
+
+    // ---------- Helpers ----------
+    function escapeHtml(s) {
+        if (s == null) return '';
+        return String(s)
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    function plural(n, forms) {
+        // forms: [one, few, many] — e.g. ['спикер','спикера','спикеров']
+        const a = Math.abs(n) % 100;
+        const b = a % 10;
+        if (a > 10 && a < 20) return forms[2];
+        if (b > 1 && b < 5) return forms[1];
+        if (b === 1) return forms[0];
+        return forms[2];
+    }
+
+    function fmtCount(n) {
+        if (n == null || isNaN(n)) return '0';
+        return new Intl.NumberFormat('ru-RU').format(n);
+    }
+
+    function fmtRelTime(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return '—';
+        const now = new Date();
+        const diffSec = Math.round((now - d) / 1000);
+        if (diffSec < 60) return 'только что';
+        if (diffSec < 3600) {
+            const m = Math.round(diffSec / 60);
+            return `${m} ${plural(m, ['минута', 'минуты', 'минут'])} назад`;
+        }
+        const sameDay = d.toDateString() === now.toDateString();
+        if (sameDay) {
+            return `сегодня · ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+        }
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        if (d.toDateString() === yesterday.toDateString()) {
+            return `вчера · ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+        }
+        return d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' })
+            + ' · ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function fmtEventDate(iso, fallback) {
+        if (!iso) return fallback || 'Дата уточняется';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return fallback || iso;
+        return d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
+    }
+
+    // ---------- Rendering ----------
+    function renderKpis(k, filters) {
+        const windowDays = k.window_days || Number(filters.period) || 30;
+        const cards = [
+            {
+                icon: 'fa-users', label: 'Всего спикеров',
+                value: fmtCount(k.total_speakers),
+                hint: 'В базе StarLift',
+            },
+            {
+                icon: 'fa-bolt', label: 'Активных спикеров',
+                value: fmtCount(k.active_speakers),
+                hint: `С отзывами за последние ${windowDays} дн.`,
+                accent: true,
+            },
+            {
+                icon: 'fa-user-plus', label: 'Новые спикеры',
+                value: fmtCount(k.new_speakers),
+                hint: 'За последние 30 дней',
+            },
+        ];
+        els.kpi.innerHTML = cards.map(c => `
+            <div class="home-kpi-card ${c.accent ? 'accent' : ''}">
+                <div class="home-kpi-top">
+                    <span class="home-kpi-label">${escapeHtml(c.label)}</span>
+                    <span class="home-kpi-icon"><i class="fa-solid ${c.icon}"></i></span>
+                </div>
+                <div class="home-kpi-value">${escapeHtml(String(c.value))}</div>
+                <div class="home-kpi-hint">${escapeHtml(c.hint || '')}</div>
+            </div>
+        `).join('');
+    }
+
+    function renderUpcoming(events) {
+        if (!events || !events.length) {
+            els.upcoming.innerHTML = `
+                <div class="home-empty" style="grid-column: 1 / -1;">
+                    <i class="fa-regular fa-calendar"></i>
+                    Ближайших событий не найдено.
+                    <div style="margin-top:4px; font-size:12px;">Создайте новое мероприятие — оно появится здесь автоматически.</div>
+                </div>`;
+            els.upcomingTag.textContent = '0 событий';
+            return;
+        }
+        els.upcoming.innerHTML = events.map(ev => {
+            const title = escapeHtml(ev.title || 'Без названия');
+            const dateLabel = escapeHtml(fmtEventDate(ev.date_iso, ev.date_label));
+            const desc = ev.description
+                ? `<p class="home-event-desc">${escapeHtml(ev.description)}</p>`
+                : '';
+            const location = ev.location
+                ? `<span class="loc"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(ev.location)}</span>`
+                : '<span class="loc"><i class="fa-solid fa-globe"></i> Онлайн / место уточняется</span>';
+            const externalBadge = ev.is_external
+                ? '<span class="badge-external"><i class="fa-solid fa-arrow-up-right-from-square"></i> Внешнее</span>'
+                : '';
+            const speakers = ev.speakers_count
+                ? `<span><i class="fa-solid fa-people-group"></i> ${fmtCount(ev.speakers_count)}</span>`
+                : '';
+            return `
+                <article class="home-event-card">
+                    <div class="home-event-meta">
+                        <span class="home-event-date"><i class="fa-regular fa-clock"></i> ${dateLabel}</span>
+                        <span class="badge-future">Планируется</span>
+                    </div>
+                    <h3 class="home-event-name">${title}</h3>
+                    ${desc}
+                    <div class="home-event-footer">
+                        ${location}
+                        <span style="display:inline-flex; gap:10px; align-items:center;">
+                            ${speakers}
+                            ${externalBadge}
+                        </span>
+                    </div>
+                </article>`;
+        }).join('');
+        els.upcomingTag.textContent = `${events.length} ${plural(events.length, ['событие', 'события', 'событий'])}`;
+    }
+
+    function renderTopSpeakers(speakers) {
+        if (!speakers || !speakers.length) {
+            els.top.innerHTML = `
+                <div class="home-empty">
+                    <i class="fa-solid fa-user-group"></i>
+                    Для выбранных фильтров пока нет спикеров с отзывами.
+                </div>`;
+            els.topTag.textContent = '0';
+            return;
+        }
+        els.top.innerHTML = speakers.map((sp, idx) => {
+            const avatar = sp.avatar
+                ? `<img class="home-speaker-avatar" src="${escapeHtml(sp.avatar)}" alt="${escapeHtml(sp.name)}" loading="lazy">`
+                : `<div class="home-speaker-avatar" aria-hidden="true"></div>`;
+            const avg = sp.avg_score != null ? Number(sp.avg_score).toFixed(1) : '—';
+            const recommended = sp.recommended
+                ? '<span class="recommended-flag-inline" title="DevRel рекомендует">★</span>'
+                : '';
+            const subParts = [sp.stack, sp.city].filter(Boolean).map(escapeHtml).join(' · ');
+            return `
+                <div class="home-speaker-row">
+                    ${avatar}
+                    <div class="home-speaker-meta">
+                        <div class="home-speaker-name">
+                            <span style="opacity:0.45; margin-right:4px;">${idx + 1}.</span>
+                            ${escapeHtml(sp.name)}
+                            ${recommended}
+                        </div>
+                        <div class="home-speaker-sub">${subParts || '—'}</div>
+                    </div>
+                    <div class="home-speaker-score">
+                        <span class="home-nps-pill"><i class="fa-solid fa-star"></i> ${escapeHtml(avg)}</span>
+                        <small>${fmtCount(sp.feedbacks_count)} ${plural(sp.feedbacks_count, ['отзыв','отзыва','отзывов'])} · ${fmtCount(sp.events_count)} ${plural(sp.events_count, ['событие','события','событий'])}</small>
+                    </div>
+                </div>`;
+        }).join('');
+        els.topTag.textContent = `TOP ${speakers.length}`;
+    }
+
+    function renderActivity(items) {
+        if (!items || !items.length) {
+            els.activity.innerHTML = `
+                <div class="home-empty">
+                    <i class="fa-solid fa-seedling"></i>
+                    Пока нет событий в ленте. Добавьте отзыв, спикера или мероприятие — они появятся здесь.
+                </div>`;
+            els.activity.classList.remove('home-timeline');
+            els.activityTag.textContent = '0';
+            return;
+        }
+        els.activity.classList.add('home-timeline');
+        els.activity.innerHTML = items.map(it => `
+            <div class="home-timeline-item home-timeline-type-${escapeHtml(it.type)}">
+                <span class="home-timeline-dot"></span>
+                <div class="home-timeline-time">${escapeHtml(fmtRelTime(it.timestamp))}</div>
+                <div class="home-timeline-title">
+                    <i class="fa-solid ${escapeHtml(it.icon)}" style="margin-right:6px; color: var(--sber-green);"></i>
+                    ${escapeHtml(it.title)}
+                </div>
+                ${it.subtitle ? `<div class="home-timeline-sub">${escapeHtml(it.subtitle)}</div>` : ''}
+            </div>`).join('');
+        els.activityTag.textContent = `${items.length} ${plural(items.length, ['событие', 'события', 'событий'])}`;
+    }
+
+    function renderSkeleton() {
+        els.kpi.innerHTML = Array.from({ length: 3 }).map(() => `
+            <div class="home-kpi-card">
+                <div class="home-kpi-top">
+                    <span class="skeleton skeleton-row" style="width:60%; height:10px;">.</span>
+                    <span class="home-kpi-icon"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+                </div>
+                <div class="skeleton" style="height:24px; width:50%;">.</div>
+                <div class="skeleton skeleton-row" style="width:70%;">.</div>
+            </div>`).join('');
+        els.upcoming.innerHTML = Array.from({ length: 4 }).map(() => `
+            <div class="home-event-card">
+                <div class="skeleton skeleton-row" style="width:40%;">.</div>
+                <div class="skeleton" style="height:20px; width:90%;">.</div>
+                <div class="skeleton skeleton-row" style="width:80%;">.</div>
+                <div class="skeleton skeleton-row" style="width:55%;">.</div>
+            </div>`).join('');
+        els.top.innerHTML = Array.from({ length: 4 }).map(() => `
+            <div class="home-speaker-row">
+                <div class="skeleton" style="width:44px; height:44px; border-radius:50%;">.</div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <div class="skeleton skeleton-row" style="width:60%;">.</div>
+                    <div class="skeleton skeleton-row" style="width:40%; height:10px;">.</div>
+                </div>
+                <div class="skeleton" style="width:60px; height:26px; border-radius:999px;">.</div>
+            </div>`).join('');
+        els.activity.classList.remove('home-timeline');
+        els.activity.innerHTML = Array.from({ length: 5 }).map(() => `
+            <div style="padding:6px 0;">
+                <div class="skeleton skeleton-row" style="width:25%; height:10px; margin-bottom:6px;">.</div>
+                <div class="skeleton skeleton-row" style="width:80%;">.</div>
+            </div>`).join('');
+    }
+
+    function applyData(data) {
+        renderKpis(data.kpis || {}, state.filters);
+        renderUpcoming(data.upcoming_events || []);
+        renderTopSpeakers(data.top_speakers || []);
+        renderActivity(data.activity || []);
+        state.rendered = true;
+    }
+
+    function setLive(status) {
+        if (!els.live || !els.liveLabel) return;
+        els.live.dataset.state = status;
+        const labels = {
+            idle: 'Подключение…',
+            ok: 'Live · обновлено ' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            error: 'Не удалось обновить — повтор через ' + Math.round(POLL_INTERVAL / 1000) + ' сек',
+            loading: 'Обновление…',
+        };
+        els.liveLabel.textContent = labels[status] || labels.idle;
+    }
+
+    // ---------- Networking ----------
+    async function fetchData() {
+        const params = new URLSearchParams();
+        Object.entries(state.filters).forEach(([k, v]) => {
+            if (v !== '' && v != null) params.set(k, v);
+        });
+        if (!params.has('period')) params.set('period', DEFAULT_PERIOD);
+
+        if (state.controller) state.controller.abort();
+        state.controller = new AbortController();
+
+        setLive(state.rendered ? 'loading' : 'idle');
+
+        try {
+            const resp = await fetch('/api/home/?' + params.toString(), {
+                signal: state.controller.signal,
+                headers: { 'Accept': 'application/json' },
+            });
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const data = await resp.json();
+
+            state.errorStreak = 0;
+
+            // If filters were changed mid-flight, force a re-render
+            const currentKey = JSON.stringify(state.filters);
+            const filtersChanged = currentKey !== state.lastFilters;
+            state.lastFilters = currentKey;
+
+            if (!filtersChanged && state.version === data.version && state.rendered) {
+                setLive('ok');
+                return;
+            }
+            state.version = data.version;
+            applyData(data);
+            setLive('ok');
+        } catch (err) {
+            if (err && err.name === 'AbortError') return;
+            state.errorStreak += 1;
+            console.error('[home] fetch failed:', err);
+            if (!state.rendered) {
+                els.kpi.innerHTML = `<div class="home-empty" style="grid-column:1 / -1;">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    Не удалось загрузить данные. Попытка через ${Math.round(POLL_INTERVAL / 1000)} сек…
+                </div>`;
+            }
+            setLive('error');
+        }
+    }
+
+    // ---------- Lifecycle ----------
+    function start() {
+        renderSkeleton();
+        fetchData();
+
+        state.timer = setInterval(() => {
+            // Self-heal: if the user navigated away via SPA, dismantle ourselves.
+            if (!document.body.contains(root)) {
+                stop();
+                return;
+            }
+            // Pause polling when the tab is hidden to save traffic.
+            if (document.hidden) return;
+            fetchData();
+        }, POLL_INTERVAL);
+
+        document.addEventListener('visibilitychange', onVisibility);
+    }
+
+    function onVisibility() {
+        if (!document.hidden) fetchData();
+    }
+
+    function stop() {
+        if (state.timer) clearInterval(state.timer);
+        state.timer = null;
+        if (state.controller) state.controller.abort();
+        document.removeEventListener('visibilitychange', onVisibility);
+    }
+
+    window.__starliftHomeCtl = { stop };
+
+    start();
+})();
+</script>
 {% endblock %}

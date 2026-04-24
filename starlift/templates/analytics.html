@@ -1,278 +1,889 @@
 {% extends 'base.html' %}
 {% block content %}
 <style>
-    .analytics-page {
-        display: grid;
-        gap: 20px;
-        padding: 20px;
-    }
+    .dash { display: flex; flex-direction: column; gap: 24px; }
 
-    .analytics-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-    }
+    .dash-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+    .dash-title { margin: 0; font-size: 28px; font-weight: 800; color: var(--text-main); letter-spacing: -0.01em; }
+    .dash-subtitle { margin: 6px 0 0; font-size: 14px; color: var(--text-muted); max-width: 720px; line-height: 1.5; }
 
-    .analytics-title {
-        font-size: 32px;
-        font-weight: 800;
-        color: var(--text-main);
-        margin: 0;
+    .dash-window-pill {
+        display: inline-flex; align-items: center; gap: 8px;
+        font-size: 12px; font-weight: 600; color: var(--text-muted);
+        padding: 8px 14px; border-radius: 999px;
+        background: var(--glass-bg); border: 1px solid var(--glass-border);
+        backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
     }
+    .dash-window-pill i { color: var(--sber-green); }
 
-    .analytics-kpis {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 20px;
-    }
-
-    .metric-card {
+    /* ---------- Filter panel ---------- */
+    .filter-panel {
         background: var(--glass-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
         padding: 20px;
-        text-align: center;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
         backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+    .filter-panel h3 {
+        margin: 0 0 14px 0; font-size: 13px; font-weight: 700;
+        color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .filter-row { display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 14px; align-items: end; }
+    .filter-row .filter-cell { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .filter-row label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .filter-row .input-compact, .filter-row .select-compact { width: 100%; }
+
+    .period-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--white); border: 1px solid var(--border-color); }
+    .period-tabs .tab {
+        border: none; background: transparent; cursor: pointer;
+        padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+        color: var(--text-muted); transition: var(--transition);
+    }
+    .period-tabs .tab:hover { color: var(--text-main); }
+    .period-tabs .tab.active { background: var(--sber-green); color: #fff; }
+
+    .filter-actions { display: flex; gap: 10px; }
+    .btn-primary, .btn-ghost {
+        padding: 10px 18px; border-radius: 12px; font-size: 13px; font-weight: 600;
+        cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: var(--transition);
+        border: 1px solid transparent;
+    }
+    .btn-primary { background: var(--sber-green); color: #fff; border-color: var(--sber-green); }
+    .btn-primary:hover { background: var(--sber-green-hover); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(10,128,59,0.25); }
+    .btn-ghost { background: transparent; color: var(--text-main); border-color: var(--border-color); text-decoration: none; }
+    .btn-ghost:hover { border-color: var(--sber-green); color: var(--sber-green); }
+
+    .quick-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .chip {
+        padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+        border: 1px solid var(--border-color); background: var(--white); color: var(--text-main);
+        cursor: pointer; transition: var(--transition);
+    }
+    .chip:hover { border-color: var(--sber-green); color: var(--sber-green); }
+    .chip.active { background: var(--light-green); border-color: var(--sber-green); color: var(--sber-green-hover); }
+
+    @media (max-width: 1100px) { .filter-row { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 640px) { .filter-row { grid-template-columns: 1fr; } }
+
+    /* ---------- KPI cards ---------- */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    @media (max-width: 1200px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 520px) { .kpi-grid { grid-template-columns: 1fr; } }
+
+    .kpi-card {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
+        padding: 18px 20px;
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        display: flex; flex-direction: column; gap: 8px;
+        transition: var(--transition);
+        min-width: 0;
+    }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
+    .kpi-card .kpi-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .kpi-card .kpi-value { font-size: 28px; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
+    .kpi-card .kpi-hint { font-size: 12px; color: var(--text-muted); }
+    .kpi-card.accent .kpi-value { color: var(--sber-green); }
+    .kpi-card .kpi-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .kpi-card .kpi-icon {
+        width: 36px; height: 36px; border-radius: 12px;
+        background: var(--light-green); color: var(--sber-green);
+        display: inline-flex; align-items: center; justify-content: center; font-size: 16px;
     }
 
-    .metric-label {
-        font-size: 14px;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 10px;
-    }
-
-    .metric-value {
-        font-size: 36px;
-        font-weight: 800;
-        color: var(--sber-green);
-    }
-
-    .analytics-grid {
-        display: grid;
-        grid-template-columns: 2fr 1fr;
-        gap: 20px;
-    }
-    
+    /* ---------- Section panel ---------- */
+    .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    .grid-3-2 { display: grid; grid-template-columns: 3fr 2fr; gap: 20px; }
+    .grid-halves { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     @media (max-width: 1024px) {
-        .analytics-grid {
-            grid-template-columns: 1fr;
-        }
+        .grid-2, .grid-3-2, .grid-halves { grid-template-columns: 1fr; }
     }
 
-    .panel {
+    .panel-v2 {
         background: var(--glass-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
         padding: 20px;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        display: flex;
-        flex-direction: column;
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        display: flex; flex-direction: column; gap: 16px;
+        min-width: 0;
+    }
+    .panel-v2 header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .panel-v2 .panel-heading { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .panel-v2 .panel-title-v2 { font-size: 16px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+    .panel-v2 .panel-title-v2 i { color: var(--sber-green); }
+    .panel-v2 .panel-sub { font-size: 12px; color: var(--text-muted); }
+    .panel-v2 .panel-tag {
+        font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+        background: var(--light-green); color: var(--sber-green-hover);
+        border: 1px solid var(--sber-green);
+        white-space: nowrap;
     }
 
-    .panel-title {
-        font-size: 18px;
-        font-weight: 700;
-        margin-bottom: 15px;
-        color: var(--text-main);
+    .empty-state {
+        text-align: center; padding: 28px 14px;
+        color: var(--text-muted); font-size: 14px;
+        border: 1px dashed var(--border-color); border-radius: 14px;
+        background: rgba(0,0,0,0.02);
+    }
+    [data-theme="dark"] .empty-state { background: rgba(255,255,255,0.02); }
+    .empty-state i { display: block; font-size: 28px; color: var(--sber-green); opacity: 0.7; margin-bottom: 8px; }
+
+    /* ---------- Tables ---------- */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th {
+        text-align: left; padding: 10px 12px;
+        font-size: 11px; font-weight: 700; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: 0.06em;
         border-bottom: 1px solid var(--border-color);
-        padding-bottom: 10px;
+        background: transparent;
+        cursor: default;
+    }
+    .data-table td { padding: 12px; border-bottom: 1px solid var(--border-color); vertical-align: middle; color: var(--text-main); }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr { cursor: default; }
+    .data-table tr:hover td { background: var(--tr-hover); }
+
+    .speaker-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .speaker-cell img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: var(--border-color); flex-shrink: 0; }
+    .speaker-cell .speaker-meta { display: flex; flex-direction: column; min-width: 0; }
+    .speaker-cell .speaker-name { font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .speaker-cell .speaker-sub { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .score-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 48px; padding: 4px 10px; border-radius: 999px; font-weight: 700; font-size: 12px; }
+    .score-pill.good { background: var(--light-green); color: var(--sber-green-hover); }
+    .score-pill.meh { background: #FFF3CF; color: #A67A00; }
+    .score-pill.bad { background: #FFD8D8; color: #B53030; }
+    [data-theme="dark"] .score-pill.meh { background: rgba(255, 230, 120, 0.15); color: #F1C84B; }
+    [data-theme="dark"] .score-pill.bad { background: rgba(235, 87, 87, 0.15); color: #EB5757; }
+
+    .nps-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .nps-chip.up { background: var(--light-green); color: var(--sber-green-hover); }
+    .nps-chip.flat { background: var(--status-past-bg); color: var(--status-past-color); }
+    .nps-chip.down { background: #FFD8D8; color: #B53030; }
+    [data-theme="dark"] .nps-chip.down { background: rgba(235, 87, 87, 0.15); color: #EB5757; }
+
+    .recommended-flag {
+        display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700;
+        padding: 3px 8px; border-radius: 6px;
+        background: var(--sber-green); color: #fff;
     }
 
-    .top-speakers-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
+    /* ---------- Charts ---------- */
+    .chart-box { position: relative; width: 100%; height: 260px; }
+    .chart-box.tall { height: 320px; }
+    .chart-box.short { height: 200px; }
 
-    .top-speakers-table th, .top-speakers-table td {
-        padding: 12px 15px;
-        text-align: left;
-        border-bottom: 1px solid var(--border-color);
+    /* ---------- Candidate cards ---------- */
+    .candidates-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .candidate-card {
+        border: 1px solid var(--glass-border); border-radius: 16px; padding: 16px;
+        background: linear-gradient(135deg, rgba(221, 240, 228, 0.35), rgba(255,255,255,0.15));
+        display: flex; flex-direction: column; gap: 12px;
+        transition: var(--transition);
     }
-
-    .top-speakers-table th {
-        background: var(--th-bg);
-        font-weight: 600;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        font-size: 12px;
-        border-top-left-radius: 8px;
-        border-top-right-radius: 8px;
+    [data-theme="dark"] .candidate-card { background: linear-gradient(135deg, rgba(21, 46, 32, 0.4), rgba(30, 30, 30, 0.35)); }
+    .candidate-card:hover { transform: translateY(-2px); border-color: var(--sber-green); }
+    .candidate-card .head { display: flex; gap: 12px; align-items: center; }
+    .candidate-card .head img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; background: var(--border-color); }
+    .candidate-card .head .nm { font-weight: 700; color: var(--text-main); }
+    .candidate-card .head .sb { font-size: 12px; color: var(--text-muted); }
+    .candidate-card .stats-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .candidate-card .stat-pill {
+        background: var(--white); border: 1px solid var(--border-color);
+        padding: 5px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; color: var(--text-main);
     }
+    .candidate-card .stat-pill strong { color: var(--sber-green); margin-right: 4px; }
+    .candidate-card .reason { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
 
-    .top-speakers-table tr:hover {
-        background: var(--tr-hover);
+    /* ---------- City bars ---------- */
+    .city-list { display: flex; flex-direction: column; gap: 10px; }
+    .city-row { display: grid; grid-template-columns: 150px 1fr 70px; align-items: center; gap: 12px; }
+    .city-row .city-name { font-size: 13px; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .city-row .city-bar { position: relative; height: 10px; border-radius: 999px; background: var(--border-color); overflow: hidden; }
+    .city-row .city-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--sber-green), var(--sber-green-hover)); border-radius: 999px; }
+    .city-row .city-count { text-align: right; font-size: 12px; color: var(--text-muted); font-weight: 600; }
+    @media (max-width: 640px) { .city-row { grid-template-columns: 100px 1fr 54px; gap: 8px; } }
+
+    /* ---------- Blind zones ---------- */
+    .zones-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 720px) { .zones-grid { grid-template-columns: 1fr; } }
+    .zones-sub { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+    .zone-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .zone-chips .zchip { padding: 6px 10px; border-radius: 10px; font-size: 12px; border: 1px solid var(--border-color); background: var(--white); color: var(--text-main); }
+    .zone-chips .zchip.alert { border-color: #EB5757; color: #B53030; background: rgba(235, 87, 87, 0.08); }
+    [data-theme="dark"] .zone-chips .zchip.alert { color: #EB5757; background: rgba(235, 87, 87, 0.15); }
+
+    /* ---------- Media library ---------- */
+    .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+    .media-card {
+        position: relative; aspect-ratio: 3/4; border-radius: 16px; overflow: hidden;
+        border: 1px solid var(--glass-border);
+        background: var(--glass-bg);
+        display: flex; align-items: flex-end;
+        transition: var(--transition);
     }
-
-    .speaker-link {
-        color: var(--text-main);
-        text-decoration: none;
-        font-weight: 600;
+    .media-card:hover { transform: translateY(-2px); border-color: var(--sber-green); }
+    .media-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .media-card .meta {
+        position: relative; z-index: 2; width: 100%; padding: 12px;
+        background: linear-gradient(0deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.0) 100%);
+        color: #fff;
     }
-
-    .speaker-link:hover {
-        color: var(--sber-green);
+    .media-card .meta .mname { font-size: 13px; font-weight: 700; }
+    .media-card .meta .mcity { font-size: 11px; opacity: 0.8; }
+    .media-card .media-flag {
+        position: absolute; top: 8px; right: 8px; z-index: 3;
+        font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+        background: rgba(0,0,0,0.5); color: #fff;
     }
-
-    .score-badge {
-        display: inline-block;
-        padding: 4px 8px;
-        border-radius: 6px;
+    .media-card.no-photo { aspect-ratio: auto; padding: 16px; background: var(--glass-bg); }
+    .media-card.no-photo .placeholder {
+        width: 100%; height: 110px; border-radius: 12px;
         background: var(--light-green);
-        color: var(--sber-green-hover);
-        font-weight: 700;
-        font-size: 14px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--sber-green); font-size: 32px; margin-bottom: 10px;
     }
+    .media-card.no-photo .mname-plain { color: var(--text-main); font-weight: 700; font-size: 13px; }
+    .media-card.no-photo .mcity-plain { color: var(--text-muted); font-size: 11px; }
 
-    .chart-container {
-        position: relative;
-        flex-grow: 1;
-        min-height: 250px;
-        width: 100%;
+    /* ---------- External source chips ---------- */
+    .source-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .source-chips .schip {
+        padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-color);
+        background: var(--white); font-size: 12px; color: var(--text-main); font-weight: 600;
     }
+    .source-chips .schip strong { color: var(--sber-green); margin-right: 4px; }
+
+    /* ---------- Rules card ---------- */
+    .rules-card {
+        display: flex; flex-direction: column; gap: 8px;
+        background: rgba(10, 128, 59, 0.08);
+        border: 1px solid rgba(10, 128, 59, 0.2);
+        border-radius: 14px; padding: 14px 16px;
+        font-size: 12px; color: var(--text-main);
+    }
+    [data-theme="dark"] .rules-card { background: rgba(33, 160, 56, 0.12); }
+    .rules-card .rule-title { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .rules-card ul { margin: 0; padding-left: 18px; }
+    .rules-card li { margin: 2px 0; line-height: 1.5; }
 </style>
 
-<div class="analytics-page animate-fade">
-    <div class="analytics-header">
-        <h1 class="analytics-title">Общая аналитика</h1>
+<div class="dash animate-fade" data-analytics-dashboard>
+    <!-- Заголовок + текущее окно -->
+    <div class="dash-header">
+        <div>
+            <h1 class="dash-title">Аналитика спикеров</h1>
+            <p class="dash-subtitle">
+                Единое окно для HR-бренда и DevRel: карта активности, рейтинг, кандидаты на выдвижение,
+                внешний след, слепые зоны и тематический профиль.
+            </p>
+        </div>
+        <div class="dash-window-pill">
+            <i class="fa-regular fa-calendar-days"></i>
+            Окно данных: {{ filters.start_date }} — {{ filters.end_date }}
+        </div>
     </div>
 
-    <!-- Общие KPI -->
-    <div class="analytics-kpis">
-        <div class="metric-card">
-            <div class="metric-label">Всего отзывов</div>
-            <div class="metric-value">{{ total_feedbacks }}</div>
+    <!-- ===== Фильтры ===== -->
+    <form method="get" class="filter-panel" id="analyticsFilters" action="{% url 'analytics' %}">
+        <h3><i class="fa-solid fa-sliders" style="color: var(--sber-green);"></i> Фильтры</h3>
+
+        <input type="hidden" name="period" id="periodHidden" value="{{ filters.period }}">
+
+        <!-- Period tabs -->
+        <div class="period-tabs" role="tablist" style="margin-bottom: 14px;">
+            <button type="button" class="tab" data-period="30">30 дн.</button>
+            <button type="button" class="tab" data-period="90">90 дн.</button>
+            <button type="button" class="tab" data-period="180">180 дн.</button>
+            <button type="button" class="tab" data-period="custom">Свой диапазон</button>
         </div>
-        <div class="metric-card">
-            <div class="metric-label">Средний балл</div>
-            <div class="metric-value">{{ average_score|floatformat:2 }}</div>
+
+        <div class="filter-row">
+            <div class="filter-cell" data-custom-range style="display: none;">
+                <label for="dateFrom">Начало</label>
+                <input type="date" class="input-compact" id="dateFrom" name="date_from" value="{{ filters.date_from }}">
+            </div>
+            <div class="filter-cell" data-custom-range style="display: none;">
+                <label for="dateTo">Окончание</label>
+                <input type="date" class="input-compact" id="dateTo" name="date_to" value="{{ filters.date_to }}">
+            </div>
+            <div class="filter-cell">
+                <label for="filterCity">Город/регион</label>
+                <select class="select-compact" name="city" id="filterCity">
+                    <option value="">Все города</option>
+                    {% for c in cities_list %}
+                    <option value="{{ c }}" {% if filters.city == c %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-cell">
+                <label for="filterTopic">Тема/стек</label>
+                <select class="select-compact" name="topic" id="filterTopic">
+                    <option value="">Все темы</option>
+                    {% for t in topics_list %}
+                    <option value="{{ t }}" {% if filters.topic == t %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-cell">
+                <label for="filterNps">NPS / средний балл ≥</label>
+                <input type="number" step="0.1" min="0" max="10" class="input-compact" name="nps_threshold"
+                       id="filterNps" placeholder="например, 9.4"
+                       value="{{ filters.nps_threshold }}">
+            </div>
+            <div class="filter-cell filter-actions">
+                <button type="submit" class="btn-primary"><i class="fa-solid fa-check"></i> Применить</button>
+                <a class="btn-ghost" href="{% url 'analytics' %}"><i class="fa-solid fa-arrows-rotate"></i> Сброс</a>
+            </div>
+        </div>
+
+        <div class="quick-presets">
+            <button type="button" class="chip" data-quick-nps="9.4"><i class="fa-solid fa-medal"></i> NPS ≥ 9.4</button>
+            <button type="button" class="chip" data-quick-nps="9.0">Средний ≥ 9.0</button>
+            <button type="button" class="chip" data-quick-nps="8.0">Средний ≥ 8.0</button>
+            <label class="chip" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" name="only_recommended" value="1" {% if filters.only_recommended %}checked{% endif %} style="margin: 0;">
+                Только "Рекомендую к выдвижению"
+            </label>
+        </div>
+    </form>
+
+    <!-- ===== KPI row ===== -->
+    <div class="kpi-grid">
+        <div class="kpi-card accent">
+            <div class="kpi-top">
+                <span class="kpi-label">Отзывов за период</span>
+                <span class="kpi-icon"><i class="fa-solid fa-comment-dots"></i></span>
+            </div>
+            <div class="kpi-value">{{ kpis.total_feedbacks }}</div>
+            <div class="kpi-hint">{{ kpis.active_speakers }} спикер(ов), {{ kpis.active_events }} событие(ий)</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-top">
+                <span class="kpi-label">Средний балл</span>
+                <span class="kpi-icon"><i class="fa-solid fa-star"></i></span>
+            </div>
+            <div class="kpi-value">{{ nps_stats.avg_score|default:"—" }}</div>
+            <div class="kpi-hint">из 10 возможных</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-top">
+                <span class="kpi-label">NPS</span>
+                <span class="kpi-icon"><i class="fa-solid fa-chart-line"></i></span>
+            </div>
+            <div class="kpi-value">{{ nps_stats.nps }}</div>
+            <div class="kpi-hint">Промоутеры {{ nps_stats.promoter_pct }}% · Пассивы {{ nps_stats.passive_pct }}% · Детракторы {{ nps_stats.detractor_pct }}%</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-top">
+                <span class="kpi-label">Кандидатов</span>
+                <span class="kpi-icon"><i class="fa-solid fa-user-check"></i></span>
+            </div>
+            <div class="kpi-value">{{ kpis.candidates_count }}</div>
+            <div class="kpi-hint">
+                балл ≥ {{ candidate_rules.min_avg_score }}, ≥ {{ candidate_rules.min_events }} выступл. / 6 мес.
+            </div>
         </div>
     </div>
 
-    <div class="analytics-grid">
-        <!-- Топ спикеров -->
-        <div class="panel">
-            <div class="panel-title"><i class="fa-solid fa-trophy" style="color: var(--sber-green); margin-right: 8px;"></i>Топ лучших спикеров</div>
+    <!-- ===== Score distribution + NPS breakdown ===== -->
+    <div class="grid-3-2">
+        <div class="panel-v2">
+            <header>
+                <div class="panel-heading">
+                    <div class="panel-title-v2"><i class="fa-solid fa-chart-column"></i> Распределение оценок</div>
+                    <div class="panel-sub">Сколько отзывов получено по каждой оценке (0–10)</div>
+                </div>
+                {% if kpis.total_feedbacks == 0 %}<span class="panel-tag">Нет данных</span>{% endif %}
+            </header>
+            <div class="chart-box">
+                <canvas id="scoreDistChart"></canvas>
+            </div>
+        </div>
+        <div class="panel-v2">
+            <header>
+                <div class="panel-heading">
+                    <div class="panel-title-v2"><i class="fa-solid fa-circle-half-stroke"></i> Структура NPS</div>
+                    <div class="panel-sub">Промоутеры 9–10 · Пассивы 7–8 · Детракторы 0–6</div>
+                </div>
+            </header>
+            <div class="chart-box">
+                <canvas id="npsDonutChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 1. Карта активности + 4. Внешний след ===== -->
+    <div class="grid-2">
+        <!-- Карта активности -->
+        <div class="panel-v2">
+            <header>
+                <div class="panel-heading">
+                    <div class="panel-title-v2"><i class="fa-solid fa-location-dot"></i> Карта активности (по городам)</div>
+                    <div class="panel-sub">Объём выступлений и отзывов в разрезе городов за выбранный период</div>
+                </div>
+                <span class="panel-tag">{{ city_activity|length }} город(ов)</span>
+            </header>
+            <div class="chart-box tall">
+                <canvas id="cityChart"></canvas>
+            </div>
+            {% if city_activity %}
+                <div class="city-list">
+                    {% for row in city_activity|slice:":6" %}
+                    <div class="city-row">
+                        <span class="city-name">{{ row.city }}</span>
+                        <div class="city-bar"><div class="city-bar-fill" data-width="{{ row.feedbacks_count }}"></div></div>
+                        <span class="city-count">{{ row.feedbacks_count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                    Нет данных об активности в этом окне. Попробуйте увеличить период или убрать фильтры.
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Внешний след -->
+        <div class="panel-v2">
+            <header>
+                <div class="panel-heading">
+                    <div class="panel-title-v2"><i class="fa-solid fa-tower-broadcast"></i> Внешний след</div>
+                    <div class="panel-sub">Внешние конференции, подкасты, отраслевые площадки</div>
+                </div>
+                <span class="panel-tag">{{ external_footprint.total_events }} событий</span>
+            </header>
+
+            {% if external_footprint.sources %}
+                <div class="source-chips">
+                    {% for src in external_footprint.sources %}
+                    <span class="schip"><strong>{{ src.cnt }}</strong>{{ src.label }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if external_footprint.events %}
+                <div style="overflow-x: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Событие</th>
+                                <th>Дата</th>
+                                <th>Спикеров</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ev in external_footprint.events|slice:":8" %}
+                            <tr>
+                                <td>
+                                    <div style="font-weight: 600;">{{ ev.title }}</div>
+                                    <div style="font-size: 11px; color: var(--text-muted);">{{ ev.location }} · {{ ev.source }}</div>
+                                </td>
+                                <td style="white-space: nowrap; font-size: 12px; color: var(--text-muted);">{{ ev.date }}</td>
+                                <td style="width: 60px; text-align: center;">{{ ev.speakers_count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-signal"></i>
+                    Внешних мероприятий в выбранном окне пока нет.
+                    <div style="margin-top: 6px; font-size: 12px;">
+                        Отметьте события флагом <code>is_external=True</code> при импорте — они появятся здесь автоматически.
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ===== 2. Рейтинг спикеров ===== -->
+    <div class="panel-v2">
+        <header>
+            <div class="panel-heading">
+                <div class="panel-title-v2"><i class="fa-solid fa-trophy"></i> Рейтинг спикеров</div>
+                <div class="panel-sub">Сортировка по среднему баллу в выбранном окне. Учитываются активные фильтры.</div>
+            </div>
+            <span class="panel-tag">TOP {{ speakers_ranking|length }}</span>
+        </header>
+        {% if speakers_ranking %}
             <div style="overflow-x: auto;">
-                <table class="top-speakers-table">
+                <table class="data-table">
                     <thead>
                         <tr>
+                            <th style="width: 50px;">#</th>
                             <th>Спикер</th>
-                            <th>Средний балл</th>
-                            <th>Отзывов</th>
+                            <th>Город</th>
+                            <th>Стек</th>
+                            <th style="width: 90px;">Отзывов</th>
+                            <th style="width: 90px;">Средний</th>
+                            <th style="width: 90px;">NPS</th>
+                            <th style="width: 100px;">Флаг</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for speaker in top_speakers %}
+                        {% for sp in speakers_ranking %}
                         <tr>
+                            <td style="color: var(--text-muted); font-weight: 700;">{{ forloop.counter }}</td>
                             <td>
-                                <a href="{% url 'speakers' %}?id={{ speaker.id }}" class="speaker-link">{{ speaker.name }}</a>
+                                <div class="speaker-cell">
+                                    {% if sp.avatar %}<img src="{{ sp.avatar }}" alt="{{ sp.name }}">{% else %}<div style="width:36px;height:36px;border-radius:50%;background:var(--light-green);display:flex;align-items:center;justify-content:center;color:var(--sber-green);font-weight:700;">{{ sp.name|slice:":1" }}</div>{% endif %}
+                                    <div class="speaker-meta">
+                                        <span class="speaker-name">{{ sp.name }}</span>
+                                        <span class="speaker-sub">{{ sp.sub|default:"—" }}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="color: var(--text-muted);">{{ sp.city|default:"—" }}</td>
+                            <td style="color: var(--text-muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ sp.stack|default:"—" }}</td>
+                            <td>{{ sp.feedbacks_count }}</td>
+                            <td>
+                                {% if sp.avg_score is not None %}
+                                    <span class="score-pill {% if sp.avg_score >= 9 %}good{% elif sp.avg_score >= 7 %}meh{% else %}bad{% endif %}">
+                                        {{ sp.avg_score }}
+                                    </span>
+                                {% else %}—{% endif %}
                             </td>
                             <td>
-                                <span class="score-badge">{{ speaker.avg_score|floatformat:2 }}</span>
+                                <span class="nps-chip {% if sp.nps > 30 %}up{% elif sp.nps >= 0 %}flat{% else %}down{% endif %}">
+                                    {% if sp.nps > 0 %}+{% endif %}{{ sp.nps }}
+                                </span>
                             </td>
-                            <td style="color: var(--text-muted); font-size: 14px;">{{ speaker.feedbacks_count }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 20px;">Нет данных о спикерах с отзывами</td>
+                            <td>
+                                {% if sp.recommended %}
+                                    <span class="recommended-flag"><i class="fa-solid fa-check"></i> Рекомендую</span>
+                                {% else %}
+                                    <span style="color: var(--text-muted); font-size: 12px;">—</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fa-solid fa-users-slash"></i>
+                Нет спикеров с отзывами в этом окне. Попробуйте расширить период или снять порог NPS.
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- ===== 3. Кандидаты на выдвижение ===== -->
+    <div class="panel-v2">
+        <header>
+            <div class="panel-heading">
+                <div class="panel-title-v2"><i class="fa-solid fa-award"></i> Кандидаты на выдвижение</div>
+                <div class="panel-sub">Автовыборка по объективным метрикам для федерального уровня</div>
+            </div>
+            <span class="panel-tag">{{ candidates|length }} кандидат(ов)</span>
+        </header>
+
+        <div class="rules-card">
+            <div class="rule-title"><i class="fa-solid fa-list-check" style="color: var(--sber-green);"></i> Правила автовыборки</div>
+            <ul>
+                <li>Средний балл по обратной связи ≥ <strong>{{ candidate_rules.min_avg_score }}</strong> (или порог из фильтра)</li>
+                <li>Не менее <strong>{{ candidate_rules.min_events }}</strong> выступлений за последние <strong>{{ candidate_rules.window_days }}</strong> дней</li>
+                <li>Учитывается флаг "Рекомендую к выдвижению", выставляемый DevRel</li>
+            </ul>
         </div>
 
-        <!-- График распределения -->
-        <div class="panel">
-            <div class="panel-title"><i class="fa-solid fa-chart-pie" style="color: var(--sber-green); margin-right: 8px;"></i>Распределение оценок</div>
-            <div class="chart-container">
-                <canvas id="scoreChart"></canvas>
+        {% if candidates %}
+            <div class="candidates-grid">
+                {% for cand in candidates %}
+                <div class="candidate-card">
+                    <div class="head">
+                        {% if cand.avatar %}<img src="{{ cand.avatar }}" alt="{{ cand.name }}">{% else %}<div style="width:50px;height:50px;border-radius:50%;background:var(--light-green);display:flex;align-items:center;justify-content:center;color:var(--sber-green);font-weight:800;font-size:18px;">{{ cand.name|slice:":1" }}</div>{% endif %}
+                        <div style="min-width: 0; flex: 1;">
+                            <div class="nm">{{ cand.name }}</div>
+                            <div class="sb">{{ cand.city|default:"—" }}{% if cand.stack %} · {{ cand.stack }}{% endif %}</div>
+                        </div>
+                        {% if cand.recommended %}<i class="fa-solid fa-check-circle" style="color: var(--sber-green); font-size: 18px;" title="Отмечен DevRel"></i>{% endif %}
+                    </div>
+                    <div class="stats-row">
+                        <span class="stat-pill"><strong>{{ cand.avg_score }}</strong>средний балл</span>
+                        <span class="stat-pill"><strong>{{ cand.events_count }}</strong>выступл. / 6 мес.</span>
+                        <span class="stat-pill"><strong>{% if cand.nps > 0 %}+{% endif %}{{ cand.nps }}</strong>NPS</span>
+                    </div>
+                    <div class="reason"><i class="fa-solid fa-circle-info"></i> {{ cand.reason }}</div>
+                </div>
+                {% endfor %}
             </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                Под текущие критерии никто не подходит. Попробуйте снизить порог среднего балла или расширить период.
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- ===== 6. Тематический профиль + 5. Слепые зоны ===== -->
+    <div class="grid-halves">
+        <div class="panel-v2">
+            <header>
+                <div class="panel-heading">
+                    <div class="panel-title-v2"><i class="fa-solid fa-layer-group"></i> Тематический профиль</div>
+                    <div class="panel-sub">Сколько спикеров работает в каждой теме/стеке</div>
+                </div>
+                <span class="panel-tag">{{ thematic_profile|length }} тем</span>
+            </header>
+            {% if thematic_profile %}
+                <div class="chart-box">
+                    <canvas id="topicsChart"></canvas>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-layer-group"></i>
+                    Темы пока не сформированы. Укажите стек спикерам в их профилях.
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="panel-v2">
+            <header>
+                <div class="panel-heading">
+                    <div class="panel-title-v2"><i class="fa-solid fa-triangle-exclamation"></i> Слепые зоны</div>
+                    <div class="panel-sub">Города и темы с минимальной активностью — где пора подкачать регион</div>
+                </div>
+            </header>
+            <div class="zones-grid">
+                <div>
+                    <div class="zones-sub">Города без выступлений</div>
+                    {% if blind_zones.silent_cities %}
+                        <div class="zone-chips">
+                            {% for z in blind_zones.silent_cities %}
+                            <span class="zchip alert">{{ z.city }}</span>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="empty-state" style="padding: 12px;">
+                            <i class="fa-solid fa-circle-check" style="font-size: 20px;"></i>
+                            Все города проявили активность
+                        </div>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="zones-sub">Низкая активность</div>
+                    {% if blind_zones.low_cities %}
+                        <div class="zone-chips">
+                            {% for z in blind_zones.low_cities %}
+                            <span class="zchip">{{ z.city }} <span style="color: var(--text-muted); margin-left: 4px;">· {{ z.feedbacks_count }}</span></span>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="empty-state" style="padding: 12px;">
+                            <i class="fa-solid fa-gauge-high" style="font-size: 20px;"></i>
+                            Все активные города на уровне
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% if blind_zones.weak_topics %}
+            <div>
+                <div class="zones-sub" style="margin-top: 8px;">Слабые темы</div>
+                <div class="zone-chips">
+                    {% for t in blind_zones.weak_topics %}
+                    <span class="zchip">{{ t.topic }} <span style="color: var(--text-muted); margin-left: 4px;">· {{ t.speakers_count }} спикер(ов)</span></span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
+
 </div>
 
-<!-- Load Chart.js -->
+<!-- Chart.js (грузится один раз; SPA-navigator переинициализирует инлайн-скрипт при входе на страницу) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script id="analyticsChartData" type="application/json">{{ chart_data_json|safe }}</script>
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const canvas = document.getElementById('scoreChart');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        
-        // Prepare data from Django context
-        const labelsData = [
-            {% for score, count in score_distribution.items %}
-                '{{ score }}'{% if not forloop.last %},{% endif %}
-            {% endfor %}
-        ];
-        
-        const countsData = [
-            {% for score, count in score_distribution.items %}
-                {{ count }}{% if not forloop.last %},{% endif %}
-            {% endfor %}
-        ];
+(function initAnalyticsDashboard() {
+    const root = document.querySelector('[data-analytics-dashboard]');
+    if (!root) return;
+    if (typeof Chart === 'undefined') {
+        // Chart.js ещё не догрузился (SPA-переход) — повторим попытку
+        return setTimeout(initAnalyticsDashboard, 100);
+    }
 
-        const isDarkTheme = document.documentElement.getAttribute('data-theme') === 'dark';
-        const textColor = isDarkTheme ? '#A0A5AA' : '#5B7565';
-        const mainColor = '#0A803B'; // sber-green
-        const bgColor = isDarkTheme ? 'rgba(33, 160, 56, 0.4)' : 'rgba(10, 128, 59, 0.4)';
+    // --- Data ---
+    const payloadNode = document.getElementById('analyticsChartData');
+    let payload = { score_distribution: {}, city_activity: [], thematic_profile: [], nps_breakdown: {} };
+    try { payload = JSON.parse(payloadNode.textContent); } catch (e) { console.error('analytics payload parse', e); }
 
-        new Chart(ctx, {
+    // --- Theme colors ---
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#A0A5AA' : '#5B7565';
+    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+    const greenSolid = isDark ? '#21A038' : '#0A803B';
+    const greenFill = isDark ? 'rgba(33,160,56,0.55)' : 'rgba(10,128,59,0.55)';
+    const palette = [
+        '#0A803B', '#21A038', '#48C774', '#A8CCB7', '#DDF0E4',
+        '#2E7D32', '#66BB6A', '#81C784', '#C8E6C9', '#145A32',
+    ];
+
+    Chart.defaults.color = textColor;
+    Chart.defaults.font.family = 'Inter, sans-serif';
+
+    // --- Score distribution (bar) ---
+    const scoreCanvas = document.getElementById('scoreDistChart');
+    if (scoreCanvas && payload.score_distribution) {
+        const labels = [];
+        const data = [];
+        for (let i = 0; i <= 10; i++) {
+            labels.push(String(i));
+            data.push(Number(payload.score_distribution[i] || 0));
+        }
+        const colors = labels.map(l => {
+            const v = Number(l);
+            if (v >= 9) return greenSolid;
+            if (v >= 7) return isDark ? '#F1C84B' : '#F1B500';
+            return isDark ? '#EB5757' : '#D33B3B';
+        });
+        new Chart(scoreCanvas.getContext('2d'), {
             type: 'bar',
-            data: {
-                labels: labelsData.reverse(),
-                datasets: [{
-                    label: 'Количество оценок',
-                    data: countsData.reverse(),
-                    backgroundColor: bgColor,
-                    borderColor: mainColor,
-                    borderWidth: 1,
-                    borderRadius: 4
-                }]
-            },
+            data: { labels, datasets: [{ label: 'Отзывы', data, backgroundColor: colors, borderRadius: 6, borderSkipped: false }] },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            title: function(context) {
-                                return 'Оценка: ' + context[0].label;
-                            }
-                        }
-                    }
-                },
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: { callbacks: { title: (ctx) => 'Оценка: ' + ctx[0].label } } },
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            stepSize: 1,
-                            color: textColor
-                        },
-                        grid: {
-                            color: isDarkTheme ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
-                        }
-                    },
-                    x: {
-                        ticks: {
-                            color: textColor
-                        },
-                        grid: {
-                            display: false
-                        }
-                    }
+                    x: { grid: { display: false }, ticks: { color: textColor } },
+                    y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor, precision: 0 } }
                 }
             }
         });
+    }
+
+    // --- NPS donut ---
+    const npsCanvas = document.getElementById('npsDonutChart');
+    if (npsCanvas && payload.nps_breakdown) {
+        const br = payload.nps_breakdown;
+        const promoters = Number(br.promoters || 0);
+        const passives = Number(br.passives || 0);
+        const detractors = Number(br.detractors || 0);
+        const hasData = promoters + passives + detractors > 0;
+        new Chart(npsCanvas.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Промоутеры (9–10)', 'Пассивы (7–8)', 'Детракторы (0–6)'],
+                datasets: [{
+                    data: hasData ? [promoters, passives, detractors] : [1, 0, 0],
+                    backgroundColor: hasData ? [greenSolid, isDark ? '#8BA095' : '#A8CCB7', isDark ? '#EB5757' : '#D33B3B'] : [isDark ? '#2A3B32' : '#DDF0E4'],
+                    borderWidth: 0,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '65%',
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: textColor, padding: 14, usePointStyle: true, pointStyle: 'circle' } },
+                    tooltip: { enabled: hasData }
+                }
+            }
+        });
+    }
+
+    // --- City chart (bar horizontal-ish) ---
+    const cityCanvas = document.getElementById('cityChart');
+    if (cityCanvas) {
+        const rows = (payload.city_activity || []).slice(0, 8);
+        if (rows.length > 0) {
+            const labels = rows.map(r => r.city);
+            const values = rows.map(r => r.feedbacks_count);
+            new Chart(cityCanvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Отзывов', data: values,
+                        backgroundColor: greenFill, borderColor: greenSolid, borderWidth: 1, borderRadius: 6,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor, precision: 0 } },
+                        y: { grid: { display: false }, ticks: { color: textColor } }
+                    }
+                }
+            });
+        } else {
+            cityCanvas.parentElement.innerHTML = '<div class="empty-state"><i class="fa-solid fa-chart-bar"></i>График построится при появлении данных.</div>';
+        }
+    }
+
+    // --- Topics (horizontal bar) ---
+    const topicsCanvas = document.getElementById('topicsChart');
+    if (topicsCanvas) {
+        const rows = (payload.thematic_profile || []).slice(0, 10);
+        if (rows.length > 0) {
+            new Chart(topicsCanvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: rows.map(r => r.topic),
+                    datasets: [{
+                        label: 'Спикеров', data: rows.map(r => r.speakers_count),
+                        backgroundColor: rows.map((_, i) => palette[i % palette.length]),
+                        borderRadius: 6,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor, precision: 0 } },
+                        y: { grid: { display: false }, ticks: { color: textColor } }
+                    }
+                }
+            });
+        }
+    }
+
+    // --- City bar fill widths ---
+    const cityBars = root.querySelectorAll('.city-bar-fill');
+    let maxVal = 0;
+    cityBars.forEach(b => { const v = Number(b.dataset.width || 0); if (v > maxVal) maxVal = v; });
+    if (maxVal > 0) cityBars.forEach(b => {
+        const v = Number(b.dataset.width || 0);
+        b.style.width = Math.max(6, Math.round(v / maxVal * 100)) + '%';
     });
+
+    // --- Filter UX ---
+    const form = document.getElementById('analyticsFilters');
+    if (form) {
+        const periodInput = form.querySelector('#periodHidden');
+        const currentPeriod = (periodInput.value || '90');
+        const tabButtons = form.querySelectorAll('.period-tabs .tab');
+        const customCells = form.querySelectorAll('[data-custom-range]');
+
+        function applyPeriod(value) {
+            periodInput.value = value;
+            tabButtons.forEach(t => t.classList.toggle('active', t.dataset.period === value));
+            const isCustom = value === 'custom';
+            customCells.forEach(c => c.style.display = isCustom ? 'flex' : 'none');
+        }
+        applyPeriod(currentPeriod);
+
+        tabButtons.forEach(t => t.addEventListener('click', () => {
+            applyPeriod(t.dataset.period);
+        }));
+
+        form.querySelectorAll('[data-quick-nps]').forEach(chip => {
+            chip.addEventListener('click', () => {
+                form.querySelector('#filterNps').value = chip.dataset.quickNps;
+                form.querySelectorAll('[data-quick-nps]').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+            });
+        });
+        const npsVal = (form.querySelector('#filterNps').value || '').trim();
+        form.querySelectorAll('[data-quick-nps]').forEach(chip => {
+            if (chip.dataset.quickNps === npsVal) chip.classList.add('active');
+        });
+    }
+})();
 </script>
 {% endblock %}

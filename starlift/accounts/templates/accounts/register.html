@@ -1,0 +1,76 @@
+{% extends 'accounts/auth_base.html' %}
+
+{% block title %}Регистрация — StarLift{% endblock %}
+
+{% block content %}
+<h1 class="auth-title">Создание аккаунта</h1>
+<p class="auth-subtitle">
+    Зарегистрируйтесь, чтобы получить базовый доступ. После подтверждения email
+    вы увидите сводную статистику по спикерам и событиям. Полный доступ выдаёт
+    администратор.
+</p>
+
+{% if form.non_field_errors %}
+<div class="alert alert-error">{% for e in form.non_field_errors %}<p>{{ e }}</p>{% endfor %}</div>
+{% endif %}
+
+{% if messages %}
+    {% for msg in messages %}
+    <div class="alert {% if msg.tags == 'error' %}alert-error{% elif msg.tags == 'warning' %}alert-error{% else %}alert-info{% endif %}">{{ msg }}</div>
+    {% endfor %}
+{% endif %}
+
+<form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="form-field">
+        <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+        {{ form.username }}
+        {% if form.username.errors %}<div class="field-errors">{% for e in form.username.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="form-field">
+            <label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
+            {{ form.first_name }}
+            {% if form.first_name.errors %}<div class="field-errors">{% for e in form.first_name.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+        </div>
+        <div class="form-field">
+            <label for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
+            {{ form.last_name }}
+            {% if form.last_name.errors %}<div class="field-errors">{% for e in form.last_name.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+        </div>
+    </div>
+
+    <div class="form-field">
+        <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+        {{ form.email }}
+        {% if form.email.errors %}<div class="field-errors">{% for e in form.email.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+    </div>
+
+    <div class="form-field">
+        <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
+        {{ form.password1 }}
+        {% if form.password1.errors %}<div class="field-errors">{% for e in form.password1.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+        <div class="field-errors" style="color:var(--text-muted);">Не менее 8 символов, не только цифры и не только специальные символы.</div>
+    </div>
+
+    <div class="form-field">
+        <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
+        {{ form.password2 }}
+        {% if form.password2.errors %}<div class="field-errors">{% for e in form.password2.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+    </div>
+
+    <button type="submit" class="btn-primary">
+        <i class="fa-solid fa-user-plus"></i> Зарегистрироваться
+    </button>
+
+    <div class="auth-links">
+        <a href="{% url 'accounts:login' %}">Уже есть аккаунт? Войти</a>
+    </div>
+</form>
+
+<div class="auth-footer-note">
+    После отправки формы на указанный email придёт ссылка для активации. До перехода по ней войти в систему нельзя.
+</div>
+{% endblock %}
