@@ -214,11 +214,20 @@ class InviteSignupForm(forms.Form):
 class ProfileEditForm(forms.Form):
     first_name = forms.CharField(label="Имя", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
     last_name = forms.CharField(label="Фамилия", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
+    avatar = forms.ImageField(label="Аватар", required=False, widget=forms.FileInput(attrs={"class": _INPUT_CLASS}))
     bio = forms.CharField(
         label="О себе",
         required=False,
         widget=forms.Textarea(attrs={**_field_attrs(), "rows": 4, "style": "width:100%; min-height:120px;"}),
     )
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get("avatar")
+        if not avatar:
+            return avatar
+        if avatar.size > 10 * 1024 * 1024:
+            raise ValidationError("Размер файла не должен превышать 10 МБ.")
+        return avatar
 
 
 class SpeakerProfileForm(forms.Form):

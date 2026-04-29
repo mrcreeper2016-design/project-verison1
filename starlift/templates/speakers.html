@@ -151,6 +151,60 @@
             overflow-x: auto;
         }
     }
+
+    .numeric-stepper {
+        position: relative;
+        width: 100%;
+    }
+
+    .nps-range-container .numeric-stepper .input-compact {
+        padding-right: 44px;
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
+
+    .nps-range-container .numeric-stepper .input-compact::-webkit-outer-spin-button,
+    .nps-range-container .numeric-stepper .input-compact::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .stepper-controls {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: inline-flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .stepper-btn {
+        width: 28px;
+        height: 16px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background: var(--glass-bg);
+        color: var(--text-muted);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: var(--transition);
+        padding: 0;
+        line-height: 1;
+    }
+
+    .stepper-btn i { font-size: 10px; }
+
+    .stepper-btn:hover {
+        border-color: var(--sber-green);
+        color: var(--sber-green);
+        background: var(--light-green);
+        transform: translateY(-1px);
+    }
+
+    .stepper-btn:active { transform: translateY(0); }
 </style>
 
 <div class="speakers-page">
@@ -214,8 +268,28 @@
                             <div class="filter-field">
                                 <label>NPS</label>
                                 <div class="nps-range-container">
-                                    <input id="npsMin" class="input-compact" type="number" step="1" min="-100" max="100" inputmode="numeric" placeholder="Мин.">
-                                    <input id="npsMax" class="input-compact" type="number" step="1" min="-100" max="100" inputmode="numeric" placeholder="Макс.">
+                                    <div class="numeric-stepper">
+                                        <input id="npsMin" class="input-compact" type="number" step="1" min="-100" max="100" inputmode="numeric" placeholder="Мин.">
+                                        <div class="stepper-controls">
+                                            <button type="button" class="stepper-btn" data-step-target="npsMin" data-step-dir="up" aria-label="Увеличить минимум NPS">
+                                                <i class="fa-solid fa-chevron-up"></i>
+                                            </button>
+                                            <button type="button" class="stepper-btn" data-step-target="npsMin" data-step-dir="down" aria-label="Уменьшить минимум NPS">
+                                                <i class="fa-solid fa-chevron-down"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="numeric-stepper">
+                                        <input id="npsMax" class="input-compact" type="number" step="1" min="-100" max="100" inputmode="numeric" placeholder="Макс.">
+                                        <div class="stepper-controls">
+                                            <button type="button" class="stepper-btn" data-step-target="npsMax" data-step-dir="up" aria-label="Увеличить максимум NPS">
+                                                <i class="fa-solid fa-chevron-up"></i>
+                                            </button>
+                                            <button type="button" class="stepper-btn" data-step-target="npsMax" data-step-dir="down" aria-label="Уменьшить максимум NPS">
+                                                <i class="fa-solid fa-chevron-down"></i>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -317,8 +391,25 @@
         const n = Number(value);
         return Number.isFinite(n) ? n : null;
     }
+
+    function stepNumericInput(input, direction) {
+        if (!input) return;
+        const step = Number(input.step || 1) || 1;
+        const min = input.min !== '' ? Number(input.min) : -Infinity;
+        const max = input.max !== '' ? Number(input.max) : Infinity;
+        const current = input.value === '' ? 0 : Number(input.value);
+        const nextRaw = current + (direction * step);
+        const next = Math.min(max, Math.max(min, nextRaw));
+        const decimals = (String(step).split('.')[1] || '').length;
+        input.value = next.toFixed(decimals);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     
-    function getAvatarUrl(img, size = 150) {
+    function getAvatarUrl(speaker, size = 150) {
+        if (speaker && speaker.avatar) {
+            return speaker.avatar;
+        }
+        const img = speaker ? speaker.img : '';
         if (img && (img.startsWith('/media/') || img.startsWith('http'))) {
             return img;
         }
@@ -420,7 +511,7 @@
             <tr class="${i % 2 !== 0 ? 'alt-row' : ''}">
                 <td onclick="showEvents(${s.id})">
                     <div class="speaker-info">
-                        <img src="${getAvatarUrl(s.img, 150)}" class="avatar" style="object-fit: cover;">
+                        <img src="${getAvatarUrl(s, 150)}" class="avatar" style="object-fit: cover;">
                         <div><strong>${s.name}</strong></div>
                     </div>
                 </td>
@@ -461,7 +552,7 @@
         const speaker = speakersData.find(s => s.id === id);
         if (!speaker) return;
         
-        document.getElementById('modalAvatarImg').src = getAvatarUrl(speaker.img, 300);
+        document.getElementById('modalAvatarImg').src = getAvatarUrl(speaker, 300);
         document.getElementById('modalAvatarNameText').innerText = speaker.name;
         
         document.getElementById('modalStackVal').innerText = speaker.stack;
@@ -618,6 +709,14 @@
                 });
             });
         }
+
+        document.querySelectorAll('[data-step-target][data-step-dir]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = document.getElementById(btn.dataset.stepTarget);
+                const dir = btn.dataset.stepDir === 'down' ? -1 : 1;
+                stepNumericInput(target, dir);
+            });
+        });
 
         const toggleFiltersBtn = document.getElementById('filtersToggle');
         const filterPanel = document.getElementById('filtersPanel');

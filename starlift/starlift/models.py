@@ -12,6 +12,7 @@ class Speaker(models.Model):
     status = models.CharField(max_length=50)
     nps = models.IntegerField(default=0)
     img = models.CharField(max_length=100)
+    avatar = models.ImageField(upload_to="avatars/speakers/", null=True, blank=True)
     recommended = models.BooleanField(
         default=False,
         verbose_name="Рекомендую к выдвижению",
@@ -44,6 +45,12 @@ class Speaker(models.Model):
 
     @property
     def avatar_url(self):
+        if self.avatar:
+            try:
+                return self.avatar.url
+            except ValueError:
+                # Storage backend may fail to build URL for broken rows.
+                pass
         if self.img:
             if self.img.startswith('/media/') or self.img.startswith('http'):
                 return self.img

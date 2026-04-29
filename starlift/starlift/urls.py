@@ -23,4 +23,7 @@ urlpatterns = [
     path('qr-generator/', views.qr_generator_view, name='qr_generator'),
     path('rate/<int:event_id>/<int:speaker_id>/', views.submit_feedback_view, name='rate_speaker'),
     path('thanks/', views.thank_you_view, name='thank_you'),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
+
+if settings.MEDIA_URL.startswith("/"):
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

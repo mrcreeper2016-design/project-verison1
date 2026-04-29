@@ -45,9 +45,26 @@
         <div class="content-block profile-card animate-fade">
             <div class="section-title"><i class="fa-solid fa-user"></i> Основное</div>
 
-            <form method="post" style="display:grid; gap:12px;">
+            <form method="post" enctype="multipart/form-data" style="display:grid; gap:12px;">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="profile">
+                <div class="form-row">
+                    <label for="{{ form.avatar.id_for_label }}">Аватар</label>
+                    <div class="readonly-box">
+                        {% if profile.avatar_url %}
+                        <img src="{{ profile.avatar_url }}" alt="{{ user.username }}" style="width:56px; height:56px; border-radius:12px; object-fit:cover; border:1px solid var(--border-color);">
+                        {% else %}
+                        <div style="width:56px; height:56px; border-radius:12px; border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--sber-green); background:var(--light-green);">
+                            {{ user.first_name|default:user.username|slice:":1"|upper }}
+                        </div>
+                        {% endif %}
+                        <div style="display:grid; gap:6px;">
+                            {{ form.avatar }}
+                            <span style="font-size:12px; color:var(--text-muted);">JPG/PNG/WEBP, до 10 МБ</span>
+                        </div>
+                    </div>
+                    {% if form.avatar.errors %}<div class="field-errors">{% for e in form.avatar.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
                 <div class="form-row">
                     <label for="{{ form.first_name.id_for_label }}">Имя</label>
                     {{ form.first_name }}
@@ -90,10 +107,10 @@
                 <div class="form-row">
                     <label>Текущее фото</label>
                     <div class="readonly-box">
-                        {% if linked_speaker.img|slice:':4' == 'http' or linked_speaker.img|slice:':6' == '/media' %}
-                        <img src="{{ linked_speaker.img }}" alt="Фото спикера" style="width:56px; height:56px; border-radius:12px; object-fit:cover; border:1px solid var(--border-color);">
+                        {% if linked_speaker.avatar_url %}
+                        <img src="{{ linked_speaker.avatar_url }}" alt="Фото спикера" style="width:56px; height:56px; border-radius:12px; object-fit:cover; border:1px solid var(--border-color);">
                         {% else %}
-                        <img src="https://i.pravatar.cc/120?img={{ linked_speaker.img }}" alt="Фото спикера" style="width:56px; height:56px; border-radius:12px; object-fit:cover; border:1px solid var(--border-color);">
+                        <div style="width:56px; height:56px; border-radius:12px; border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--sber-green); background:var(--light-green);">{{ linked_speaker.name|slice:":1" }}</div>
                         {% endif %}
                         <span style="font-size:12px; color:var(--text-muted);">Можно загрузить файл или указать URL ниже</span>
                     </div>

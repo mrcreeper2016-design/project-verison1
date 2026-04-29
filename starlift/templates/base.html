@@ -858,7 +858,7 @@
                 <div class="logo-text">STARLIFT</div>
             </div>
             <nav class="nav-menu">
-                {% if user.is_superuser or user.profile.role == 'admin' or user.profile.role == 'speaker' %}
+                {% if user.is_authenticated %}
                 <a href="{% url 'home' %}" class="nav-item"><i class="fa-solid fa-house"></i> <span>Главная</span></a>
                 <a href="{% url 'speakers' %}" class="nav-item"><i class="fa-solid fa-user-group"></i> <span>Спикеры</span></a>
                 <a href="{% url 'events' %}" class="nav-item"><i class="fa-regular fa-calendar-days"></i> <span>Мероприятия</span></a>
@@ -867,10 +867,14 @@
                 {% else %}
                 <a href="{% url 'explore' %}" class="nav-item"><i class="fa-solid fa-compass"></i> <span>Обзор</span></a>
                 {% endif %}
-                {% if user.is_superuser or user.profile.role == 'admin' %}
+                {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
                 <a href="{% url 'accounts:console_home' %}" class="nav-item"><i class="fa-solid fa-sliders"></i> <span>Админ-консоль</span></a>
                 {% endif %}
+                {% if user.is_authenticated %}
                 <a href="{% url 'accounts:profile' %}" class="nav-item"><i class="fa-solid fa-gear"></i> <span>Настройки</span></a>
+                {% else %}
+                <a href="{% url 'accounts:login' %}" class="nav-item"><i class="fa-solid fa-right-to-bracket"></i> <span>Вход</span></a>
+                {% endif %}
             </nav>
         </div>
         <div class="sidebar-bottom-logo animate-fade" style="animation-delay: 0.5s;">
@@ -886,25 +890,43 @@
             <div class="admin-profile-container">
                 <div class="admin-profile" id="profileTrigger">
                     <div class="admin-info">
-                        <span class="admin-name">{{ user.get_full_name|default:user.username }}</span>
-                        <span class="admin-role">{% if user.is_superuser %}Суперпользователь{% elif user.profile.role == 'admin' %}Администратор{% elif user.profile.role == 'speaker' %}Спикер{% else %}Гость{% endif %}</span>
+                        <span class="admin-name">{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}Гость{% endif %}</span>
+                        <span class="admin-role">
+                            {% if user.is_authenticated %}
+                                {% if user.is_superuser %}Суперпользователь{% elif user.profile.role == 'admin' %}Администратор{% elif user.profile.role == 'speaker' %}Спикер{% else %}Пользователь{% endif %}
+                            {% else %}
+                                Гость
+                            {% endif %}
+                        </span>
                     </div>
+                    {% if user.is_authenticated and user.profile.avatar_url %}
+                    <img class="admin-avatar" src="{{ user.profile.avatar_url }}" alt="{{ user.username }}">
+                    {% else %}
                     <div class="admin-avatar" style="display:flex; align-items:center; justify-content:center; background:var(--light-green); color:var(--sber-green); font-weight:700;">
-                        {{ user.first_name.0|default:user.username.0|upper }}{{ user.last_name.0|upper }}
+                        {% if user.is_authenticated %}
+                            {{ user.first_name|default:user.username|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}
+                        {% else %}
+                            G
+                        {% endif %}
                     </div>
+                    {% endif %}
                     <i class="fa-solid fa-chevron-down" style="font-size: 12px; color: #70757a;"></i>
                 </div>
                 <div class="dropdown-menu" id="dropdownMenu">
-                    <a href="{% url 'accounts:profile' %}" class="dropdown-item"><i class="fa-regular fa-user"></i> Мой профиль</a>
-                    {% if user.is_superuser or user.profile.role == 'admin' %}
-                    <a href="{% url 'accounts:console_home' %}" class="dropdown-item"><i class="fa-solid fa-sliders"></i> Админ-консоль</a>
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'accounts:profile' %}" class="dropdown-item"><i class="fa-regular fa-user"></i> Мой профиль</a>
+                        {% if user.is_superuser or user.profile.role == 'admin' %}
+                        <a href="{% url 'accounts:console_home' %}" class="dropdown-item"><i class="fa-solid fa-sliders"></i> Админ-консоль</a>
+                        {% endif %}
+                        <a href="{% url 'accounts:password_change' %}" class="dropdown-item"><i class="fa-solid fa-key"></i> Сменить пароль</a>
+                        <hr style="margin: 5px 0; border: 0; border-top: 1px solid var(--border-color);">
+                        <form method="post" action="{% url 'accounts:logout' %}" style="margin:0;">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item" style="color: #EB5757; background:none; border:none; width:100%; text-align:left; cursor:pointer; font:inherit;"><i class="fa-solid fa-power-off"></i> Выход</button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'accounts:login' %}" class="dropdown-item"><i class="fa-solid fa-right-to-bracket"></i> Войти</a>
                     {% endif %}
-                    <a href="{% url 'accounts:password_change' %}" class="dropdown-item"><i class="fa-solid fa-key"></i> Сменить пароль</a>
-                    <hr style="margin: 5px 0; border: 0; border-top: 1px solid var(--border-color);">
-                    <form method="post" action="{% url 'accounts:logout' %}" style="margin:0;">
-                        {% csrf_token %}
-                        <button type="submit" class="dropdown-item" style="color: #EB5757; background:none; border:none; width:100%; text-align:left; cursor:pointer; font:inherit;"><i class="fa-solid fa-power-off"></i> Выход</button>
-                    </form>
                 </div>
             </div>
         </header>

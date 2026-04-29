@@ -30,7 +30,14 @@ SECRET_KEY = 'django-insecure-$!y7q&gyioy-19s!8_5+vlbf@czrczz^v!w8#bd35!f)%(bxh!
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.1.126', '127.0.0.1', 'localhost']
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    "192.168.1.126",
+    ".ngrok-free.app",
+    ".ngrok-free.dev",
+]
+CSRF_TRUSTED_ORIGINS = ["https://*.ngrok-free.app", "https://*.ngrok-free.dev"]
 
 
 # Application definition
@@ -45,6 +52,10 @@ INSTALLED_APPS = [
     'accounts',
     'starlift',
 ]
+
+USE_OBJECT_STORAGE = os.getenv("USE_OBJECT_STORAGE", "false").lower() == "true"
+if USE_OBJECT_STORAGE:
+    INSTALLED_APPS.append("storages")
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -173,7 +184,45 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-
-MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+if USE_OBJECT_STORAGE:
+    STORAGE_ENDPOINT_URL = os.getenv("STORAGE_ENDPOINT_URL", "").strip()
+    STORAGE_BUCKET_NAME = os.getenv("STORAGE_BUCKET_NAME", "").strip()
+    STORAGE_ACCESS_KEY = os.getenv("STORAGE_ACCESS_KEY", "").strip()
+    STORAGE_SECRET_KEY = os.getenv("STORAGE_SECRET_KEY", "").strip()
+    STORAGE_REGION = os.getenv("STORAGE_REGION", "").strip()
+    STORAGE_PUBLIC_BASE_URL = os.getenv("STORAGE_PUBLIC_BASE_URL", "").strip()
+    STORAGE_ADDRESSING_STYLE = os.getenv("STORAGE_ADDRESSING_STYLE", "auto").strip() or "auto"
+
+    if not STORAGE_BUCKET_NAME:
+        raise RuntimeError("USE_OBJECT_STORAGE=true requires STORAGE_BUCKET_NAME")
+    if not STORAGE_ACCESS_KEY or not STORAGE_SECRET_KEY:
+        raise RuntimeError("USE_OBJECT_STORAGE=true requires STORAGE_ACCESS_KEY and STORAGE_SECRET_KEY")
+
+    AWS_ACCESS_KEY_ID = STORAGE_ACCESS_KEY
+    AWS_SECRET_ACCESS_KEY = STORAGE_SECRET_KEY
+    AWS_STORAGE_BUCKET_NAME = STORAGE_BUCKET_NAME
+    AWS_S3_REGION_NAME = STORAGE_REGION or None
+    AWS_S3_ENDPOINT_URL = STORAGE_ENDPOINT_URL or None
+    AWS_S3_ADDRESSING_STYLE = STORAGE_ADDRESSING_STYLE
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = False
+    AWS_S3_FILE_OVERWRITE = False
+
+    STORAGES = {
+        "default": {"BACKEND": "storages.backends.s3.S3Storage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+
+    if STORAGE_PUBLIC_BASE_URL:
+        storage_base = STORAGE_PUBLIC_BASE_URL.rstrip("/")
+        custom_domain = storage_base.replace("https://", "").replace("http://", "")
+        AWS_S3_CUSTOM_DOMAIN = custom_domain
+        MEDIA_URL = f"{storage_base}/"
+    else:
+        MEDIA_URL = "/media/"
+else:
+    MEDIA_URL = '/media/'
 

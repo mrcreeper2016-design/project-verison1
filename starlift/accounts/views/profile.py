@@ -51,6 +51,7 @@ def profile_view(request: HttpRequest) -> HttpResponse:
         action = request.POST.get("action", "profile")
         form = ProfileEditForm(
             request.POST if action == "profile" else None,
+            request.FILES if action == "profile" else None,
             initial={
                 "first_name": user.first_name,
                 "last_name": user.last_name,
@@ -100,9 +101,16 @@ def profile_view(request: HttpRequest) -> HttpResponse:
             if new_bio != profile.bio:
                 changes["bio_len"] = {"old": len(profile.bio), "new": len(new_bio)}
                 profile.bio = new_bio
+            avatar_file = form.cleaned_data.get("avatar")
+            if avatar_file:
+                profile.avatar = avatar_file
+                changes["avatar"] = {"updated": True}
             if changes:
                 user.save(update_fields=["first_name", "last_name"])
-                profile.save(update_fields=["bio", "updated_at"])
+                profile_update_fields = ["bio", "updated_at"]
+                if "avatar" in changes:
+                    profile_update_fields.append("avatar")
+                profile.save(update_fields=profile_update_fields)
                 if linked_speaker:
                     linked_speaker.name = _speaker_name()
                     linked_speaker.bio = profile.bio or ""

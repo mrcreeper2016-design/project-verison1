@@ -240,6 +240,7 @@ def speakers_api(request):
                 "status": speaker.status,
                 "nps": int(speaker.nps) if speaker.nps else 0,
                 "img": speaker.img,
+                "avatar": speaker.avatar_url,
                 "events": [{"t": e.title, "s": e.status} for e in speaker.events.all()],
                 "feedbacks": feedbacks_data
             })

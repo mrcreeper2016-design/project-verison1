@@ -34,6 +34,53 @@
     .filter-row label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
     .filter-row .input-compact, .filter-row .select-compact { width: 100%; }
 
+    .numeric-stepper {
+        position: relative;
+        width: 100%;
+    }
+    .numeric-stepper .input-compact {
+        padding-right: 44px;
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
+    .numeric-stepper .input-compact::-webkit-outer-spin-button,
+    .numeric-stepper .input-compact::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    .stepper-controls {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: inline-flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .stepper-btn {
+        width: 28px;
+        height: 16px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background: var(--glass-bg);
+        color: var(--text-muted);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: var(--transition);
+        padding: 0;
+        line-height: 1;
+    }
+    .stepper-btn i { font-size: 10px; }
+    .stepper-btn:hover {
+        border-color: var(--sber-green);
+        color: var(--sber-green);
+        background: var(--light-green);
+        transform: translateY(-1px);
+    }
+    .stepper-btn:active { transform: translateY(0); }
+
     .period-tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--white); border: 1px solid var(--border-color); }
     .period-tabs .tab {
         border: none; background: transparent; cursor: pointer;
@@ -330,9 +377,19 @@
             </div>
             <div class="filter-cell">
                 <label for="filterNps">NPS / средний балл ≥</label>
-                <input type="number" step="0.1" min="0" max="10" class="input-compact" name="nps_threshold"
-                       id="filterNps" placeholder="например, 9.4"
-                       value="{{ filters.nps_threshold }}">
+                <div class="numeric-stepper">
+                    <input type="number" step="0.1" min="0" max="10" class="input-compact" name="nps_threshold"
+                           id="filterNps" placeholder="например, 9.4"
+                           value="{{ filters.nps_threshold }}">
+                    <div class="stepper-controls">
+                        <button type="button" class="stepper-btn" data-step-dir="up" aria-label="Увеличить значение NPS">
+                            <i class="fa-solid fa-chevron-up"></i>
+                        </button>
+                        <button type="button" class="stepper-btn" data-step-dir="down" aria-label="Уменьшить значение NPS">
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
             <div class="filter-cell filter-actions">
                 <button type="submit" class="btn-primary"><i class="fa-solid fa-check"></i> Применить</button>
@@ -882,6 +939,23 @@
         const npsVal = (form.querySelector('#filterNps').value || '').trim();
         form.querySelectorAll('[data-quick-nps]').forEach(chip => {
             if (chip.dataset.quickNps === npsVal) chip.classList.add('active');
+        });
+
+        const npsInput = form.querySelector('#filterNps');
+        form.querySelectorAll('[data-step-dir]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (!npsInput) return;
+                const dir = btn.dataset.stepDir === 'down' ? -1 : 1;
+                const step = Number(npsInput.step || 1) || 1;
+                const min = npsInput.min !== '' ? Number(npsInput.min) : -Infinity;
+                const max = npsInput.max !== '' ? Number(npsInput.max) : Infinity;
+                const current = npsInput.value === '' ? 0 : Number(npsInput.value);
+                const nextRaw = current + (dir * step);
+                const next = Math.min(max, Math.max(min, nextRaw));
+                const decimals = (String(step).split('.')[1] || '').length;
+                npsInput.value = next.toFixed(decimals);
+                npsInput.dispatchEvent(new Event('input', { bubbles: true }));
+            });
         });
     }
 })();

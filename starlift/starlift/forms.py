@@ -1,10 +1,8 @@
-import os
 import requests
 from io import BytesIO
 from PIL import Image
 from django import forms
-from django.conf import settings
-from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError
 from .models import Speaker, Feedback
 
@@ -28,6 +26,7 @@ class SpeakerForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['img'].required = False
+        self._processed_avatar_file = None
 
     class Meta:
         model = Speaker
@@ -95,26 +94,34 @@ class SpeakerForm(forms.ModelForm):
                 # Сохранение в webp
                 import uuid
                 filename = f"avatar_{uuid.uuid4().hex[:8]}.webp"
-                rel_path = f"speakers/{filename}"
-                abs_path = os.path.join(settings.MEDIA_ROOT, 'speakers')
-                os.makedirs(abs_path, exist_ok=True)
-                full_path = os.path.join(abs_path, filename)
-                
+
                 # Конвертируем в RGB если изображение с альфа-каналом и сохраняем
                 if img.mode in ('RGBA', 'P'):
                     img = img.convert('RGB')
-                    
-                img.save(full_path, format='WEBP')
-                
-                cleaned_data['img'] = f"{settings.MEDIA_URL}{rel_path}"
+
+                buffer = BytesIO()
+                img.save(buffer, format='WEBP')
+                buffer.seek(0)
+                self._processed_avatar_file = ContentFile(buffer.read(), name=filename)
+                if not img_field and not getattr(self.instance, "img", ""):
+                    cleaned_data['img'] = "uploaded"
 
             except Exception as e:
                 raise ValidationError(f"Ошибка при обработке изображения: {str(e)}")
-        elif not img_field:
+        elif not img_field and not getattr(self.instance, "img", "") and not getattr(self.instance, "avatar", None):
             import random
             cleaned_data['img'] = str(random.randint(1, 70))
 
         return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self._processed_avatar_file is not None:
+            instance.avatar.save(self._processed_avatar_file.name, self._processed_avatar_file, save=False)
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 class SpeakerSelfEditForm(SpeakerForm):

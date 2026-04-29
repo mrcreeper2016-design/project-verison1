@@ -24,6 +24,7 @@ class UserProfile(models.Model):
     email_verified = models.BooleanField(default=False)
     pending_email = models.EmailField(null=True, blank=True)
     bio = models.TextField(blank=True, default="")
+    avatar = models.ImageField(upload_to="avatars/users/", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -51,6 +52,15 @@ class UserProfile(models.Model):
     def is_member(self) -> bool:
         """Member == admin or speaker; guests are not members."""
         return self.role in (self.ROLE_ADMIN, self.ROLE_SPEAKER)
+
+    @property
+    def avatar_url(self) -> str:
+        if self.avatar:
+            try:
+                return self.avatar.url
+            except ValueError:
+                return ""
+        return ""
 
 
 class Invite(models.Model):

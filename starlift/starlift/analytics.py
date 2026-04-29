@@ -567,7 +567,7 @@ def media_library(filters: AnalyticsFilters, limit: int = 12) -> list[dict[str, 
 
     items = []
     for sp in speakers[:limit]:
-        has_photo = bool(sp.img and (sp.img.startswith("/media/") or sp.img.startswith("http")))
+        has_photo = bool(sp.avatar_url and not sp.avatar_url.startswith("https://i.pravatar.cc/"))
         items.append({
             "id": sp.id,
             "name": sp.name,
