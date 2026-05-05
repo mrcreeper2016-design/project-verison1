@@ -36,7 +36,8 @@
     - `urls.py` — Маршрутизация роутов API и страниц сайта.
     - `views.py` — Основная бизнес-логика (работа с данными и рендер шаблонов).
   - 📁 **`parser/`** — Модули для автоматизированного сбора данных о конференциях:
-    - `parser_highload.py`, `parser_ontico.py`, `ontico_scraper_db.py` — Скраперы для различных IT-мероприятий.
+    - `highload.py`, `highload_importer.py` — разбор страниц Highload++ и импорт в БД через `sync_highload`;
+    - `parser_ontico.py`, `ontico_scraper_db.py` — скраперы для других IT-мероприятий.
     - `tavily_parser.py` — Интеграция с внешним API Tavily.
   - 📁 **`templates/`** — Графический интерфейс, HTML-шаблоны страниц:
     - Дашборд (`index.html`), аналитика (`analytics.html`), списки и профили (`speakers.html`, `profile.html`, `events.html`).
@@ -93,6 +94,25 @@ python manage.py cleanup_stale_auth --login-attempt-days 30
 ```
 Запускать раз в сутки по расписанию.
 
+### Highload++ (`sync_highload`)
+
+Доклады с `highload.ru` сохраняются **напрямую в PostgreSQL** (модели `Speaker`, `Event`, связь M2M). **CSV не используется.**
+
+Разовый проход:
+
+```bash
+cd starlift
+python manage.py sync_highload --once
+```
+
+Цикл с паузой между проходами (интервал по умолчанию 30 минут — задайте флагом или `HIGHLOAD_INTERVAL_MINUTES` в `.env`):
+
+```bash
+python manage.py sync_highload --interval-minutes 30
+```
+
+`--max-cycles N` ограничивает число итераций (удобно для отладки). Список URL — `HIGHLOAD_URLS` в `.env`, пример в `starlift/.env.example`.
+
 ---
 
 ## ⚙️ Переменные окружения
@@ -125,6 +145,12 @@ ACCOUNTS_LOCKOUT_WINDOW_SECONDS=60
 ACCOUNTS_INVITE_TTL_DAYS=7
 ACCOUNTS_EMAIL_CHANGE_TTL_HOURS=24
 ACCOUNTS_RESET_EMAIL_MIN_INTERVAL_SECONDS=300
+
+# Highload++ parser (`python manage.py sync_highload`)
+HIGHLOAD_URLS=https://highload.ru/moscow/2025/abstracts,https://highload.ru/spb/2026/abstracts
+HIGHLOAD_INTERVAL_MINUTES=30
+HIGHLOAD_REQUEST_TIMEOUT=20
+HIGHLOAD_MAX_RETRIES=3
 
 # Object storage (S3-compatible, recommended free option: Cloudflare R2)
 USE_OBJECT_STORAGE=false
@@ -169,9 +195,10 @@ python manage.py migrate_avatars_to_object_storage
 ```bash
 cd starlift
 python manage.py test accounts
+python manage.py test starlift
 ```
 
-Покрывают: валидаторы паролей, backend логина, lockout, токены, аудит, login-flow, password reset/change, invite flow (create/revoke/accept), профиль, email change, admin console (link-speaker, unlock, role change).
+Покрывают: валидаторы паролей, backend логина, lockout, токены, аудит, login-flow, password reset/change, invite flow (create/revoke/accept), профиль, email change, admin console (link-speaker, unlock, role change); парсинг Highload, импорт в БД без дубликатов, management-команда `sync_highload`.
 
 ### Smoke-checklist после включения object storage
 
