@@ -449,46 +449,80 @@
             text-align: center;
         }
 
+        /**
+         * Круглые чекбоксы в стиле интерфейса (glass + зелёная отметка).
+         * Классы: .sl-checkbox (основной), .custom-checkbox — алиас для старых разметок.
+         */
+        .sl-checkbox,
         .custom-checkbox {
             appearance: none;
             -webkit-appearance: none;
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             margin: 0;
-            border-radius: 6px;
-            border: 1.5px solid var(--border-color);
-            background: var(--white);
+            flex-shrink: 0;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+            background: var(--panel-bg);
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.22);
             cursor: pointer;
             position: relative;
-            transition: var(--transition);
+            transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
             vertical-align: middle;
         }
 
+        [data-theme="dark"] .sl-checkbox,
+        [data-theme="dark"] .custom-checkbox {
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+        }
+
+        .sl-checkbox:hover,
         .custom-checkbox:hover {
             border-color: var(--sber-green);
-            box-shadow: 0 0 0 4px var(--light-green);
+            box-shadow: 0 0 0 4px var(--light-green), inset 0 1px 2px rgba(255, 255, 255, 0.12);
+            transform: scale(1.06);
         }
 
+        .sl-checkbox:checked,
         .custom-checkbox:checked {
-            background: var(--sber-green);
-            border-color: var(--sber-green);
+            background: linear-gradient(160deg, var(--sber-green) 0%, var(--sber-green-hover) 100%);
+            border-color: var(--sber-green-hover);
+            box-shadow:
+                0 2px 10px rgba(10, 128, 59, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
 
+        [data-theme="dark"] .sl-checkbox:checked,
+        [data-theme="dark"] .custom-checkbox:checked {
+            box-shadow:
+                0 2px 12px rgba(33, 160, 56, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.12);
+        }
+
+        .sl-checkbox:checked::after,
         .custom-checkbox:checked::after {
-            content: '\2713';
+            content: '';
             position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 13px;
-            color: #fff;
-            font-weight: 800;
+            left: 6px;
+            top: 2px;
+            width: 5px;
+            height: 10px;
+            border: solid #fff;
+            border-width: 0 2.5px 2.5px 0;
+            transform: rotate(45deg);
+            border-radius: 0 1px 0 0;
+            box-sizing: border-box;
         }
 
+        .sl-checkbox:focus-visible,
         .custom-checkbox:focus-visible {
             outline: none;
             box-shadow: 0 0 0 4px var(--light-green);
+        }
+
+        .sl-checkbox:focus-visible:checked,
+        .custom-checkbox:focus-visible:checked {
+            box-shadow: 0 0 0 4px var(--light-green), 0 2px 10px rgba(10, 128, 59, 0.3);
         }
 
         .table-row-selected {
@@ -899,8 +933,8 @@
                             {% endif %}
                         </span>
                     </div>
-                    {% if user.is_authenticated and user.profile.avatar_url %}
-                    <img class="admin-avatar" src="{{ user.profile.avatar_url }}" alt="{{ user.username }}">
+                    {% if user.is_authenticated and header_avatar_url %}
+                    <img class="admin-avatar" src="{{ header_avatar_url }}" alt="{{ user.username }}">
                     {% else %}
                     <div class="admin-avatar" style="display:flex; align-items:center; justify-content:center; background:var(--light-green); color:var(--sber-green); font-weight:700;">
                         {% if user.is_authenticated %}
@@ -1131,6 +1165,14 @@
 
                         // Запускаем кастомное событие для скриптов, ожидающих загрузки контента
                         document.dispatchEvent(new Event('spa-page-loaded'));
+
+                        // Страница «Спикеры»: повторно подтянуть данные после SPA (скрипты иногда не
+                        // отрабатывают из DOMParser, либо fetch стартует до готовности разметки).
+                        requestAnimationFrame(() => {
+                            if (document.querySelector('.speakers-page') && typeof window.loadStarliftSpeakersData === 'function') {
+                                window.loadStarliftSpeakersData();
+                            }
+                        });
                     } else {
                         // Резервный вариант, если что-то пошло не так
                         window.location.href = url;
@@ -1171,8 +1213,9 @@
                         // Если скрипт внешний
                         newScript.src = oldScript.src;
                     } else {
-                        // Если скрипт инлайновый
-                        newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+                        // text / textContent надёжнее innerHTML для узлов из DOMParser
+                        const code = oldScript.textContent || oldScript.text || oldScript.innerHTML || '';
+                        newScript.appendChild(document.createTextNode(code));
                     }
                     oldScript.parentNode.replaceChild(newScript, oldScript);
                 });

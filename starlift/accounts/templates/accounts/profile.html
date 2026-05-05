@@ -29,7 +29,15 @@
     <div class="profile-header animate-fade">
         <div>
             <h1 class="profile-title">Личный кабинет</h1>
-            <p class="profile-subtitle">Имя, фамилия, email, пароль и краткое био. Изменения сохраняются сразу.</p>
+            <p class="profile-subtitle">
+                {% if speaker_card_linked %}
+                Имя, фото и описание — как в списке спикеров на платформе.
+                {% elif is_speaker_role %}
+                Имя, фото и текст о себе. После привязки карточки спикера поле «Описание» появится здесь же.
+                {% else %}
+                Имя, фамилия, email, пароль и краткая информация. Изменения сохраняются сразу.
+                {% endif %}
+            </p>
         </div>
         <span class="role-badge"><i class="fa-solid fa-id-badge"></i> {{ profile.get_role_display }}</span>
     </div>
@@ -53,6 +61,8 @@
                     <div class="readonly-box">
                         {% if profile.avatar_url %}
                         <img src="{{ profile.avatar_url }}" alt="{{ user.username }}" style="width:56px; height:56px; border-radius:12px; object-fit:cover; border:1px solid var(--border-color);">
+                        {% elif linked_speaker and linked_speaker.card_avatar_url %}
+                        <img src="{{ linked_speaker.card_avatar_url }}" alt="{{ user.username }}" style="width:56px; height:56px; border-radius:12px; object-fit:cover; border:1px solid var(--border-color);">
                         {% else %}
                         <div style="width:56px; height:56px; border-radius:12px; border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--sber-green); background:var(--light-green);">
                             {{ user.first_name|default:user.username|slice:":1"|upper }}
@@ -60,7 +70,7 @@
                         {% endif %}
                         <div style="display:grid; gap:6px;">
                             {{ form.avatar }}
-                            <span style="font-size:12px; color:var(--text-muted);">JPG/PNG/WEBP, до 10 МБ</span>
+                            <span style="font-size:12px; color:var(--text-muted);">JPG/PNG/WEBP, до 10 МБ — одно фото для аккаунта и карточки спикера.</span>
                         </div>
                     </div>
                     {% if form.avatar.errors %}<div class="field-errors">{% for e in form.avatar.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
@@ -82,80 +92,27 @@
                         <span style="font-size:12px; color:var(--text-muted);">Неизменно</span>
                     </div>
                 </div>
+                {% if is_speaker_role and not linked_speaker %}
+                <div class="alert-inline alert-warning">
+                    Карточка спикера в базе ещё не привязана. Обратитесь к администратору — после привязки здесь же появится поле «Описание» для ленты спикеров.
+                </div>
+                {% endif %}
                 <div class="form-row">
-                    <label for="{{ form.bio.id_for_label }}">О себе</label>
+                    {% if speaker_card_linked %}
+                    <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+                    {{ form.description }}
+                    {% if form.description.errors %}<div class="field-errors">{% for e in form.description.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                    {% else %}
+                    <label for="{{ form.bio.id_for_label }}">{{ form.bio.label }}</label>
                     {{ form.bio }}
                     {% if form.bio.errors %}<div class="field-errors">{% for e in form.bio.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                    {% endif %}
                 </div>
                 <div style="display:flex; gap:10px; margin-top:4px;">
                     <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-floppy-disk"></i> Сохранить</button>
                 </div>
             </form>
         </div>
-
-        {% if is_speaker_role %}
-        <div class="content-block profile-card animate-fade">
-            <div class="section-title"><i class="fa-solid fa-microphone-lines"></i> Профиль спикера</div>
-            {% if linked_speaker %}
-            <div class="alert-inline alert-warning">
-                Имя и "О себе" синхронизируются из блока "Основное". Здесь редактируются поля карточки спикера.
-            </div>
-            <form method="post" enctype="multipart/form-data" style="display:grid; gap:12px;">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="speaker_profile">
-                {{ speaker_form.img }}
-                <div class="form-row">
-                    <label>Текущее фото</label>
-                    <div class="readonly-box">
-                        {% if linked_speaker.avatar_url %}
-                        <img src="{{ linked_speaker.avatar_url }}" alt="Фото спикера" style="width:56px; height:56px; border-radius:12px; object-fit:cover; border:1px solid var(--border-color);">
-                        {% else %}
-                        <div style="width:56px; height:56px; border-radius:12px; border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--sber-green); background:var(--light-green);">{{ linked_speaker.name|slice:":1" }}</div>
-                        {% endif %}
-                        <span style="font-size:12px; color:var(--text-muted);">Можно загрузить файл или указать URL ниже</span>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <label for="{{ speaker_form.upload_image.id_for_label }}">Загрузить фото (JPG/PNG/WEBP, до 10 МБ)</label>
-                    {{ speaker_form.upload_image }}
-                    {% if speaker_form.upload_image.errors %}<div class="field-errors">{% for e in speaker_form.upload_image.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
-                </div>
-                <div class="form-row">
-                    <label for="{{ speaker_form.image_url.id_for_label }}">Или ссылка на фото</label>
-                    {{ speaker_form.image_url }}
-                    {% if speaker_form.image_url.errors %}<div class="field-errors">{% for e in speaker_form.image_url.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
-                </div>
-                <div class="form-row">
-                    <label for="{{ speaker_form.sub.id_for_label }}">Подзаголовок</label>
-                    {{ speaker_form.sub }}
-                    {% if speaker_form.sub.errors %}<div class="field-errors">{% for e in speaker_form.sub.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
-                </div>
-                <div class="form-row">
-                    <label for="{{ speaker_form.stack.id_for_label }}">Стек</label>
-                    {{ speaker_form.stack }}
-                    {% if speaker_form.stack.errors %}<div class="field-errors">{% for e in speaker_form.stack.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
-                </div>
-                <div class="form-row">
-                    <label for="{{ speaker_form.city.id_for_label }}">Город</label>
-                    {{ speaker_form.city }}
-                    {% if speaker_form.city.errors %}<div class="field-errors">{% for e in speaker_form.city.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
-                </div>
-                <div class="form-row">
-                    <label for="{{ speaker_form.status.id_for_label }}">Статус</label>
-                    {{ speaker_form.status }}
-                    {% if speaker_form.status.errors %}<div class="field-errors">{% for e in speaker_form.status.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
-                </div>
-                <div style="display:flex; gap:10px; margin-top:4px;">
-                    <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-floppy-disk"></i> Сохранить карточку</button>
-                </div>
-            </form>
-            {% else %}
-            <div class="alert-inline alert-warning">
-                Ваш аккаунт спикера ещё не привязан к карточке в базе. Обратитесь к администратору, чтобы выполнить привязку.
-            </div>
-            {% endif %}
-        </div>
-        {% endif %}
         </div>
 
         <div style="display:grid; gap:20px;">

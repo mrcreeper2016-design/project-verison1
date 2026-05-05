@@ -19,11 +19,11 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 
 from starlift.models import Speaker
-from starlift.forms import SpeakerSelfEditForm
 
-from ..forms import EmailChangeForm, ProfileEditForm
+from ..forms import EmailChangeForm, ProfileEditForm, SpeakerProfileMainForm
 from ..models import AuditLog, EmailVerification, UserProfile
 from ..services import audit, email as email_svc, tokens as token_svc
+from ..services.speaker_avatar import backfill_profile_avatar_if_empty
 
 
 def _get_or_create_profile(user) -> UserProfile:
@@ -32,6 +32,25 @@ def _get_or_create_profile(user) -> UserProfile:
         defaults={"role": UserProfile.ROLE_SPEAKER, "email_verified": False},
     )
     return profile
+
+
+def _speaker_main_form(user, profile, linked_speaker):
+    """Форма «Основное»: для привязанного спикера — описание карточки; иначе поле «О себе»."""
+    if profile.role == UserProfile.ROLE_SPEAKER and linked_speaker is not None:
+        return SpeakerProfileMainForm(
+            initial={
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "description": linked_speaker.stack or "",
+            }
+        )
+    return ProfileEditForm(
+        initial={
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "bio": profile.bio,
+        }
+    )
 
 
 @login_required
@@ -47,49 +66,33 @@ def profile_view(request: HttpRequest) -> HttpResponse:
     def _speaker_name() -> str:
         return f"{user.first_name} {user.last_name}".strip() or user.username
 
-    if request.method == "POST":
-        action = request.POST.get("action", "profile")
-        form = ProfileEditForm(
-            request.POST if action == "profile" else None,
-            request.FILES if action == "profile" else None,
-            initial={
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "bio": profile.bio,
-            },
-        )
-        speaker_form = SpeakerSelfEditForm(
-            request.POST if action == "speaker_profile" else None,
-            request.FILES if action == "speaker_profile" else None,
-            instance=linked_speaker,
-        )
+    if linked_speaker and request.method == "GET":
+        if backfill_profile_avatar_if_empty(linked_speaker, user):
+            profile.refresh_from_db()
 
-        if action == "speaker_profile":
-            if not is_speaker_role:
-                messages.error(request, "Доступ к настройке профиля спикера запрещён.")
-                return redirect(reverse("accounts:profile"))
-            if not linked_speaker:
-                messages.warning(
-                    request,
-                    "Профиль спикера ещё не привязан. Попросите администратора связать ваш аккаунт со спикером.",
-                )
-                return redirect(reverse("accounts:profile"))
-            if speaker_form.is_valid():
-                updated_speaker = speaker_form.save(commit=False)
-                # Source of truth for these fields is the account profile.
-                updated_speaker.name = _speaker_name()
-                updated_speaker.bio = profile.bio or ""
-                updated_speaker.save()
-                messages.success(request, "Карточка спикера обновлена.")
-                audit.log(
-                    action=AuditLog.ACTION_PROFILE_UPDATED,
-                    actor=user,
-                    request=request,
-                    target=user,
-                    metadata={"fields": ["speaker.sub", "speaker.stack", "speaker.city", "speaker.status", "speaker.img"]},
-                )
-                return redirect(reverse("accounts:profile"))
-        elif form.is_valid():
+    if request.method == "GET":
+        form = _speaker_main_form(user, profile, linked_speaker)
+    else:
+        action = request.POST.get("action", "profile")
+        if action != "profile":
+            messages.error(request, "Неизвестное действие.")
+            return redirect(reverse("accounts:profile"))
+
+        speaker_linked = is_speaker_role and linked_speaker is not None
+        if speaker_linked:
+            form = SpeakerProfileMainForm(request.POST, request.FILES)
+        else:
+            form = ProfileEditForm(
+                request.POST,
+                request.FILES,
+                initial={
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "bio": profile.bio,
+                },
+            )
+
+        if form.is_valid():
             changes: dict = {}
             if form.cleaned_data.get("first_name") != user.first_name:
                 changes["first_name"] = {"old": user.first_name, "new": form.cleaned_data["first_name"]}
@@ -97,24 +100,42 @@ def profile_view(request: HttpRequest) -> HttpResponse:
             if form.cleaned_data.get("last_name") != user.last_name:
                 changes["last_name"] = {"old": user.last_name, "new": form.cleaned_data["last_name"]}
                 user.last_name = form.cleaned_data["last_name"]
-            new_bio = form.cleaned_data.get("bio") or ""
-            if new_bio != profile.bio:
-                changes["bio_len"] = {"old": len(profile.bio), "new": len(new_bio)}
-                profile.bio = new_bio
+
             avatar_file = form.cleaned_data.get("avatar")
             if avatar_file:
                 profile.avatar = avatar_file
                 changes["avatar"] = {"updated": True}
-            if changes:
-                user.save(update_fields=["first_name", "last_name"])
-                profile_update_fields = ["bio", "updated_at"]
-                if "avatar" in changes:
-                    profile_update_fields.append("avatar")
-                profile.save(update_fields=profile_update_fields)
+
+            profile_update_fields = ["updated_at"]
+            if speaker_linked:
+                desc = form.cleaned_data.get("description") or ""
+                if desc != (linked_speaker.stack or ""):
+                    changes["speaker.stack"] = True
+                if desc != (profile.bio or ""):
+                    changes["bio_len"] = {"old": len(profile.bio or ""), "new": len(desc)}
+                profile.bio = desc
+                profile_update_fields.append("bio")
+                linked_speaker.stack = desc
+                linked_speaker.bio = desc
+                linked_speaker.name = _speaker_name()
+                linked_speaker.save(update_fields=["name", "stack", "bio"])
+            else:
+                new_bio = form.cleaned_data.get("bio") or ""
+                if new_bio != profile.bio:
+                    changes["bio_len"] = {"old": len(profile.bio), "new": len(new_bio)}
+                    profile.bio = new_bio
+                    profile_update_fields.append("bio")
                 if linked_speaker:
                     linked_speaker.name = _speaker_name()
                     linked_speaker.bio = profile.bio or ""
                     linked_speaker.save(update_fields=["name", "bio"])
+
+            if changes:
+                user.save(update_fields=["first_name", "last_name"])
+                if "avatar" in changes:
+                    profile_update_fields.append("avatar")
+                profile.save(update_fields=profile_update_fields)
+
                 audit.log(
                     action=AuditLog.ACTION_PROFILE_UPDATED,
                     actor=user,
@@ -126,21 +147,14 @@ def profile_view(request: HttpRequest) -> HttpResponse:
             else:
                 messages.info(request, "Изменений не найдено.")
             return redirect(reverse("accounts:profile"))
-    else:
-        form = ProfileEditForm(initial={
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "bio": profile.bio,
-        })
-        speaker_form = SpeakerSelfEditForm(instance=linked_speaker)
 
     context = {
         "form": form,
         "profile": profile,
         "pending_email": profile.pending_email,
-        "speaker_form": speaker_form,
         "linked_speaker": linked_speaker,
         "is_speaker_role": is_speaker_role,
+        "speaker_card_linked": is_speaker_role and linked_speaker is not None,
     }
     return render(request, "accounts/profile.html", context)
 

@@ -36,9 +36,8 @@ class SpeakerForm(forms.ModelForm):
         fields = ['name', 'stack', 'city', 'img', 'recommended']
         labels = {
             'name': 'Имя и Фамилия',
-            'stack': 'Стек (через запятую)',
+            'stack': 'Описание',
             'city': 'Город',
-            'status': 'Статус',
         }
         widgets = {
             'name': forms.TextInput(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border);'}),
@@ -132,19 +131,18 @@ class SpeakerSelfEditForm(SpeakerForm):
     """
 
     class Meta(SpeakerForm.Meta):
-        fields = ['sub', 'stack', 'city', 'status', 'bio', 'img']
+        fields = ['sub', 'stack', 'city', 'bio', 'img']
         labels = {
             'sub': 'Подзаголовок',
-            'stack': 'Стек (через запятую)',
+            'stack': 'Описание',
             'city': 'Город',
-            'status': 'Статус',
             'bio': 'О себе',
         }
         widgets = {
             'sub': forms.TextInput(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border);'}),
             'stack': forms.TextInput(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border);'}),
             'city': forms.TextInput(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border);'}),
-            'status': forms.TextInput(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border);'}),
             'bio': forms.Textarea(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border); min-height: 120px;'}),
             'img': forms.HiddenInput(),
         }
+

@@ -24,6 +24,7 @@ from starlift.models import Speaker
 from ..decorators import role_required
 from ..models import AuditLog, LoginAttempt, UserProfile
 from ..services import audit, lockout
+from ..services.speaker_avatar import seed_user_profile_avatar_from_linked_speaker
 
 
 User = get_user_model()
@@ -156,6 +157,7 @@ def user_detail_view(request: HttpRequest, user_id: int) -> HttpResponse:
                                 auto_linked_speaker = matches[0]
                                 auto_linked_speaker.user = target
                                 auto_linked_speaker.save(update_fields=["user"])
+                                seed_user_profile_avatar_from_linked_speaker(auto_linked_speaker, target)
                                 audit.log(
                                     action=AuditLog.ACTION_SPEAKER_LINKED,
                                     actor=request.user,
@@ -214,9 +216,13 @@ def user_detail_view(request: HttpRequest, user_id: int) -> HttpResponse:
                                 f"Этот спикер уже связан с пользователем {speaker.user.username}.",
                             )
                         else:
-                            Speaker.objects.filter(user=target).exclude(pk=speaker.pk).update(user=None)
+                            Speaker.objects.filter(user=target).exclude(pk=speaker.pk).update(
+                                user=None,
+                                status=Speaker.STATUS_UNAUTHORIZED,
+                            )
                             speaker.user = target
                             speaker.save(update_fields=["user"])
+                            seed_user_profile_avatar_from_linked_speaker(speaker, target)
                             audit.log(
                                 action=AuditLog.ACTION_SPEAKER_LINKED,
                                 actor=request.user,

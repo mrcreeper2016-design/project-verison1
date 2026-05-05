@@ -9,8 +9,10 @@ Covers the two most important guarantees of the StarLift MVP:
 
 import json
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.http.request import QueryDict
 from django.test import TestCase
 from django.urls import reverse
@@ -19,6 +21,95 @@ from django.utils import timezone
 from . import analytics as analytics_lib
 from . import home_metrics
 from .models import Event, Feedback, Speaker
+
+from parser.highload import parse_records_from_html
+from parser.highload_importer import ImportCounters, run_import_pass, sync_all_urls
+
+
+def _login_admin(client):
+    from accounts.models import UserProfile
+
+    User = get_user_model()
+    user = User.objects.create_user(
+        username="admintest",
+        email="admin@example.com",
+        password="Secret!234",
+    )
+    user.profile.role = UserProfile.ROLE_ADMIN
+    user.profile.email_verified = True
+    user.profile.save(update_fields=["role", "email_verified"])
+    client.login(username="admintest", password="Secret!234")
+    return user
+
+
+class QrAccessTests(TestCase):
+    def setUp(self):
+        self.sp_me = _make_speaker("MeSpeaker")
+        self.sp_other = _make_speaker("OtherSpeaker")
+        self.ev_ok = _make_event("My Talk")
+        self.ev_foreign = _make_event("Foreign Event")
+        self.ev_ok.speakers.add(self.sp_me)
+        self.ev_foreign.speakers.add(self.sp_other)
+
+        User = get_user_model()
+        from accounts.models import UserProfile
+
+        self.user_sp = User.objects.create_user(
+            username="spqr",
+            email="spqr@example.com",
+            password="Secret!234",
+        )
+        self.user_sp.profile.role = UserProfile.ROLE_SPEAKER
+        self.user_sp.profile.email_verified = True
+        self.user_sp.profile.save(update_fields=["role", "email_verified"])
+        self.sp_me.user = self.user_sp
+        self.sp_me.save(update_fields=["user"])
+
+    def test_speaker_qr_page_hides_speaker_picker(self):
+        self.client.login(username="spqr", password="Secret!234")
+        r = self.client.get(reverse("qr_generator"))
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, 'id="speakerSelect"')
+        self.assertContains(r, "Выберите мероприятие")
+        self.assertContains(r, "My Talk")
+        self.assertNotContains(r, "Foreign Event")
+
+    def test_admin_qr_page_lists_all_speakers(self):
+        _login_admin(self.client)
+        r = self.client.get(reverse("qr_generator"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'id="speakerSelect"')
+        self.assertContains(r, "MeSpeaker")
+        self.assertContains(r, "OtherSpeaker")
+
+    def test_speaker_can_generate_qr_only_own_event(self):
+        self.client.login(username="spqr", password="Secret!234")
+        url = reverse("generate_qr", kwargs={"speaker_id": self.sp_me.id, "event_id": self.ev_ok.id})
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_speaker_forbidden_other_speaker(self):
+        self.client.login(username="spqr", password="Secret!234")
+        url = reverse("generate_qr", kwargs={"speaker_id": self.sp_other.id, "event_id": self.ev_ok.id})
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_speaker_forbidden_event_not_linked(self):
+        self.client.login(username="spqr", password="Secret!234")
+        url = reverse("generate_qr", kwargs={"speaker_id": self.sp_me.id, "event_id": self.ev_foreign.id})
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_admin_can_generate_any_pair(self):
+        _login_admin(self.client)
+        url = reverse("generate_qr", kwargs={"speaker_id": self.sp_other.id, "event_id": self.ev_foreign.id})
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_unlinked_speaker_sees_warning_and_disabled_controls(self):
+        self.sp_me.user = None
+        self.sp_me.save(update_fields=["user"])
+        self.client.login(username="spqr", password="Secret!234")
+        r = self.client.get(reverse("qr_generator"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "привязанная карточка")
+        self.assertIn("disabled", r.content.decode().lower())
 
 
 def _login_member(client):
@@ -45,7 +136,7 @@ def _login_member(client):
 
 def _make_speaker(name: str = "Speaker", city: str = "Moscow", stack: str = "Python") -> Speaker:
     return Speaker.objects.create(
-        name=name, sub="Sub", stack=stack, city=city, status="active", nps=0, img="1"
+        name=name, sub="Sub", stack=stack, city=city, nps=0, img="1"
     )
 
 
@@ -300,3 +391,128 @@ class HomeDashboardTests(TestCase):
     def test_parse_filters_normalises_invalid_period(self):
         filters = home_metrics.parse_filters(QueryDict("period=bogus"))
         self.assertEqual(filters.period, str(home_metrics.DEFAULT_PERIOD_DAYS))
+
+
+HIGHLOAD_FIXTURE_HTML = """
+<div class="thesis__list">
+  <div>
+    <div>
+      <h2 class="thesis__item-title">
+        <a class="thesis__item-title-link" href="/talk/one">Talk One</a>
+      </h2>
+      <div class="thesis__tags"><div>Python</div><div>Backend</div></div>
+      <div class="thesis__authors">
+        <div class="thesis__author">
+          <a class="thesis__author-name">Jane Doe</a>
+          <p class="thesis__author-company">ACME Corp</p>
+          <a class="thesis__author-img" style="background-image: url('/static/jane.png');"></a>
+        </div>
+      </div>
+      <a class="thesis__item-schedule-text">12 марта, 10:00</a>
+      <div class="thesis__text">Abstract body</div>
+    </div>
+  </div>
+</div>
+"""
+
+
+class HighloadParserTests(TestCase):
+    def test_parses_expected_fields(self):
+        rows = parse_records_from_html(HIGHLOAD_FIXTURE_HTML, base_url="https://highload.ru")
+        self.assertEqual(len(rows), 1)
+        r = rows[0]
+        self.assertEqual(r["author"], "Jane Doe")
+        self.assertEqual(r["company"], "ACME Corp")
+        self.assertEqual(r["title"], "Talk One")
+        self.assertEqual(r["date"], "12 марта")
+        self.assertEqual(r["stack"], "Python, Backend")
+        self.assertEqual(r["description"], "Abstract body")
+        self.assertEqual(r["link"], "https://highload.ru/talk/one")
+        self.assertTrue(r["author_avatar"].endswith("/static/jane.png"))
+
+    def test_missing_thesis_list_returns_empty(self):
+        self.assertEqual(parse_records_from_html("<html><body></body></html>"), [])
+
+    def test_broken_inner_blocks_skipped_without_crash(self):
+        bad = """
+        <div class="thesis__list"><div><div>
+          <h2 class="thesis__item-title"></h2>
+        </div></div></div>
+        """
+        self.assertEqual(parse_records_from_html(bad), [])
+
+
+class HighloadImporterTests(TestCase):
+    def _sample_record(self) -> dict[str, str]:
+        return {
+            "author": "Jane Doe",
+            "author_avatar": "https://highload.test/a.png",
+            "company": "ACME Corp",
+            "title": "Talk One",
+            "date": "12 марта",
+            "stack": "Python",
+            "description": "Abstract body",
+            "link": "https://highload.ru/talk/one",
+        }
+
+    def test_import_creates_speaker_event_and_m2m(self):
+        run_import_pass(records=[self._sample_record()])
+        self.assertEqual(Speaker.objects.count(), 1)
+        self.assertEqual(Event.objects.count(), 1)
+        sp = Speaker.objects.get()
+        ev = Event.objects.get()
+        self.assertEqual(sp.name, "Jane Doe")
+        self.assertEqual(sp.sub, "ACME Corp")
+        self.assertEqual(sp.city, "Не указан")
+        self.assertEqual(sp.status, Speaker.STATUS_UNAUTHORIZED)
+        self.assertEqual(ev.title, "Talk One")
+        self.assertEqual(ev.status, "future")
+        self.assertEqual(ev.source, "parser")
+        self.assertTrue(ev.is_external)
+        self.assertIn(sp, ev.speakers.all())
+
+    def test_second_import_no_duplicates(self):
+        rec = self._sample_record()
+        run_import_pass(records=[rec])
+        n_sp, n_ev = Speaker.objects.count(), Event.objects.count()
+        run_import_pass(records=[rec])
+        self.assertEqual(Speaker.objects.count(), n_sp)
+        self.assertEqual(Event.objects.count(), n_ev)
+
+    def test_empty_author_skipped(self):
+        bad = self._sample_record()
+        bad["author"] = ""
+        c = run_import_pass(records=[bad])
+        self.assertEqual(c.skipped, 1)
+        self.assertEqual(Speaker.objects.count(), 0)
+
+    @patch.object(Speaker, "save", side_effect=RuntimeError("db down"))
+    def test_failed_row_counts_failed(self, _mock_save):
+        rec = self._sample_record()
+        c = run_import_pass(records=[rec])
+        self.assertEqual(c.failed, 1)
+        self.assertEqual(Speaker.objects.count(), 0)
+
+    @patch("parser.highload.fetch_html")
+    def test_sync_all_urls_no_network(self, mock_fetch):
+        mock_fetch.return_value = HIGHLOAD_FIXTURE_HTML
+        import requests
+
+        sync_all_urls(urls=["https://example.invalid/abstracts"], session=requests.Session())
+        self.assertTrue(Speaker.objects.filter(name="Jane Doe").exists())
+        mock_fetch.assert_called()
+
+
+class SyncHighloadCommandTests(TestCase):
+    @patch("starlift.management.commands.sync_highload.sync_all_urls")
+    def test_once_calls_sync_once(self, mock_sync):
+        mock_sync.return_value = ImportCounters()
+        call_command("sync_highload", "--once")
+        mock_sync.assert_called_once()
+
+    @patch("time.sleep", return_value=None)
+    @patch("starlift.management.commands.sync_highload.sync_all_urls")
+    def test_max_cycles_runs_n_times(self, mock_sync, _sleep):
+        mock_sync.return_value = ImportCounters()
+        call_command("sync_highload", "--max-cycles=2", "--interval-minutes=1")
+        self.assertEqual(mock_sync.call_count, 2)

@@ -5,10 +5,14 @@ from .models import Event, Feedback, Speaker
 
 @admin.register(Speaker)
 class SpeakerAdmin(admin.ModelAdmin):
-    list_display = ("name", "city", "status", "nps", "recommended", "created_at")
+    list_display = ("name", "city", "link_status_display", "nps", "recommended", "created_at")
     list_filter = ("status", "recommended", "city")
     search_fields = ("name", "sub", "stack", "city")
-    readonly_fields = ("nps", "created_at")
+    readonly_fields = ("nps", "status", "created_at")
+
+    @admin.display(description="Статус", ordering="status")
+    def link_status_display(self, obj: Speaker) -> str:
+        return obj.link_status_display
 
 
 @admin.register(Event)

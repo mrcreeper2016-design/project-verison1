@@ -230,6 +230,28 @@ class ProfileEditForm(forms.Form):
         return avatar
 
 
+class SpeakerProfileMainForm(forms.Form):
+    """Единое «Основное» для спикера с привязанной карточкой: имя, аватар, описание (`Speaker.stack`)."""
+
+    first_name = forms.CharField(label="Имя", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
+    last_name = forms.CharField(label="Фамилия", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
+    avatar = forms.ImageField(label="Аватар", required=False, widget=forms.FileInput(attrs={"class": _INPUT_CLASS}))
+    description = forms.CharField(
+        label="Описание",
+        max_length=200,
+        required=False,
+        widget=forms.Textarea(attrs={**_field_attrs(), "rows": 4, "style": "width:100%; min-height:120px;"}),
+    )
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get("avatar")
+        if not avatar:
+            return avatar
+        if avatar.size > 10 * 1024 * 1024:
+            raise ValidationError("Размер файла не должен превышать 10 МБ.")
+        return avatar
+
+
 class SpeakerProfileForm(forms.Form):
     """Speaker-owned fields for the linked `starlift.Speaker` card.
 
@@ -254,12 +276,6 @@ class SpeakerProfileForm(forms.Form):
         max_length=100,
         required=False,
         widget=forms.TextInput(attrs=_field_attrs()),
-    )
-    status = forms.CharField(
-        label="Статус",
-        max_length=50,
-        required=False,
-        widget=forms.TextInput(attrs=_field_attrs(placeholder="Активен")),
     )
 
 

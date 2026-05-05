@@ -109,6 +109,13 @@
     }
     .chip:hover { border-color: var(--sber-green); color: var(--sber-green); }
     .chip.active { background: var(--light-green); border-color: var(--sber-green); color: var(--sber-green-hover); }
+    label.chip.chip-checkbox {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        user-select: none;
+        margin: 0;
+    }
 
     @media (max-width: 1100px) { .filter-row { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 640px) { .filter-row { grid-template-columns: 1fr; } }
@@ -401,8 +408,8 @@
             <button type="button" class="chip" data-quick-nps="9.4"><i class="fa-solid fa-medal"></i> NPS ≥ 9.4</button>
             <button type="button" class="chip" data-quick-nps="9.0">Средний ≥ 9.0</button>
             <button type="button" class="chip" data-quick-nps="8.0">Средний ≥ 8.0</button>
-            <label class="chip" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
-                <input type="checkbox" name="only_recommended" value="1" {% if filters.only_recommended %}checked{% endif %} style="margin: 0;">
+            <label class="chip chip-checkbox">
+                <input type="checkbox" name="only_recommended" value="1" class="sl-checkbox" {% if filters.only_recommended %}checked{% endif %}>
                 Только "Рекомендую к выдвижению"
             </label>
         </div>

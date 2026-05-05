@@ -90,26 +90,71 @@
     .btn-generate:active {
         transform: translateY(0);
     }
+
+    .btn-generate:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .btn-generate:disabled:hover {
+        background-color: var(--sber-green);
+        transform: none;
+        box-shadow: none;
+    }
+
+    .qr-hint {
+        font-size: 14px;
+        color: var(--text-muted);
+        margin: -12px 0 8px;
+        line-height: 1.45;
+        text-align: center;
+    }
+
+    .qr-alert {
+        padding: 12px 14px;
+        border-radius: 12px;
+        font-size: 14px;
+        line-height: 1.45;
+        background: rgba(224, 165, 0, 0.12);
+        color: #B87C00;
+        border: 1px solid rgba(224, 165, 0, 0.35);
+        margin-bottom: 16px;
+    }
 </style>
 
 <div class="qr-gen-container">
-    <div class="qr-form-card animate-fade">
+    <div class="qr-form-card animate-fade" id="qrGenRoot"
+         data-self-only="{% if qr_self_only %}1{% else %}0{% endif %}"
+         data-speaker-id="{% if qr_speaker_id %}{{ qr_speaker_id }}{% endif %}">
         <h2 class="qr-form-title">Создать QR-код для оценки</h2>
 
+        {% if qr_self_only %}
+            {% if linked_speaker %}
+            <p class="qr-hint">QR-код ведёт на оценку вашего выступления. Выберите мероприятие из списка, где вы указаны как спикер.</p>
+            {% else %}
+            <div class="qr-alert">
+                Чтобы создавать QR-коды, нужна привязанная карточка спикера. Обратитесь к администратору.
+            </div>
+            {% endif %}
+        {% endif %}
+
+        {% if not qr_self_only %}
         <div class="form-group">
             <label class="form-label" for="speakerSelect">Выберите спикера</label>
             <select class="form-select" id="speakerSelect">
-                <!-- Опция по умолчанию -->
                 <option value="" disabled selected>-- Выберите спикера --</option>
                 {% for speaker in speakers %}
                     <option value="{{ speaker.id }}">{{ speaker.name }}</option>
                 {% endfor %}
             </select>
         </div>
+        {% endif %}
 
         <div class="form-group">
             <label class="form-label" for="eventSelect">Выберите мероприятие</label>
-            <select class="form-select" id="eventSelect">
+            <select class="form-select" id="eventSelect" {% if qr_self_only and not linked_speaker %}disabled{% endif %}>
                 <option value="" disabled selected>-- Выберите мероприятие --</option>
                 {% for event in events %}
                     <option value="{{ event.id }}">{{ event.title }}</option>
@@ -117,7 +162,11 @@
             </select>
         </div>
 
-        <button type="button" class="btn-generate" id="generateBtn">
+        {% if qr_self_only and linked_speaker and not events %}
+        <p class="qr-hint" style="margin-top:4px;">У вас пока нет мероприятий в базе. После того как администратор добавит вас к событию, оно появится здесь.</p>
+        {% endif %}
+
+        <button type="button" class="btn-generate" id="generateBtn" {% if qr_self_only and not qr_speaker_id or qr_self_only and linked_speaker and not events %}disabled{% endif %}>
             <i class="fa-solid fa-qrcode"></i> Сгенерировать
         </button>
     </div>
@@ -125,21 +174,25 @@
 
 <script>
     (function() {
+        const root = document.getElementById('qrGenRoot');
         const generateBtn = document.getElementById('generateBtn');
         const speakerSelect = document.getElementById('speakerSelect');
         const eventSelect = document.getElementById('eventSelect');
+        const selfOnly = root && root.dataset.selfOnly === '1';
+        const fixedSpeakerId = (root && root.dataset.speakerId) ? String(root.dataset.speakerId).trim() : '';
 
         if (generateBtn) {
             generateBtn.addEventListener('click', function() {
-                const speakerId = speakerSelect.value;
-                const eventId = eventSelect.value;
+                const speakerId = selfOnly ? fixedSpeakerId : (speakerSelect && speakerSelect.value);
+                const eventId = eventSelect && eventSelect.value;
 
                 if (!speakerId || !eventId) {
-                    alert('Пожалуйста, выберите спикера и мероприятие.');
+                    alert(selfOnly
+                        ? 'Пожалуйста, выберите мероприятие.'
+                        : 'Пожалуйста, выберите спикера и мероприятие.');
                     return;
                 }
 
-                // Формируем ссылку на основе имеющегося шаблона url - '/speaker/<speaker_id>/event/<event_id>/qr/'
                 const qrUrl = `/speaker/${speakerId}/event/${eventId}/qr/`;
                 window.location.href = qrUrl;
             });

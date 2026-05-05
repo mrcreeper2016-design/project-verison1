@@ -58,7 +58,7 @@ class ConsoleOperationsTests(TestCase):
         cls.guest.profile.role = UserProfile.ROLE_GUEST
         cls.guest.profile.email_verified = True
         cls.guest.profile.save()
-        cls.speaker_model = Speaker.objects.create(name="Петр", sub="M", stack="py", city="Msk", status="open", img="x")
+        cls.speaker_model = Speaker.objects.create(name="Петр", sub="M", stack="py", city="Msk", img="x")
 
     def setUp(self):
         self.client.login(username="root", password="Admin!234")
@@ -93,7 +93,7 @@ class ConsoleOperationsTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         self.speaker_model.refresh_from_db()
         self.assertEqual(self.speaker_model.user_id, self.speaker.pk)
-        self.assertTrue(AuditLog.objects.filter(action=AuditLog.ACTION_SPEAKER_LINKED).exists())
+        self.assertEqual(self.speaker_model.status, Speaker.STATUS_AUTHORIZED)
 
     def test_admin_unlink_speaker(self):
         self.speaker_model.user = self.speaker
@@ -105,6 +105,7 @@ class ConsoleOperationsTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         self.speaker_model.refresh_from_db()
         self.assertIsNone(self.speaker_model.user_id)
+        self.assertEqual(self.speaker_model.status, Speaker.STATUS_UNAUTHORIZED)
         self.assertTrue(AuditLog.objects.filter(action=AuditLog.ACTION_SPEAKER_UNLINKED).exists())
 
     def test_admin_can_delete_guest_user(self):

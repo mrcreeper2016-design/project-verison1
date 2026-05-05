@@ -25,6 +25,7 @@ from ..decorators import role_required
 from ..forms import InviteCreateForm, InviteSignupForm
 from ..models import AuditLog, Invite, UserProfile
 from ..services import audit, email as email_svc, tokens as token_svc
+from ..services.speaker_avatar import seed_user_profile_avatar_from_linked_speaker
 
 
 User = get_user_model()
@@ -164,6 +165,7 @@ def invite_accept_view(request: HttpRequest, token: str) -> HttpResponse:
                         if speaker is not None and speaker.user_id is None:
                             speaker.user = user
                             speaker.save(update_fields=["user"])
+                            seed_user_profile_avatar_from_linked_speaker(speaker, user)
 
                     invite_fresh.used_at = timezone.now()
                     invite_fresh.consumed_by = user

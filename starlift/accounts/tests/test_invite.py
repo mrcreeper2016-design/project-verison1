@@ -20,7 +20,7 @@ class InviteFlowTests(TestCase):
         cls.speaker_person = User.objects.create_user(username="vasya", email="vasya@example.com", password="Secret!234")
         cls.speaker_person.profile.role = UserProfile.ROLE_SPEAKER
         cls.speaker_person.profile.save()
-        cls.speaker = Speaker.objects.create(name="Петр Петров", sub="Senior", stack="py,go", city="Москва", status="open", img="p.jpg")
+        cls.speaker = Speaker.objects.create(name="Петр Петров", sub="Senior", stack="py,go", city="Москва", img="p.jpg")
 
     def test_speaker_cannot_see_invites(self):
         self.client.login(username="vasya", password="Secret!234")
@@ -95,6 +95,7 @@ class InviteFlowTests(TestCase):
         self.speaker.refresh_from_db()
         new_user = User.objects.get(username="petrp")
         self.assertEqual(self.speaker.user_id, new_user.pk)
+        self.assertEqual(self.speaker.status, Speaker.STATUS_AUTHORIZED)
 
     def test_accept_invalid_token_410(self):
         resp = self.client.get(reverse("accounts:invite_accept", args=["invalidtoken"]))

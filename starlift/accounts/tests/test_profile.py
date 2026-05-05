@@ -157,7 +157,6 @@ class AvatarMigrationTests(TestCase):
                 sub="S",
                 stack="py",
                 city="Msk",
-                status="active",
                 nps=0,
                 img="/media/speakers/legacy.png",
             )

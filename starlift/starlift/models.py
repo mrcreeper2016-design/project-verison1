@@ -5,11 +5,26 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class Speaker(models.Model):
+    """Speaker card. Field ``status`` reflects account linkage only (see ``save``)."""
+
+    STATUS_UNAUTHORIZED = "unauthorized"
+    STATUS_AUTHORIZED = "authorized"
+    STATUS_CHOICES = [
+        (STATUS_UNAUTHORIZED, "Неавторизован"),
+        (STATUS_AUTHORIZED, "Авторизован"),
+    ]
+
     name = models.CharField(max_length=200)
     sub = models.CharField(max_length=200)
     stack = models.CharField(max_length=200)
     city = models.CharField(max_length=100)
-    status = models.CharField(max_length=50)
+    status = models.CharField(
+        max_length=50,
+        choices=STATUS_CHOICES,
+        default=STATUS_UNAUTHORIZED,
+        verbose_name="Статус",
+        help_text="Неавторизован — нет привязки к аккаунту; Авторизован — связан с пользователем платформы.",
+    )
     nps = models.IntegerField(default=0)
     img = models.CharField(max_length=100)
     avatar = models.ImageField(upload_to="avatars/speakers/", null=True, blank=True)
@@ -43,19 +58,52 @@ class Speaker(models.Model):
     class Meta:
         db_table = 'starlift_speaker'
 
+    def save(self, *args, **kwargs):
+        self.status = self.STATUS_AUTHORIZED if self.user_id else self.STATUS_UNAUTHORIZED
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = list(update_fields)
+            if "status" not in update_fields:
+                update_fields.append("status")
+            kwargs["update_fields"] = update_fields
+        super().save(*args, **kwargs)
+
     @property
-    def avatar_url(self):
+    def link_status_display(self) -> str:
+        """Статус для UI: только факт привязки к аккаунту (не сырое поле ``status``)."""
+        labels = dict(self.STATUS_CHOICES)
+        return labels[self.STATUS_AUTHORIZED] if self.user_id else labels[self.STATUS_UNAUTHORIZED]
+
+    @property
+    def card_avatar_url(self) -> str:
+        """Photo stored on the speaker card only (ImageField + ``img``), not the linked account."""
         if self.avatar:
             try:
                 return self.avatar.url
             except ValueError:
-                # Storage backend may fail to build URL for broken rows.
                 pass
         if self.img:
-            if self.img.startswith('/media/') or self.img.startswith('http'):
+            if self.img.startswith("/media/") or self.img.startswith("http"):
                 return self.img
             return f"https://i.pravatar.cc/150?img={self.img}"
         return ""
+
+    @property
+    def avatar_url(self) -> str:
+        if self.user_id:
+            from django.apps import apps
+
+            Profile = apps.get_model("accounts", "UserProfile")
+            try:
+                prof = Profile.objects.get(pk=self.user_id)
+                if prof.avatar and getattr(prof.avatar, "name", ""):
+                    try:
+                        return prof.avatar.url
+                    except ValueError:
+                        pass
+            except Profile.DoesNotExist:
+                pass
+        return self.card_avatar_url
 
     def calculate_nps(self, event_id=None):
         qs = self.feedbacks.all()
