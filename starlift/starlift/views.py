@@ -1,8 +1,11 @@
 ﻿import base64
 import json
+import logging
 import re
 from datetime import date
 from io import BytesIO
+
+logger = logging.getLogger(__name__)
 
 import qrcode
 from django.contrib.auth.decorators import login_required
@@ -137,9 +140,6 @@ def effective_sort_date(event: Event, today: date) -> date | None:
     return earliest_date_in_text((event.description or "")[:800], today)
 
 def get_client_ip(request):
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        return x_forwarded_for.split(',')[0]
     return request.META.get('REMOTE_ADDR')
 
 def submit_feedback_view(request, event_id, speaker_id):
@@ -182,7 +182,6 @@ def submit_feedback_view(request, event_id, speaker_id):
             feedback.ip_address = ip_address
 
             # Rate limiting
-            from django.utils import timezone
             from datetime import timedelta
             recent_feedback = Feedback.objects.filter(ip_address=ip_address, created_at__gte=timezone.now() - timedelta(minutes=1)).exists()
             if recent_feedback:
@@ -199,7 +198,7 @@ def submit_feedback_view(request, event_id, speaker_id):
                 'already_voted': True,
                 'success_msg': True
             })
-            response.set_cookie(f'voted_{event.id}_{speaker.id}', 'true', max_age=315360000)
+            response.set_cookie(f'voted_{event.id}_{speaker.id}', 'true', max_age=60 * 60 * 24 * 365)
             return response
     else:
         form = FeedbackForm()
@@ -368,9 +367,9 @@ def speakers_api(request):
                 "feedbacks": feedbacks_data
             })
         return JsonResponse(speakers_data, safe=False)
-    except Exception as e:
-        print(f"Error fetching speakers: {e}")
-        return JsonResponse([], safe=False)
+    except Exception:
+        logger.exception("Error fetching speakers")
+        return JsonResponse({"error": "Internal server error"}, status=500)
 
 @member_required
 def events_api(request):
@@ -441,9 +440,9 @@ def events_api(request):
         events_data.sort(key=sort_key)
 
         return JsonResponse(events_data, safe=False)
-    except Exception as e:
-        print(f"Error fetching events: {e}")
-        return JsonResponse([], safe=False)
+    except Exception:
+        logger.exception("Error fetching events")
+        return JsonResponse({"error": "Internal server error"}, status=500)
 
 @role_required('admin')
 def speaker_add(request):

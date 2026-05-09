@@ -227,6 +227,9 @@ class ProfileEditForm(forms.Form):
             return avatar
         if avatar.size > 10 * 1024 * 1024:
             raise ValidationError("Размер файла не должен превышать 10 МБ.")
+        allowed_types = {"image/jpeg", "image/png", "image/webp"}
+        if avatar.content_type not in allowed_types:
+            raise ValidationError("Допустимые форматы: JPEG, PNG, WebP.")
         return avatar
 
 
@@ -249,6 +252,9 @@ class SpeakerProfileMainForm(forms.Form):
             return avatar
         if avatar.size > 10 * 1024 * 1024:
             raise ValidationError("Размер файла не должен превышать 10 МБ.")
+        allowed_types = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+        if avatar.content_type not in allowed_types:
+            raise ValidationError("Допустимые форматы: JPEG, PNG, GIF, WebP.")
         return avatar
 
 

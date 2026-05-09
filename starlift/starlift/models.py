@@ -136,8 +136,13 @@ class Event(models.Model):
         ('parser', 'Автопарсинг'),
     ]
 
+    STATUS_CHOICES = [
+        ('past', 'Прошедшее'),
+        ('future', 'Предстоящее'),
+    ]
+
     title = models.CharField(max_length=200)
-    status = models.CharField(max_length=50)  # 'past' or 'future'
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='future')
     date = models.CharField(max_length=100, null=True, blank=True)
     event_date = models.DateField(
         null=True,

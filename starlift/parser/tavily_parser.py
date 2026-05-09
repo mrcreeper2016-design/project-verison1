@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Load environment variables
-load_dotenv(dotenv_path="F:/h1tn3s/github/project-verison1/starlift/.env")
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 DB_NAME = os.getenv("DB_NAME")
@@ -136,19 +136,14 @@ async def save_event(pool, data: dict):
             if event_record:
                 event_id = event_record['id']
                 logger.info(f"Event '{event_title}' found. Updating.")
-                update_fields = {}
-                if not event_record['date'] and event_date: update_fields['date'] = event_date
-                if not event_record['location'] and event_location: update_fields['location'] = event_location
-                if not event_record['link'] and event_link: update_fields['link'] = event_link
-                if not event_record['description'] and event_description: update_fields['description'] = event_description
-                if not event_record['schedule'] and event_schedule: update_fields['schedule'] = event_schedule
-                
-                # Force update some fields if they are missing or were empty strings or we want to overwrite
-                # Since the user requested fixing them, let's always update date, location, description, schedule
-                update_fields['date'] = event_date
-                update_fields['location'] = event_location
-                update_fields['description'] = event_description
-                update_fields['schedule'] = event_schedule
+                update_fields = {
+                    'date': event_date,
+                    'location': event_location,
+                    'description': event_description,
+                    'schedule': event_schedule,
+                }
+                if not event_record['link'] and event_link:
+                    update_fields['link'] = event_link
 
                 if update_fields:
                     set_clauses = ", ".join([f"{k} = ${i+2}" for i, k in enumerate(update_fields.keys())])
