@@ -3,6 +3,7 @@ from django.urls import include, path
 from django.conf import settings
 from django.conf.urls.static import static
 from starlift import views
+from starlift.views_legal import PrivacyView, ConsentView, TermsView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -23,6 +24,18 @@ urlpatterns = [
     path('qr-generator/', views.qr_generator_view, name='qr_generator'),
     path('rate/<int:event_id>/<int:speaker_id>/', views.submit_feedback_view, name='rate_speaker'),
     path('thanks/', views.thank_you_view, name='thank_you'),
+    path('events/request-create/', views.submit_event_request_view, name='submit_event_request'),
+    path('events/<int:event_id>/request-join/', views.submit_join_request_view, name='submit_join_request'),
+    path('api/my-event-requests/', views.my_event_requests_api, name='my_event_requests_api'),
+    path('events/admin/create/', views.admin_event_create, name='admin_event_create'),
+    path('events/admin/<int:event_id>/edit/', views.admin_event_edit, name='admin_event_edit'),
+    path('events/admin/<int:event_id>/delete/', views.admin_event_delete, name='admin_event_delete'),
+    path('events/admin/<int:event_id>/remove-speaker/<int:speaker_id>/', views.admin_event_remove_speaker, name='admin_event_remove_speaker'),
+    path('api/admin/pending-requests/', views.admin_pending_requests_api, name='admin_pending_requests_api'),
+    path('api/admin/quick-approve/<int:request_id>/', views.admin_quick_approve, name='admin_quick_approve'),
+    path('privacy/', PrivacyView.as_view(), name='privacy'),
+    path('consent/', ConsentView.as_view(), name='consent'),
+    path('terms/', TermsView.as_view(), name='terms'),
 ]
 
 if settings.MEDIA_URL.startswith("/"):
