@@ -9,6 +9,7 @@ from django.contrib.auth.forms import (
 )
 from django.core.exceptions import ValidationError
 from django.db.models import Q
+from django.utils.safestring import mark_safe
 
 from .models import Invite, UserProfile
 
@@ -29,6 +30,18 @@ def _field_attrs(extra: str = "", placeholder: str = "") -> dict:
     if placeholder:
         attrs["placeholder"] = placeholder
     return attrs
+
+
+_CONSENT_PDN_LABEL = mark_safe(
+    'Я даю согласие на обработку моих персональных данных в соответствии с '
+    '<a href="/consent/" target="_blank" rel="noopener">Согласием на обработку ПДн</a> и ФЗ-152.'
+)
+_ACCEPT_POLICY_LABEL = mark_safe(
+    'Я ознакомлен и принимаю <a href="/privacy/" target="_blank" rel="noopener">Политику '
+    'конфиденциальности</a> и <a href="/terms/" target="_blank" rel="noopener">Пользовательское соглашение</a>.'
+)
+_CONSENT_PDN_REQUIRED_MSG = "Для регистрации необходимо согласие на обработку персональных данных."
+_ACCEPT_POLICY_REQUIRED_MSG = "Необходимо принять Политику конфиденциальности и Пользовательское соглашение."
 
 
 class LoginForm(forms.Form):
@@ -104,6 +117,16 @@ class RegisterForm(forms.Form):
         label="Повторите пароль",
         strip=False,
         widget=forms.PasswordInput(attrs=_field_attrs()),
+    )
+    consent_pdn = forms.BooleanField(
+        required=True,
+        label=_CONSENT_PDN_LABEL,
+        error_messages={"required": _CONSENT_PDN_REQUIRED_MSG},
+    )
+    accept_policy = forms.BooleanField(
+        required=True,
+        label=_ACCEPT_POLICY_LABEL,
+        error_messages={"required": _ACCEPT_POLICY_REQUIRED_MSG},
     )
 
     def clean_username(self):
@@ -181,6 +204,16 @@ class InviteSignupForm(forms.Form):
         strip=False,
         widget=forms.PasswordInput(attrs=_field_attrs()),
     )
+    consent_pdn = forms.BooleanField(
+        required=True,
+        label=_CONSENT_PDN_LABEL,
+        error_messages={"required": _CONSENT_PDN_REQUIRED_MSG},
+    )
+    accept_policy = forms.BooleanField(
+        required=True,
+        label=_ACCEPT_POLICY_LABEL,
+        error_messages={"required": _ACCEPT_POLICY_REQUIRED_MSG},
+    )
 
     def clean_username(self):
         username = (self.cleaned_data.get("username") or "").strip()
@@ -234,11 +267,17 @@ class ProfileEditForm(forms.Form):
 
 
 class SpeakerProfileMainForm(forms.Form):
-    """Единое «Основное» для спикера с привязанной карточкой: имя, аватар, описание (`Speaker.stack`)."""
+    """Единое «Основное» для спикера с привязанной карточкой: имя, аватар, компания, описание (`Speaker.stack`)."""
 
     first_name = forms.CharField(label="Имя", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
     last_name = forms.CharField(label="Фамилия", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
     avatar = forms.ImageField(label="Аватар", required=False, widget=forms.FileInput(attrs={"class": _INPUT_CLASS}))
+    company = forms.CharField(
+        label="Компания",
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs=_field_attrs(placeholder="Сбербанк, СберТех...")),
+    )
     description = forms.CharField(
         label="Описание",
         max_length=200,
