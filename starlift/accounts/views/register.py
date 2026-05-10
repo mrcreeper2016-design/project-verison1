@@ -113,7 +113,11 @@ def register_view(request: HttpRequest) -> HttpResponse:
             )
         return redirect(reverse("accounts:register_pending") + f"?email={user.email}")
 
-    return render(request, "accounts/register.html", {"form": form})
+    return render(
+        request,
+        "accounts/register.html",
+        {"form": form, "legal_doc_version": settings.LEGAL_DOC_VERSION},
+    )
 
 
 @anonymous_required()

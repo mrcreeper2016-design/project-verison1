@@ -1,42 +1,20 @@
-{% extends 'base.html' %}
-{% block title %}Политика конфиденциальности{% endblock %}
+{% extends 'accounts/auth_base.html' %}
+{% block title %}Политика конфиденциальности — StarLift{% endblock %}
+
+{% block extra_css %}
+.auth-card { max-width: 760px; }
+.legal-doc h2, .legal-doc h3 { color: var(--text-main); }
+.legal-doc h3 { font-size: 16px; margin-top: 18px; }
+.legal-doc p, .legal-doc li { color: var(--text-main); font-size: 14px; line-height: 1.6; }
+.legal-doc em { color: var(--text-muted); font-style: normal; font-size: 12px; }
+.legal-doc a { color: var(--sber-green); }
+.back-link { display: inline-block; margin-top: 18px; color: var(--sber-green); text-decoration: none; font-weight: 600; font-size: 13px; }
+.back-link:hover { text-decoration: underline; }
+{% endblock %}
+
 {% block content %}
-<article class="legal-doc" style="max-width:800px; margin:0 auto; padding:24px;">
-    <h1>Политика конфиденциальности</h1>
-    <p><em>Действует с {{ legal_doc_version }}</em></p>
-
-    <h2>1. Общие положения</h2>
-    <p>Настоящая Политика определяет порядок обработки персональных данных пользователей сервиса StarLift (далее — Оператор) в соответствии с Федеральным законом № 152-ФЗ «О персональных данных».</p>
-
-    <h2>2. Реквизиты Оператора</h2>
-    <p>{# TODO: указать наименование, ИНН, юридический адрес, контакты ответственного за обработку ПДн #}</p>
-
-    <h2>3. Какие данные мы собираем</h2>
-    <ul>
-        <li>Имя пользователя, имя и фамилия;</li>
-        <li>Адрес электронной почты;</li>
-        <li>Аватар (по желанию);</li>
-        <li>Информация о профиле спикера (компания, стек, город) — для пользователей с ролью «Спикер»;</li>
-        <li>Технические данные: IP-адрес, User-Agent, время входа.</li>
-    </ul>
-
-    <h2>4. Цели обработки</h2>
-    <ul>
-        <li>Регистрация и аутентификация пользователей;</li>
-        <li>Предоставление функциональности сервиса;</li>
-        <li>Обеспечение безопасности и аудит действий;</li>
-        <li>Связь с пользователем по существенным вопросам (подтверждение email, восстановление пароля).</li>
-    </ul>
-
-    <h2>5. Сроки обработки</h2>
-    <p>Данные обрабатываются в течение срока действия учётной записи и до её удаления по запросу пользователя.</p>
-
-    <h2>6. Права субъекта</h2>
-    <p>Пользователь вправе запросить доступ к своим данным, их уточнение, блокировку или удаление, а также отозвать согласие на обработку, направив запрос на email Оператора.</p>
-
-    <h2>7. Изменения</h2>
-    <p>Оператор вправе обновлять настоящую Политику. Актуальная версия публикуется на этой странице.</p>
-
-    {# TODO: согласовать окончательный текст с юристом #}
-</article>
+<div class="legal-doc">
+    {% include 'legal/_privacy_body.html' %}
+</div>
+<a class="back-link" href="javascript:history.back()"><i class="fa-solid fa-arrow-left"></i> Назад</a>
 {% endblock %}

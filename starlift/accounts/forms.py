@@ -34,11 +34,15 @@ def _field_attrs(extra: str = "", placeholder: str = "") -> dict:
 
 _CONSENT_PDN_LABEL = mark_safe(
     'Я даю согласие на обработку моих персональных данных в соответствии с '
-    '<a href="/consent/" target="_blank" rel="noopener">Согласием на обработку ПДн</a> и ФЗ-152.'
+    '<a href="/consent/" class="legal-link" data-legal="consent" target="_blank" rel="noopener">'
+    'Согласием на обработку ПДн</a> и ФЗ-152.'
 )
 _ACCEPT_POLICY_LABEL = mark_safe(
-    'Я ознакомлен и принимаю <a href="/privacy/" target="_blank" rel="noopener">Политику '
-    'конфиденциальности</a> и <a href="/terms/" target="_blank" rel="noopener">Пользовательское соглашение</a>.'
+    'Я ознакомлен и принимаю '
+    '<a href="/privacy/" class="legal-link" data-legal="privacy" target="_blank" rel="noopener">'
+    'Политику конфиденциальности</a> и '
+    '<a href="/terms/" class="legal-link" data-legal="terms" target="_blank" rel="noopener">'
+    'Пользовательское соглашение</a>.'
 )
 _CONSENT_PDN_REQUIRED_MSG = "Для регистрации необходимо согласие на обработку персональных данных."
 _ACCEPT_POLICY_REQUIRED_MSG = "Необходимо принять Политику конфиденциальности и Пользовательское соглашение."

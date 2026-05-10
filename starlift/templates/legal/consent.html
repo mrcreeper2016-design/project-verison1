@@ -1,30 +1,20 @@
-{% extends 'base.html' %}
-{% block title %}Согласие на обработку персональных данных{% endblock %}
+{% extends 'accounts/auth_base.html' %}
+{% block title %}Согласие на обработку ПДн — StarLift{% endblock %}
+
+{% block extra_css %}
+.auth-card { max-width: 760px; }
+.legal-doc h2, .legal-doc h3 { color: var(--text-main); }
+.legal-doc h3 { font-size: 16px; margin-top: 18px; }
+.legal-doc p, .legal-doc li { color: var(--text-main); font-size: 14px; line-height: 1.6; }
+.legal-doc em { color: var(--text-muted); font-style: normal; font-size: 12px; }
+.legal-doc a { color: var(--sber-green); }
+.back-link { display: inline-block; margin-top: 18px; color: var(--sber-green); text-decoration: none; font-weight: 600; font-size: 13px; }
+.back-link:hover { text-decoration: underline; }
+{% endblock %}
+
 {% block content %}
-<article class="legal-doc" style="max-width:800px; margin:0 auto; padding:24px;">
-    <h1>Согласие на обработку персональных данных</h1>
-    <p><em>Версия: {{ legal_doc_version }}</em></p>
-
-    <p>Регистрируясь в сервисе StarLift, я, как субъект персональных данных, в соответствии с Федеральным законом № 152-ФЗ «О персональных данных», даю согласие Оператору на обработку моих персональных данных.</p>
-
-    <h2>Перечень данных</h2>
-    <ul>
-        <li>Имя пользователя (логин);</li>
-        <li>Фамилия, имя;</li>
-        <li>Адрес электронной почты;</li>
-        <li>Аватар (при загрузке);</li>
-        <li>Технические данные посещений (IP-адрес, User-Agent, время).</li>
-    </ul>
-
-    <h2>Перечень действий</h2>
-    <p>Сбор, запись, систематизация, накопление, хранение, уточнение, извлечение, использование, удаление, уничтожение — как с использованием средств автоматизации, так и без таковых.</p>
-
-    <h2>Цели</h2>
-    <p>Регистрация в сервисе, аутентификация, предоставление функциональности, аудит действий, связь по существенным вопросам.</p>
-
-    <h2>Срок действия согласия</h2>
-    <p>Согласие действует с момента его предоставления до момента отзыва. Отзыв согласия возможен путём направления письменного уведомления Оператору.</p>
-
-    {# TODO: согласовать окончательный текст с юристом #}
-</article>
+<div class="legal-doc">
+    {% include 'legal/_consent_body.html' %}
+</div>
+<a class="back-link" href="javascript:history.back()"><i class="fa-solid fa-arrow-left"></i> Назад</a>
 {% endblock %}

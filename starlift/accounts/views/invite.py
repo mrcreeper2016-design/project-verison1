@@ -209,5 +209,9 @@ def invite_accept_view(request: HttpRequest, token: str) -> HttpResponse:
     return render(
         request,
         "accounts/invite_accept.html",
-        {"form": form, "invite": invite},
+        {
+            "form": form,
+            "invite": invite,
+            "legal_doc_version": settings.LEGAL_DOC_VERSION,
+        },
     )
