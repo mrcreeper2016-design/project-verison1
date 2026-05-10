@@ -41,6 +41,8 @@ class RegisterViewTests(TestCase):
                 "email": "gleb@example.com",
                 "password1": "MyStrongPass!9",
                 "password2": "MyStrongPass!9",
+                "consent_pdn": "on",
+                "accept_policy": "on",
             },
         )
         self.assertEqual(resp.status_code, 302)
@@ -70,6 +72,8 @@ class RegisterViewTests(TestCase):
                 "email": "fresh@example.com",
                 "password1": "MyStrongPass!9",
                 "password2": "MyStrongPass!9",
+                "consent_pdn": "on",
+                "accept_policy": "on",
             },
         )
         self.assertContains(resp, "уже занято", status_code=200)
@@ -86,6 +90,8 @@ class RegisterViewTests(TestCase):
                 "email": "TAKEN@example.com",
                 "password1": "MyStrongPass!9",
                 "password2": "MyStrongPass!9",
+                "consent_pdn": "on",
+                "accept_policy": "on",
             },
         )
         self.assertContains(resp, "уже зарегистрирован", status_code=200)
@@ -113,6 +119,8 @@ class RegisterViewTests(TestCase):
                 "email": "invited@example.com",
                 "password1": "MyStrongPass!9",
                 "password2": "MyStrongPass!9",
+                "consent_pdn": "on",
+                "accept_policy": "on",
             },
         )
         self.assertContains(resp, "приглашение", status_code=200)
@@ -128,6 +136,8 @@ class RegisterViewTests(TestCase):
                 "email": "weak@example.com",
                 "password1": "1234567",
                 "password2": "1234567",
+                "consent_pdn": "on",
+                "accept_policy": "on",
             },
         )
         self.assertEqual(resp.status_code, 200)
@@ -143,6 +153,8 @@ class RegisterViewTests(TestCase):
                 "email": "m@example.com",
                 "password1": "StrongPass!9",
                 "password2": "StrongPass!8",
+                "consent_pdn": "on",
+                "accept_policy": "on",
             },
         )
         self.assertContains(resp, "не совпадают", status_code=200)
@@ -162,6 +174,8 @@ class RegisterActivationTests(TestCase):
                 "email": email,
                 "password1": password,
                 "password2": password,
+                "consent_pdn": "on",
+                "accept_policy": "on",
             },
         )
         return User.objects.get(username=username)

@@ -75,7 +75,7 @@ class InviteFlowTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         resp = self.client.post(
             reverse("accounts:invite_accept", args=[raw]),
-            {"username": "newbie", "first_name": "N", "last_name": "B", "password1": "NewPass!9", "password2": "NewPass!9"},
+            {"username": "newbie", "first_name": "N", "last_name": "B", "password1": "NewPass!9", "password2": "NewPass!9", "consent_pdn": "on", "accept_policy": "on"},
         )
         self.assertEqual(resp.status_code, 302)
         user = User.objects.get(username="newbie")
@@ -90,7 +90,7 @@ class InviteFlowTests(TestCase):
         raw, inv = self._make_invite(speaker=self.speaker)
         self.client.post(
             reverse("accounts:invite_accept", args=[raw]),
-            {"username": "petrp", "first_name": "P", "last_name": "P", "password1": "NewPass!9", "password2": "NewPass!9"},
+            {"username": "petrp", "first_name": "P", "last_name": "P", "password1": "NewPass!9", "password2": "NewPass!9", "consent_pdn": "on", "accept_policy": "on"},
         )
         self.speaker.refresh_from_db()
         new_user = User.objects.get(username="petrp")
