@@ -928,7 +928,16 @@
         }
     }
 
-    initSpeakersPage();
+    // Inline-скрипт сидит в block content, а модалка — в block modals (рендерится позже).
+    // На полной перезагрузке страницы DOM модалки ещё не существует в момент вызова —
+    // showEvents падал на getElementById(...).src, и спикер не открывался по хешу.
+    // Ждём DOMContentLoaded, чтобы модалка точно была в DOM. На SPA-инъекции
+    // readyState === 'complete', поэтому запускаемся сразу.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSpeakersPage, { once: true });
+    } else {
+        initSpeakersPage();
+    }
 </script>
 {% endblock %}
 

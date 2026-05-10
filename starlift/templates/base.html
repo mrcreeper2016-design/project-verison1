@@ -108,6 +108,25 @@
             scrollbar-color: var(--border-color) transparent;
         }
 
+        /* Дефолтный стиль ссылок — единообразно по всему сайту.
+           Конкретные классы (.btn-primary, .nav-item и т.п.) уже задают свой
+           цвет/декорацию и продолжат это делать благодаря правилу specificity. */
+        a {
+            color: var(--sber-green);
+            text-decoration: none;
+            transition: color .2s ease, text-decoration-color .2s ease;
+        }
+        a:hover {
+            color: var(--sber-green-hover);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        a:focus-visible {
+            outline: 2px solid var(--sber-green);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
         .mesh-gradient {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -667,20 +686,23 @@
             box-shadow: 0 0 0 4px var(--light-green);
         }
 
+        .filters-container {
+            position: relative;
+            z-index: 200;
+        }
+
         .filters-panel {
             position: absolute;
             top: calc(100% + 10px);
             right: 0;
             width: 380px;
             max-width: calc(100vw - 40px);
-            background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
-            backdrop-filter: blur(40px) saturate(200%);
-            -webkit-backdrop-filter: blur(40px) saturate(200%);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15), inset 0 2px 2px rgba(255, 255, 255, 0.2);
+            background: #fff;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
             border-radius: 20px;
             padding: 16px;
-            z-index: 1500;
+            z-index: 200;
             opacity: 0;
             visibility: hidden;
             transform: translateY(-10px);
@@ -688,11 +710,9 @@
         }
 
         [data-theme="dark"] .filters-panel {
-            background: linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 2px 2px rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(40px) saturate(200%);
-            -webkit-backdrop-filter: blur(40px) saturate(200%);
+            background: #1a1f1c;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
         }
 
         .filters-panel.show {

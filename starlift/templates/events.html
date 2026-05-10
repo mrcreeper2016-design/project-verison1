@@ -318,6 +318,8 @@
         border-radius: 18px;
         border: 1px solid var(--border-color);
         background: var(--glass-bg);
+        position: relative;
+        z-index: 10;
     }
 
     .events-search-wrap {
@@ -346,13 +348,6 @@
 
     .events-search::placeholder {
         color: var(--text-muted);
-    }
-
-    .events-filters {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 18px;
-        align-items: center;
     }
 
     .filter-toggle {
@@ -411,36 +406,6 @@
         font-size: 15px;
     }
 
-    .events-sort-wrap {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-shrink: 0;
-    }
-
-    .events-sort-wrap label {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--text-muted);
-        white-space: nowrap;
-    }
-
-    .events-sort {
-        padding: 10px 12px;
-        border-radius: 12px;
-        border: 1px solid var(--border-color);
-        background: var(--panel-bg);
-        color: var(--text-main);
-        font-size: 14px;
-        font-family: inherit;
-        min-width: 220px;
-        cursor: pointer;
-    }
-
-    .events-sort:focus {
-        outline: none;
-        border-color: rgba(10, 128, 59, 0.45);
-    }
 
     #eventModalOverlay.modal-overlay {
         align-items: flex-start;
@@ -569,28 +534,46 @@
             <label class="visually-hidden" for="eventsSearch">Поиск мероприятий</label>
             <input type="search" class="events-search" id="eventsSearch" placeholder="Поиск по названию, месту, описанию, спикерам…" autocomplete="off">
         </div>
-        <div class="events-filters">
-            <label class="filter-toggle">
-                <input type="checkbox" id="filterSoon" class="sl-checkbox">
-                <span>В ближайшие 30 дней</span>
-            </label>
-            <label class="filter-toggle">
-                <input type="checkbox" id="filterHidePast" class="sl-checkbox">
-                <span>Скрыть прошедшие</span>
-            </label>
-            <label class="filter-toggle">
-                <input type="checkbox" id="filterSber" class="sl-checkbox">
-                <span>Только Сбер</span>
-            </label>
-        </div>
-        <div class="events-sort-wrap">
-            <label for="eventsSort">Сортировка</label>
-            <select class="events-sort" id="eventsSort" aria-label="Сортировка списка">
-                <option value="date_asc" selected>Дата: сначала ближайшие</option>
-                <option value="date_desc">Дата: сначала поздние</option>
-                <option value="title_asc">Название А → Я</option>
-                <option value="title_desc">Название Я → А</option>
-            </select>
+        <div class="filters-container">
+            <button type="button" class="filters-toggle" id="evFiltersToggle" aria-haspopup="dialog" aria-expanded="false">
+                <i class="fa-solid fa-filter"></i>
+                Фильтры
+            </button>
+            <div class="filters-panel" id="evFiltersPanel" role="dialog" aria-label="Фильтры мероприятий">
+                <div class="filters-panel-title">
+                    <span>Фильтры</span>
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Esc / клик вне — закрыть</span>
+                </div>
+                <div class="filters-grid">
+                    <div class="filter-field" style="grid-column: 1 / -1;">
+                        <label for="eventsSort" style="font-size:12px; font-weight:600; color:var(--text-muted);">Сортировка</label>
+                        <select class="select-compact" id="eventsSort" aria-label="Сортировка списка">
+                            <option value="date_asc" selected>Дата: сначала ближайшие</option>
+                            <option value="date_desc">Дата: сначала поздние</option>
+                            <option value="title_asc">Название А → Я</option>
+                            <option value="title_desc">Название Я → А</option>
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-toggle">
+                            <input type="checkbox" id="filterSoon" class="sl-checkbox">
+                            <span>В ближайшие 30 дней</span>
+                        </label>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-toggle">
+                            <input type="checkbox" id="filterHidePast" class="sl-checkbox">
+                            <span>Скрыть прошедшие</span>
+                        </label>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-toggle">
+                            <input type="checkbox" id="filterSber" class="sl-checkbox">
+                            <span>Только Сбер</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
         </div>
         {% if user.is_authenticated and user.profile.role == 'speaker' %}
         <button type="button" class="btn-action" id="btnProposeEvent" style="padding: 8px 14px; border-radius: 12px; background: var(--sber-green); color: #fff; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
@@ -1093,14 +1076,11 @@ function renderEventModal(eventId) {
                     const speakerId = parseInt(m[1], 10);
                     const evOverlay = document.getElementById('eventModalOverlay');
                     if (evOverlay && window.closeAnyModal) window.closeAnyModal(evOverlay);
-                    window.__pendingOpenSpeakerId = speakerId;
-                    if (window.spaNavigateTo) {
-                        window.spaNavigateTo(location.origin + '/speakers/').then(() => {
-                            if (window.spaPushStateAndUpdate) window.spaPushStateAndUpdate(location.origin + '/speakers/');
-                        });
-                    } else {
-                        window.location.href = `/speakers/#open-speaker-${speakerId}`;
-                    }
+                    // Используем полный переход с хешем — speakers.html ловит #open-speaker-N
+                    // через tryOpenSpeakerFromHash на встроенных серверных данных. Это надёжнее,
+                    // чем SPA-путь с __pendingOpenSpeakerId, где была гонка между rAF в base.html
+                    // и инициализацией speakers.html.
+                    window.location.href = `/speakers/#open-speaker-${speakerId}`;
                 });
             });
         }
@@ -1140,10 +1120,42 @@ function bindEventsFilters() {
     const sber = document.getElementById('filterSber');
     if (sber) sber.addEventListener('change', rerender);
     if (sortSel) sortSel.addEventListener('change', rerender);
+
+    // Filters panel toggle
+    const toggleBtn = document.getElementById('evFiltersToggle');
+    const panel = document.getElementById('evFiltersPanel');
+    if (toggleBtn && panel) {
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = panel.classList.toggle('show');
+            toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#evFiltersPanel') && !e.target.closest('#evFiltersToggle')) {
+                panel.classList.remove('show');
+                toggleBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && panel.classList.contains('show')) {
+                panel.classList.remove('show');
+                toggleBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
 }
 
-bindEventsFilters();
-fetchEvents();
+// См. комментарий в speakers.html: ждём DOMContentLoaded, чтобы block modals
+// успел отрендериться до первого вызова openEventModal по хешу.
+function __startEventsPage() {
+    bindEventsFilters();
+    fetchEvents();
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', __startEventsPage, { once: true });
+} else {
+    __startEventsPage();
+}
 })();
 </script>
 {% endblock %}
@@ -1215,7 +1227,7 @@ fetchEvents();
                 {% csrf_token %}
                 <input type="hidden" name="event_id" id="adminEventId" value="">
                 <label>Название*
-                    <input type="text" name="title" required maxlength="200" placeholder="Например, Highload++ 2026">
+                    <input type="text" name="title" required maxlength="200" placeholder="Название мероприятия...">
                 </label>
                 <div class="ev-form-grid">
                     <label>Дата
