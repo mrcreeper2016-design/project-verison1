@@ -61,6 +61,18 @@
         {% if form.password2.errors %}<div class="field-errors">{% for e in form.password2.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
     </div>
 
+    <div class="form-field" style="display:flex; gap:8px; align-items:flex-start; margin-top:8px;">
+        {{ form.consent_pdn }}
+        <label for="{{ form.consent_pdn.id_for_label }}" style="font-size:0.9em;">{{ form.consent_pdn.label|safe }}</label>
+    </div>
+    {% if form.consent_pdn.errors %}<div class="field-errors">{% for e in form.consent_pdn.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+
+    <div class="form-field" style="display:flex; gap:8px; align-items:flex-start;">
+        {{ form.accept_policy }}
+        <label for="{{ form.accept_policy.id_for_label }}" style="font-size:0.9em;">{{ form.accept_policy.label|safe }}</label>
+    </div>
+    {% if form.accept_policy.errors %}<div class="field-errors">{% for e in form.accept_policy.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+
     <button type="submit" class="btn-primary">
         <i class="fa-solid fa-user-plus"></i> Зарегистрироваться
     </button>
