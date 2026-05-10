@@ -36,6 +36,7 @@
     <nav class="console-nav animate-fade" style="animation-delay:0.04s;">
         <a href="{% url 'accounts:users' %}" class="{% if active == 'users' %}active{% endif %}"><i class="fa-solid fa-users"></i> Пользователи</a>
         <a href="{% url 'accounts:invites' %}" class="{% if active == 'invites' %}active{% endif %}"><i class="fa-solid fa-envelope-circle-check"></i> Приглашения</a>
+        <a href="{% url 'accounts:event_requests' %}" class="{% if active == 'event_requests' %}active{% endif %}"><i class="fa-solid fa-inbox"></i> Заявки</a>
         <a href="{% url 'accounts:audit' %}" class="{% if active == 'audit' %}active{% endif %}"><i class="fa-solid fa-clipboard-list"></i> Аудит</a>
     </nav>
 

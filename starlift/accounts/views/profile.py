@@ -41,6 +41,7 @@ def _speaker_main_form(user, profile, linked_speaker):
             initial={
                 "first_name": user.first_name,
                 "last_name": user.last_name,
+                "company": linked_speaker.sub or "",
                 "description": linked_speaker.stack or "",
             }
         )
@@ -109,16 +110,20 @@ def profile_view(request: HttpRequest) -> HttpResponse:
             profile_update_fields = ["updated_at"]
             if speaker_linked:
                 desc = form.cleaned_data.get("description") or ""
+                company = form.cleaned_data.get("company") or ""
                 if desc != (linked_speaker.stack or ""):
                     changes["speaker.stack"] = True
+                if company != (linked_speaker.sub or ""):
+                    changes["speaker.sub"] = True
                 if desc != (profile.bio or ""):
                     changes["bio_len"] = {"old": len(profile.bio or ""), "new": len(desc)}
                 profile.bio = desc
                 profile_update_fields.append("bio")
                 linked_speaker.stack = desc
                 linked_speaker.bio = desc
+                linked_speaker.sub = company
                 linked_speaker.name = _speaker_name()
-                linked_speaker.save(update_fields=["name", "stack", "bio"])
+                linked_speaker.save(update_fields=["name", "stack", "bio", "sub"])
             else:
                 new_bio = form.cleaned_data.get("bio") or ""
                 if new_bio != profile.bio:

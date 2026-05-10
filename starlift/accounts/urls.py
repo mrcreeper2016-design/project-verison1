@@ -39,4 +39,6 @@ urlpatterns = [
     path("console/invites/", invite_views.invites_view, name="invites"),
     path("console/invites/<uuid:invite_id>/revoke/", invite_views.invite_revoke_view, name="invite_revoke"),
     path("console/audit/", console_views.audit_view, name="audit"),
+    path("console/event-requests/", console_views.event_requests_view, name="event_requests"),
+    path("console/event-requests/<int:request_id>/<str:action>/", console_views.event_request_action_view, name="event_request_action"),
 ]

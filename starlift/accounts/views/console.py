@@ -19,7 +19,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 
-from starlift.models import Speaker
+from starlift.models import Event, EventRequest, Speaker
 
 from ..decorators import role_required
 from ..models import AuditLog, LoginAttempt, UserProfile
@@ -317,3 +317,101 @@ def audit_view(request: HttpRequest) -> HttpResponse:
             "known_actions": known_actions,
         },
     )
+
+
+@role_required("admin")
+@never_cache
+@require_http_methods(["GET"])
+def event_requests_view(request: HttpRequest) -> HttpResponse:
+    status = request.GET.get("status", "pending")
+    kind = request.GET.get("kind", "")
+
+    qs = EventRequest.objects.select_related("speaker", "event", "reviewed_by").order_by("-created_at")
+    if status in (EventRequest.STATUS_PENDING, EventRequest.STATUS_APPROVED, EventRequest.STATUS_REJECTED):
+        qs = qs.filter(status=status)
+    if kind in (EventRequest.KIND_CREATE, EventRequest.KIND_JOIN):
+        qs = qs.filter(kind=kind)
+
+    paginator = Paginator(qs, 50)
+    page = paginator.get_page(request.GET.get("page"))
+
+    pending_count = EventRequest.objects.filter(status=EventRequest.STATUS_PENDING).count()
+
+    return render(
+        request,
+        "accounts/console/event_requests.html",
+        {
+            "active": "event_requests",
+            "page": page,
+            "status": status,
+            "kind": kind,
+            "pending_count": pending_count,
+        },
+    )
+
+
+@role_required("admin")
+@never_cache
+@require_http_methods(["POST"])
+@csrf_protect
+def event_request_action_view(request: HttpRequest, request_id: int, action: str) -> HttpResponse:
+    req = get_object_or_404(EventRequest, pk=request_id)
+    if req.status != EventRequest.STATUS_PENDING:
+        messages.error(request, "Заявка уже обработана.")
+        return redirect(reverse("accounts:event_requests"))
+
+    if action == "approve":
+        with transaction.atomic():
+            if req.kind == EventRequest.KIND_CREATE:
+                pd = req.proposed_event_date
+                _RU = {1:'января',2:'февраля',3:'марта',4:'апреля',5:'мая',6:'июня',7:'июля',8:'августа',9:'сентября',10:'октября',11:'ноября',12:'декабря'}
+                human_date = f"{pd.day} {_RU[pd.month]} {pd.year}" if pd else None
+                event = Event.objects.create(
+                    title=req.proposed_title,
+                    description=req.proposed_description or None,
+                    event_date=pd,
+                    date=human_date,
+                    location=req.proposed_location or None,
+                    link=req.proposed_link or None,
+                    source='self',
+                    status='past' if (pd and pd < timezone.now().date()) else 'future',
+                )
+                event.speakers.add(req.speaker)
+                req.event = event
+            elif req.kind == EventRequest.KIND_JOIN and req.event:
+                req.event.speakers.add(req.speaker)
+            req.status = EventRequest.STATUS_APPROVED
+            req.reviewed_at = timezone.now()
+            req.reviewed_by = request.user
+            req.save()
+            audit.log(
+                action="event_request_approved",
+                actor=request.user,
+                request=request,
+                target=req.speaker.user if req.speaker.user_id else None,
+                metadata={"request_id": req.id, "kind": req.kind, "event_id": req.event_id},
+            )
+        messages.success(request, "Заявка одобрена.")
+
+    elif action == "reject":
+        reason = (request.POST.get("rejection_reason") or "").strip()
+        if not reason:
+            messages.error(request, "Укажите причину отклонения.")
+            return redirect(reverse("accounts:event_requests"))
+        req.status = EventRequest.STATUS_REJECTED
+        req.rejection_reason = reason
+        req.reviewed_at = timezone.now()
+        req.reviewed_by = request.user
+        req.save()
+        audit.log(
+            action="event_request_rejected",
+            actor=request.user,
+            request=request,
+            target=req.speaker.user if req.speaker.user_id else None,
+            metadata={"request_id": req.id, "kind": req.kind, "reason": reason},
+        )
+        messages.success(request, "Заявка отклонена.")
+    else:
+        messages.error(request, "Неизвестное действие.")
+
+    return redirect(reverse("accounts:event_requests") + f"?status={request.POST.get('return_status', 'pending')}")

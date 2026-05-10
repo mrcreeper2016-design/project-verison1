@@ -1,6 +1,48 @@
 {% extends 'base.html' %}
 {% block content %}
+<script>window.__isAdmin = {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}true{% else %}false{% endif %};</script>
 <style>
+    .ev-form { display: grid; gap: 12px; }
+    .ev-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; }
+    @media (max-width: 600px) { .ev-form-grid { grid-template-columns: 1fr; } }
+    .ev-form label { display: grid; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-muted); min-width: 0; }
+    .ev-form input, .ev-form textarea {
+        box-sizing: border-box; width: 100%; max-width: 100%;
+        background: var(--white); color: var(--text-main);
+        border: 1px solid var(--border-color); border-radius: 10px;
+        padding: 9px 12px; font-size: 13px; font-family: inherit; outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+    .ev-form input:hover, .ev-form textarea:hover { border-color: rgba(10,128,59,0.45); }
+    .ev-form input:focus, .ev-form textarea:focus {
+        border-color: var(--sber-green); box-shadow: 0 0 0 4px var(--light-green);
+    }
+    .ev-form textarea { min-height: 70px; resize: vertical; line-height: 1.45; }
+    .ev-form input::placeholder, .ev-form textarea::placeholder { color: var(--text-muted); opacity: 0.6; }
+    [data-theme="dark"] .ev-form input, [data-theme="dark"] .ev-form textarea {
+        background: rgba(255,255,255,0.04);
+        border-color: rgba(255,255,255,0.12);
+    }
+    [data-theme="dark"] .ev-form input:focus, [data-theme="dark"] .ev-form textarea:focus {
+        background: rgba(255,255,255,0.07);
+        box-shadow: 0 0 0 4px rgba(10,128,59,0.18);
+    }
+    .ev-form input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(0.4); cursor: pointer;
+    }
+    [data-theme="dark"] .ev-form input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(0.85);
+    }
+    .ev-form-submit {
+        padding: 12px 16px; border-radius: 12px; background: var(--sber-green); color: #fff;
+        border: none; font-weight: 700; cursor: pointer; font-size: 14px;
+        transition: transform 0.15s, box-shadow 0.2s;
+    }
+    .ev-form-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(10,128,59,0.3); }
+    .ev-form-msg { font-size: 13px; min-height: 18px; }
+    .ev-form-modal-title { margin: 0 0 16px; font-size: 22px; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
+    .ev-form-subtitle { margin: 0 0 16px; color: var(--text-muted); font-size: 14px; }
+
     .events-page {
         display: grid;
         gap: 20px;
@@ -536,6 +578,10 @@
                 <input type="checkbox" id="filterHidePast" class="sl-checkbox">
                 <span>Скрыть прошедшие</span>
             </label>
+            <label class="filter-toggle">
+                <input type="checkbox" id="filterSber" class="sl-checkbox">
+                <span>Только Сбер</span>
+            </label>
         </div>
         <div class="events-sort-wrap">
             <label for="eventsSort">Сортировка</label>
@@ -546,6 +592,16 @@
                 <option value="title_desc">Название Я → А</option>
             </select>
         </div>
+        {% if user.is_authenticated and user.profile.role == 'speaker' %}
+        <button type="button" class="btn-action" id="btnProposeEvent" style="padding: 8px 14px; border-radius: 12px; background: var(--sber-green); color: #fff; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-plus"></i> Предложить мероприятие
+        </button>
+        {% endif %}
+        {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+        <button type="button" class="btn-action" id="btnAdminCreateEvent" style="padding: 8px 14px; border-radius: 12px; background: var(--sber-green); color: #fff; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-plus"></i> Создать мероприятие
+        </button>
+        {% endif %}
     </div>
 
     <div class="events-grid" id="eventsContainer">
@@ -735,10 +791,12 @@ function getFilteredEvents() {
     const q = (document.getElementById('eventsSearch')?.value || '').trim();
     const hidePast = document.getElementById('filterHidePast')?.checked;
     const soonOnly = document.getElementById('filterSoon')?.checked;
+    const sberOnly = document.getElementById('filterSber')?.checked;
     return allEvents.filter(ev => {
         if (hidePast && isEventPast(ev)) return false;
         if (soonOnly && !isSoon(ev)) return false;
         if (!matchesSearch(ev, q)) return false;
+        if (sberOnly && !(ev.speakers && ev.speakers.some(sp => sp.sub && sp.sub.toLowerCase().includes('сбер')))) return false;
         return true;
     });
 }
@@ -898,6 +956,7 @@ async function fetchEvents() {
         const response = await fetch('/api/events/');
         const events = await response.json();
         allEvents = Array.isArray(events) ? events : [];
+        window.allEvents = allEvents;
         updateActiveBadge();
         renderEvents();
         tryOpenEventFromHash();
@@ -905,6 +964,7 @@ async function fetchEvents() {
         console.error('Error fetching events:', err);
     }
 }
+window.fetchEvents = fetchEvents;
 
 function tryOpenEventFromHash() {
     const m = (location.hash || '').match(/^#event-(\d+)$/);
@@ -939,6 +999,8 @@ function renderEventModal(eventId) {
     }
 
     document.getElementById('eventModalTitle').textContent = ev.title;
+    window.__currentEventId = ev.id;
+    window.__currentEventTitle = ev.title;
 
     const descEl = document.getElementById('eventModalDescription');
     const descToggle = document.getElementById('eventModalDescToggle');
@@ -992,10 +1054,54 @@ function renderEventModal(eventId) {
                 const img = sp.avatar
                     ? `<img class="avatar" src="${escapeHtml(sp.avatar)}" alt="${alt}">`
                     : `<div class="avatar" style="background:var(--sber-green);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;" aria-hidden="true">${escapeHtml((sp.name || '?').charAt(0))}</div>`;
-                return `<div class="speaker-chip">${img}<div><strong><a href="${href}" class="event-speaker-link">${escapeHtml(sp.name)}</a></strong><span>${sub}</span></div></div>`;
+                const removeBtn = window.__isAdmin
+                    ? `<button type="button" class="ev-speaker-remove" data-speaker-id="${sp.id}" title="Убрать со мероприятия" style="margin-left:auto; background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3); border-radius:8px; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>`
+                    : '';
+                return `<div class="speaker-chip" style="display:flex; align-items:center; gap:10px;">${img}<div style="flex:1; min-width:0;"><strong><a href="${href}" class="event-speaker-link">${escapeHtml(sp.name)}</a></strong><span>${sub}</span></div>${removeBtn}</div>`;
             }).join('');
+            spWrap.querySelectorAll('button.ev-speaker-remove').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    const speakerId = btn.dataset.speakerId;
+                    const evId = window.__currentEventId;
+                    if (!evId || !speakerId) return;
+                    if (!confirm('Убрать спикера со мероприятия?')) return;
+                    const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]');
+                    try {
+                        const r = await fetch(`/events/admin/${evId}/remove-speaker/${speakerId}/`, {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': csrf ? csrf.value : '', 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin',
+                        });
+                        if (r.ok) {
+                            const evOverlay = document.getElementById('eventModalOverlay');
+                            if (evOverlay && window.closeAnyModal) window.closeAnyModal(evOverlay);
+                            if (typeof window.fetchEvents === 'function') window.fetchEvents();
+                        } else {
+                            alert('Не удалось убрать спикера');
+                        }
+                    } catch (err) { alert('Сеть недоступна'); }
+                });
+            });
+
             spWrap.querySelectorAll('a.event-speaker-link').forEach(a => {
-                a.addEventListener('click', e => e.stopPropagation());
+                a.addEventListener('click', e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const m = (a.getAttribute('href') || '').match(/open-speaker-(\d+)/);
+                    if (!m) return;
+                    const speakerId = parseInt(m[1], 10);
+                    const evOverlay = document.getElementById('eventModalOverlay');
+                    if (evOverlay && window.closeAnyModal) window.closeAnyModal(evOverlay);
+                    window.__pendingOpenSpeakerId = speakerId;
+                    if (window.spaNavigateTo) {
+                        window.spaNavigateTo(location.origin + '/speakers/').then(() => {
+                            if (window.spaPushStateAndUpdate) window.spaPushStateAndUpdate(location.origin + '/speakers/');
+                        });
+                    } else {
+                        window.location.href = `/speakers/#open-speaker-${speakerId}`;
+                    }
+                });
             });
         }
     }
@@ -1031,6 +1137,8 @@ function bindEventsFilters() {
     if (search) search.addEventListener('input', rerender);
     if (soon) soon.addEventListener('change', rerender);
     if (hidePast) hidePast.addEventListener('change', rerender);
+    const sber = document.getElementById('filterSber');
+    if (sber) sber.addEventListener('change', rerender);
     if (sortSel) sortSel.addEventListener('change', rerender);
 }
 
@@ -1075,10 +1183,302 @@ fetchEvents();
                     <h3 class="section-title" style="margin-bottom: 14px; font-size: 18px;"><i class="fa-solid fa-microphone-lines"></i> Утвержденные спикеры</h3>
                     <div id="eventSpeakersList" style="display:grid; gap:10px;"></div>
 
+                    {% if user.is_authenticated and user.profile.role == 'speaker' %}
+                    <button type="button" id="btnRequestJoin" style="margin-top: 14px; padding: 10px 16px; border-radius: 12px; background: var(--sber-green); color: #fff; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-paper-plane"></i> Подать заявку на участие
+                    </button>
+                    {% endif %}
+                    {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+                    <div style="margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" id="btnAdminEditEvent" style="padding: 8px 14px; border-radius: 10px; background: var(--white); color: var(--text-main); border: 1px solid var(--border-color); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-pen"></i> Редактировать
+                        </button>
+                        <button type="button" id="btnAdminDeleteEvent" style="padding: 8px 14px; border-radius: 10px; background: rgba(217,62,78,0.1); color: #D93E4E; border: 1px solid rgba(217,62,78,0.3); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-trash"></i> Удалить
+                        </button>
+                    </div>
+                    {% endif %}
+
                     <h3 class="section-title" style="margin: 18px 0 14px; font-size: 18px;"><i class="fa-solid fa-clock"></i> Расписание</h3>
                     <div class="schedule-list" id="eventScheduleList"></div>
                 </div>
             </div>
         </div>
     </div>
+
+    {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+    <div class="modal-overlay" id="adminEventModal">
+        <div class="modal-content" style="max-width: 820px; width: 100%; padding: 36px 40px;">
+            <i class="fa-solid fa-xmark modal-close" id="adminEventClose"></i>
+            <h2 id="adminEventModalTitle" class="ev-form-modal-title">Создать мероприятие</h2>
+            <form id="adminEventForm" class="ev-form">
+                {% csrf_token %}
+                <input type="hidden" name="event_id" id="adminEventId" value="">
+                <label>Название*
+                    <input type="text" name="title" required maxlength="200" placeholder="Например, Highload++ 2026">
+                </label>
+                <div class="ev-form-grid">
+                    <label>Дата
+                        <input type="date" name="event_date">
+                    </label>
+                    <label>Место
+                        <input type="text" name="location" maxlength="200" placeholder="Москва, Сколково">
+                    </label>
+                    <label>Ссылка
+                        <input type="url" name="link" maxlength="500" placeholder="https://…">
+                    </label>
+                    <label>Тема/стек
+                        <input type="text" name="topic" maxlength="100" placeholder="Backend, ML, DevOps…">
+                    </label>
+                </div>
+                <label>Описание
+                    <textarea name="description" rows="3" placeholder="О чём мероприятие"></textarea>
+                </label>
+                <label>Расписание (HTML/текст)
+                    <textarea name="schedule" rows="2"></textarea>
+                </label>
+                <div id="adminEventMsg" class="ev-form-msg"></div>
+                <button type="submit" class="ev-form-submit">Сохранить</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        function getCsrf() { const c = document.querySelector('input[name="csrfmiddlewaretoken"]'); return c ? c.value : ''; }
+        function openModal(id) { const m = document.getElementById(id); if (m) m.style.display = 'flex'; }
+
+        function fillForm(ev) {
+            const f = document.getElementById('adminEventForm');
+            f.querySelector('[name=title]').value = ev ? (ev.title || '') : '';
+            f.querySelector('[name=event_date]').value = ev && ev.event_date ? ev.event_date : '';
+            f.querySelector('[name=location]').value = ev ? (ev.location || '') : '';
+            f.querySelector('[name=link]').value = ev ? (ev.link || '') : '';
+            f.querySelector('[name=topic]').value = ev ? (ev.topic || '') : '';
+            f.querySelector('[name=description]').value = ev ? (ev.description || '') : '';
+            f.querySelector('[name=schedule]').value = ev ? (ev.schedule || '') : '';
+            document.getElementById('adminEventId').value = ev ? ev.id : '';
+            document.getElementById('adminEventModalTitle').textContent = ev ? 'Редактировать мероприятие' : 'Создать мероприятие';
+            document.getElementById('adminEventMsg').textContent = '';
+        }
+
+        const createBtn = document.getElementById('btnAdminCreateEvent');
+        if (createBtn) createBtn.addEventListener('click', () => { fillForm(null); openModal('adminEventModal'); });
+
+        const editBtn = document.getElementById('btnAdminEditEvent');
+        if (editBtn) editBtn.addEventListener('click', () => {
+            const evId = window.__currentEventId;
+            if (!evId) return;
+            const ev = (window.allEvents || []).find(e => e.id === evId);
+            if (!ev) return;
+            const evOverlay = document.getElementById('eventModalOverlay');
+            if (evOverlay && window.closeAnyModal) window.closeAnyModal(evOverlay);
+            fillForm(ev);
+            openModal('adminEventModal');
+        });
+
+        const delBtn = document.getElementById('btnAdminDeleteEvent');
+        if (delBtn) delBtn.addEventListener('click', async () => {
+            const evId = window.__currentEventId;
+            if (!evId) return;
+            if (!confirm('Удалить это мероприятие? Действие необратимо.')) return;
+            const fd = new FormData();
+            try {
+                const r = await fetch(`/events/admin/${evId}/delete/`, {
+                    method: 'POST', body: fd,
+                    headers: { 'X-CSRFToken': getCsrf(), 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                if (r.ok) {
+                    const evOverlay = document.getElementById('eventModalOverlay');
+                    if (evOverlay && window.closeAnyModal) window.closeAnyModal(evOverlay);
+                    if (typeof window.fetchEvents === 'function') window.fetchEvents();
+                } else {
+                    alert('Не удалось удалить мероприятие');
+                }
+            } catch (e) { alert('Сеть недоступна'); }
+        });
+
+        const form = document.getElementById('adminEventForm');
+        if (form) form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById('adminEventMsg');
+            msg.style.color = 'var(--text-muted)'; msg.textContent = '';
+            const evId = document.getElementById('adminEventId').value;
+            const url = evId ? `/events/admin/${evId}/edit/` : '/events/admin/create/';
+            const fd = new FormData(form);
+            try {
+                const r = await fetch(url, {
+                    method: 'POST', body: fd,
+                    headers: { 'X-CSRFToken': getCsrf(), 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                const data = await r.json();
+                if (r.ok && data.ok) {
+                    msg.style.color = 'var(--sber-green)'; msg.textContent = 'Сохранено.';
+                    if (typeof window.fetchEvents === 'function') window.fetchEvents();
+                    setTimeout(() => window.closeAnyModal(document.getElementById('adminEventModal')), 800);
+                } else {
+                    msg.style.color = '#D93E4E'; msg.textContent = 'Ошибка: ' + (data.error || 'не удалось сохранить');
+                }
+            } catch (err) { msg.style.color = '#D93E4E'; msg.textContent = 'Сеть недоступна'; }
+        });
+    })();
+    </script>
+    {% endif %}
+
+    {% if user.is_authenticated and user.profile.role == 'speaker' %}
+    <div class="modal-overlay" id="proposeEventModal">
+        <div class="modal-content" style="max-width: 820px; width: 100%; padding: 36px 40px;">
+            <i class="fa-solid fa-xmark modal-close" id="proposeEventClose"></i>
+            <h2 class="ev-form-modal-title">Предложить мероприятие</h2>
+            <p class="ev-form-subtitle">Заявка отправится администратору на рассмотрение.</p>
+            <form id="proposeEventForm" class="ev-form">
+                {% csrf_token %}
+                <label>Название*
+                    <input type="text" name="proposed_title" required maxlength="200" placeholder="Название мероприятия">
+                </label>
+                <div class="ev-form-grid">
+                    <label>Дата
+                        <input type="date" name="proposed_event_date">
+                    </label>
+                    <label>Место
+                        <input type="text" name="proposed_location" maxlength="200">
+                    </label>
+                    <label>Ссылка
+                        <input type="url" name="proposed_link" maxlength="500" placeholder="https://…">
+                    </label>
+                    <label>Тема вашего доклада
+                        <input type="text" name="topic" maxlength="200">
+                    </label>
+                </div>
+                <label>Описание мероприятия
+                    <textarea name="proposed_description" rows="3"></textarea>
+                </label>
+                <label>Комментарий администратору
+                    <textarea name="comment" rows="2"></textarea>
+                </label>
+                <div id="proposeEventMsg" class="ev-form-msg"></div>
+                <button type="submit" class="ev-form-submit">Отправить заявку</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="joinEventModal">
+        <div class="modal-content" style="max-width: 640px; width: 100%; padding: 36px 40px;">
+            <i class="fa-solid fa-xmark modal-close" id="joinEventClose"></i>
+            <h2 class="ev-form-modal-title" style="margin-bottom: 8px;">Заявка на участие</h2>
+            <p id="joinEventName" class="ev-form-subtitle"></p>
+            <form id="joinEventForm" class="ev-form">
+                {% csrf_token %}
+                <input type="hidden" name="event_id" id="joinEventId">
+                <label>Тема вашего доклада*
+                    <input type="text" name="topic" required maxlength="200" placeholder="О чём вы будете рассказывать">
+                </label>
+                <label>Комментарий администратору
+                    <textarea name="comment" rows="3"></textarea>
+                </label>
+                <div id="joinEventMsg" class="ev-form-msg"></div>
+                <button type="submit" class="ev-form-submit">Отправить заявку</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        function getCsrf() {
+            const c = document.querySelector('input[name="csrfmiddlewaretoken"]');
+            return c ? c.value : '';
+        }
+        function openModal(id) { const m = document.getElementById(id); if (m) m.style.display = 'flex'; }
+
+        // Кнопка «Предложить мероприятие»
+        const proposeBtn = document.getElementById('btnProposeEvent');
+        if (proposeBtn) proposeBtn.addEventListener('click', () => openModal('proposeEventModal'));
+
+        const proposeForm = document.getElementById('proposeEventForm');
+        if (proposeForm) {
+            proposeForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const msg = document.getElementById('proposeEventMsg');
+                msg.textContent = '';
+                msg.style.color = 'var(--text-muted)';
+                const fd = new FormData(proposeForm);
+                try {
+                    const r = await fetch('/events/request-create/', {
+                        method: 'POST', body: fd,
+                        headers: { 'X-CSRFToken': getCsrf(), 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+                    const data = await r.json();
+                    if (r.ok && data.ok) {
+                        msg.style.color = 'var(--sber-green)';
+                        msg.textContent = 'Заявка отправлена администратору.';
+                        proposeForm.reset();
+                        setTimeout(() => window.closeAnyModal(document.getElementById('proposeEventModal')), 1200);
+                    } else {
+                        msg.style.color = '#D93E4E';
+                        msg.textContent = 'Ошибка: ' + (data.error || 'не удалось отправить');
+                    }
+                } catch (err) {
+                    msg.style.color = '#D93E4E';
+                    msg.textContent = 'Сеть недоступна';
+                }
+            });
+        }
+
+        // Кнопка «Подать заявку на участие» внутри модалки события
+        const joinBtn = document.getElementById('btnRequestJoin');
+        if (joinBtn) {
+            joinBtn.addEventListener('click', () => {
+                const evId = window.__currentEventId;
+                const evTitle = window.__currentEventTitle || '';
+                if (!evId) return;
+                document.getElementById('joinEventId').value = evId;
+                document.getElementById('joinEventName').textContent = 'Мероприятие: ' + evTitle;
+                document.getElementById('joinEventMsg').textContent = '';
+                openModal('joinEventModal');
+            });
+        }
+
+        const joinForm = document.getElementById('joinEventForm');
+        if (joinForm) {
+            joinForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const msg = document.getElementById('joinEventMsg');
+                msg.textContent = '';
+                msg.style.color = 'var(--text-muted)';
+                const evId = document.getElementById('joinEventId').value;
+                const fd = new FormData(joinForm);
+                try {
+                    const r = await fetch(`/events/${evId}/request-join/`, {
+                        method: 'POST', body: fd,
+                        headers: { 'X-CSRFToken': getCsrf(), 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+                    const data = await r.json();
+                    if (r.ok && data.ok) {
+                        msg.style.color = 'var(--sber-green)';
+                        msg.textContent = 'Заявка отправлена администратору.';
+                        joinForm.reset();
+                        setTimeout(() => window.closeAnyModal(document.getElementById('joinEventModal')), 1200);
+                    } else {
+                        msg.style.color = '#D93E4E';
+                        const errMap = {
+                            already_participant: 'Вы уже в списке спикеров этого мероприятия.',
+                            already_pending: 'Вы уже подали заявку на это мероприятие.',
+                            topic_required: 'Укажите тему доклада.',
+                            no_speaker_profile: 'У вашего аккаунта не привязан профиль спикера.',
+                        };
+                        msg.textContent = errMap[data.error] || ('Ошибка: ' + (data.error || 'не удалось отправить'));
+                    }
+                } catch (err) {
+                    msg.style.color = '#D93E4E';
+                    msg.textContent = 'Сеть недоступна';
+                }
+            });
+        }
+    })();
+    </script>
+    {% endif %}
 {% endblock %}

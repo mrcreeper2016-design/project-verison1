@@ -25,7 +25,7 @@ class Speaker(models.Model):
         verbose_name="Статус",
         help_text="Неавторизован — нет привязки к аккаунту; Авторизован — связан с пользователем платформы.",
     )
-    nps = models.IntegerField(default=0)
+    nps = models.FloatField(default=0.0)
     img = models.CharField(max_length=100)
     avatar = models.ImageField(upload_to="avatars/speakers/", null=True, blank=True)
     recommended = models.BooleanField(
@@ -110,19 +110,12 @@ class Speaker(models.Model):
         if event_id:
             qs = qs.filter(event_id=event_id)
 
-        from django.db.models import Count, Q
-        stats = qs.aggregate(
-            total=Count('id'),
-            promoters=Count('id', filter=Q(score__gte=9)),
-            detractors=Count('id', filter=Q(score__lte=6)),
-        )
-        total = stats['total']
-
-        if total == 0:
+        from django.db.models import Avg
+        result = qs.aggregate(avg=Avg('score'))
+        avg = result['avg']
+        if avg is None:
             return 0
-
-        nps_score = ((stats['promoters'] - stats['detractors']) / total) * 100
-        return int(round(nps_score))
+        return round(avg, 1)
 
     def __str__(self):
         return self.name
@@ -213,3 +206,55 @@ class Feedback(models.Model):
         if nps_value is not None:
             self.speaker.nps = nps_value
             self.speaker.save(update_fields=['nps'])
+
+
+class EventRequest(models.Model):
+    KIND_CREATE = 'create'
+    KIND_JOIN = 'join'
+    KIND_CHOICES = [
+        (KIND_CREATE, 'Создание мероприятия'),
+        (KIND_JOIN, 'Заявка на участие'),
+    ]
+
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'На рассмотрении'),
+        (STATUS_APPROVED, 'Одобрено'),
+        (STATUS_REJECTED, 'Отклонено'),
+    ]
+
+    kind = models.CharField(max_length=16, choices=KIND_CHOICES)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    speaker = models.ForeignKey(Speaker, on_delete=models.CASCADE, related_name='event_requests')
+    event = models.ForeignKey(Event, on_delete=models.SET_NULL, null=True, blank=True, related_name='join_requests')
+
+    # Тема/описание доклада (для обоих типов заявок)
+    topic = models.CharField(max_length=200, blank=True, default='')
+    comment = models.TextField(blank=True, default='')
+
+    # Поля для kind='create'
+    proposed_title = models.CharField(max_length=200, blank=True, default='')
+    proposed_description = models.TextField(blank=True, default='')
+    proposed_event_date = models.DateField(null=True, blank=True)
+    proposed_location = models.CharField(max_length=200, blank=True, default='')
+    proposed_link = models.CharField(max_length=500, blank=True, default='')
+
+    rejection_reason = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reviewed_event_requests',
+    )
+
+    class Meta:
+        db_table = 'starlift_event_request'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['status', '-created_at'])]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} от {self.speaker.name} ({self.status})"

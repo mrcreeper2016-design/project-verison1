@@ -187,13 +187,13 @@ def compute_nps(feedbacks: Iterable[Feedback] | QuerySet[Feedback]) -> dict[str,
 
     passives = total - promoters - detractors
     if total == 0:
-        nps = 0.0
         promoter_pct = detractor_pct = passive_pct = 0.0
     else:
         promoter_pct = promoters * 100.0 / total
         detractor_pct = detractors * 100.0 / total
         passive_pct = passives * 100.0 / total
-        nps = promoter_pct - detractor_pct
+
+    nps = round(avg_score, 1) if avg_score is not None else 0.0
 
     return {
         "total": total,
@@ -203,7 +203,7 @@ def compute_nps(feedbacks: Iterable[Feedback] | QuerySet[Feedback]) -> dict[str,
         "promoter_pct": round(promoter_pct, 1),
         "passive_pct": round(passive_pct, 1),
         "detractor_pct": round(detractor_pct, 1),
-        "nps": round(nps, 1),
+        "nps": nps,
         "avg_score": round(avg_score, 2) if avg_score is not None else None,
     }
 
@@ -297,9 +297,7 @@ def speakers_ranking(filters: AnalyticsFilters, limit: int = 15) -> list[dict[st
     result = []
     for sp in qs[:limit]:
         total = sp.feedbacks_count or 0
-        nps = 0.0
-        if total:
-            nps = ((sp.promoters - sp.detractors) / total) * 100.0
+        avg = sp.avg_score_window
         result.append({
             "id": sp.id,
             "name": sp.name,
@@ -307,9 +305,9 @@ def speakers_ranking(filters: AnalyticsFilters, limit: int = 15) -> list[dict[st
             "city": sp.city,
             "stack": sp.stack,
             "avatar": sp.avatar_url,
-            "avg_score": round(sp.avg_score_window, 2) if sp.avg_score_window is not None else None,
+            "avg_score": round(avg, 2) if avg is not None else None,
             "feedbacks_count": total,
-            "nps": round(nps, 1),
+            "nps": round(avg, 1) if avg is not None else 0.0,
             "recommended": sp.recommended,
         })
     return result
@@ -358,7 +356,7 @@ def nomination_candidates(filters: AnalyticsFilters) -> list[dict[str, Any]]:
     result = []
     for sp in qs:
         total = sp.feedbacks_count or 0
-        nps = ((sp.promoters - sp.detractors) / total) * 100.0 if total else 0.0
+        avg = sp.avg_score_window
         result.append({
             "id": sp.id,
             "name": sp.name,
@@ -366,10 +364,10 @@ def nomination_candidates(filters: AnalyticsFilters) -> list[dict[str, Any]]:
             "city": sp.city,
             "stack": sp.stack,
             "avatar": sp.avatar_url,
-            "avg_score": round(sp.avg_score_window, 2) if sp.avg_score_window is not None else None,
+            "avg_score": round(avg, 2) if avg is not None else None,
             "events_count": sp.events_window or 0,
             "feedbacks_count": total,
-            "nps": round(nps, 1),
+            "nps": round(avg, 1) if avg is not None else 0.0,
             "recommended": sp.recommended,
             "reason": _candidate_reason(sp.avg_score_window, sp.events_window, sp.recommended, threshold),
         })

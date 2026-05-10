@@ -438,7 +438,7 @@
                 <span class="kpi-label">NPS</span>
                 <span class="kpi-icon"><i class="fa-solid fa-chart-line"></i></span>
             </div>
-            <div class="kpi-value">{{ nps_stats.nps }}</div>
+            <div class="kpi-value">{{ nps_stats.nps|floatformat:1 }}</div>
             <div class="kpi-hint">Промоутеры {{ nps_stats.promoter_pct }}% · Пассивы {{ nps_stats.passive_pct }}% · Детракторы {{ nps_stats.detractor_pct }}%</div>
         </div>
         <div class="kpi-card">
@@ -614,8 +614,8 @@
                                 {% else %}—{% endif %}
                             </td>
                             <td>
-                                <span class="nps-chip {% if sp.nps > 30 %}up{% elif sp.nps >= 0 %}flat{% else %}down{% endif %}">
-                                    {% if sp.nps > 0 %}+{% endif %}{{ sp.nps }}
+                                <span class="nps-chip {% if sp.nps >= 8 %}up{% elif sp.nps >= 5 %}flat{% else %}down{% endif %}">
+                                    {{ sp.nps|floatformat:1 }}
                                 </span>
                             </td>
                             <td>
@@ -672,7 +672,7 @@
                     <div class="stats-row">
                         <span class="stat-pill"><strong>{{ cand.avg_score }}</strong>средний балл</span>
                         <span class="stat-pill"><strong>{{ cand.events_count }}</strong>выступл. / 6 мес.</span>
-                        <span class="stat-pill"><strong>{% if cand.nps > 0 %}+{% endif %}{{ cand.nps }}</strong>NPS</span>
+                        <span class="stat-pill"><strong>{{ cand.nps|floatformat:1 }}</strong>NPS</span>
                     </div>
                     <div class="reason"><i class="fa-solid fa-circle-info"></i> {{ cand.reason }}</div>
                 </div>

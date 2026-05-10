@@ -239,7 +239,7 @@ def top_speakers(filters: HomeFilters, limit: int = TOP_SPEAKERS_LIMIT) -> list[
     result: list[dict[str, Any]] = []
     for sp in qs:
         total = sp.feedbacks_window or 0
-        nps = ((sp.promoters - sp.detractors) / total) * 100.0 if total else 0.0
+        avg = sp.avg_score_window
         result.append({
             "id": sp.id,
             "name": sp.name,
@@ -247,8 +247,8 @@ def top_speakers(filters: HomeFilters, limit: int = TOP_SPEAKERS_LIMIT) -> list[
             "stack": sp.stack,
             "city": sp.city,
             "avatar": sp.avatar_url,
-            "nps": round(nps, 1),
-            "avg_score": round(sp.avg_score_window, 2) if sp.avg_score_window is not None else None,
+            "nps": round(avg, 1) if avg is not None else 0.0,
+            "avg_score": round(avg, 2) if avg is not None else None,
             "feedbacks_count": total,
             "events_count": sp.events_window or 0,
             "recommended": bool(sp.recommended),

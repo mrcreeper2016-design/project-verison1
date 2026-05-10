@@ -97,6 +97,13 @@
                     Карточка спикера в базе ещё не привязана. Обратитесь к администратору — после привязки здесь же появится поле «Описание» для ленты спикеров.
                 </div>
                 {% endif %}
+                {% if speaker_card_linked %}
+                <div class="form-row">
+                    <label for="{{ form.company.id_for_label }}">{{ form.company.label }}</label>
+                    {{ form.company }}
+                    {% if form.company.errors %}<div class="field-errors">{% for e in form.company.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                {% endif %}
                 <div class="form-row">
                     {% if speaker_card_linked %}
                     <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
@@ -146,6 +153,61 @@
                     <button type="submit" class="btn-action" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3);"><i class="fa-solid fa-power-off"></i> Выйти из системы</button>
                 </form>
             </div>
+
+            {% if profile.role == 'speaker' %}
+            <div class="content-block profile-card animate-fade" style="animation-delay:0.20s;">
+                <div class="section-title"><i class="fa-solid fa-inbox"></i> Мои заявки</div>
+                <div id="myRequestsList" style="display:grid; gap:10px; font-size:13px;">
+                    <p style="margin:0; color:var(--text-muted);">Загрузка…</p>
+                </div>
+            </div>
+            <script>
+            (function() {
+                const STATUS_CHIP = {
+                    pending: '<span style="display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; background:rgba(224,165,0,0.15); color:#B87C00;">На рассмотрении</span>',
+                    approved: '<span style="display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; background:var(--light-green); color:var(--sber-green);">Одобрено</span>',
+                    rejected: '<span style="display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; background:rgba(217,62,78,0.1); color:#D93E4E;">Отклонено</span>',
+                };
+                function escapeHtml(s) {
+                    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                }
+                fetch('/api/my-event-requests/', { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(r => r.ok ? r.json() : { requests: [] })
+                    .then(data => {
+                        const list = document.getElementById('myRequestsList');
+                        if (!list) return;
+                        const items = data.requests || [];
+                        if (!items.length) {
+                            list.innerHTML = '<p style="margin:0; color:var(--text-muted);">Заявок пока нет.</p>';
+                            return;
+                        }
+                        list.innerHTML = items.map(r => {
+                            const head = r.kind === 'create'
+                                ? `<i class="fa-solid fa-plus-circle" style="color:var(--sber-green);"></i> ${escapeHtml(r.proposed_title)}`
+                                : `<i class="fa-solid fa-user-plus" style="color:var(--sber-green);"></i> ${escapeHtml(r.event ? r.event.title : '—')}`;
+                            const meta = [];
+                            if (r.topic) meta.push('Тема: ' + escapeHtml(r.topic));
+                            if (r.proposed_event_date) meta.push('Дата: ' + escapeHtml(r.proposed_event_date));
+                            if (r.proposed_location) meta.push(escapeHtml(r.proposed_location));
+                            const rejected = r.status === 'rejected' && r.rejection_reason
+                                ? `<div style="margin-top:6px; padding:8px; border-radius:8px; background:rgba(217,62,78,0.07); color:#D93E4E; font-size:12px;"><strong>Причина отказа:</strong> ${escapeHtml(r.rejection_reason)}</div>`
+                                : '';
+                            return `<div style="padding:10px 12px; border:1px solid var(--border-color); border-radius:12px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                                    <strong>${head}</strong>${STATUS_CHIP[r.status] || ''}
+                                </div>
+                                ${meta.length ? `<div style="margin-top:4px; color:var(--text-muted); font-size:12px;">${meta.join(' · ')}</div>` : ''}
+                                ${rejected}
+                            </div>`;
+                        }).join('');
+                    })
+                    .catch(() => {
+                        const list = document.getElementById('myRequestsList');
+                        if (list) list.innerHTML = '<p style="margin:0; color:#D93E4E;">Не удалось загрузить заявки.</p>';
+                    });
+            })();
+            </script>
+            {% endif %}
         </div>
     </div>
 </div>
