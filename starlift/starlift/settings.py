@@ -227,3 +227,6 @@ if USE_OBJECT_STORAGE:
 else:
     MEDIA_URL = '/media/'
 
+# Legal documents
+LEGAL_DOC_VERSION = "2026-05-10"
+
