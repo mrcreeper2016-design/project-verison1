@@ -155,10 +155,21 @@ def invite_accept_view(request: HttpRequest, token: str) -> HttpResponse:
                     user.is_active = True
                     user.save(update_fields=["is_active"])
 
+                    now = timezone.now()
                     profile, _ = UserProfile.objects.get_or_create(user=user)
                     profile.role = invite_fresh.role
                     profile.email_verified = True  # invite arrived at this email
-                    profile.save(update_fields=["role", "email_verified", "updated_at"])
+                    profile.pdn_consent_at = now
+                    profile.policy_accepted_at = now
+                    profile.consent_doc_version = settings.LEGAL_DOC_VERSION
+                    profile.save(update_fields=[
+                        "role",
+                        "email_verified",
+                        "pdn_consent_at",
+                        "policy_accepted_at",
+                        "consent_doc_version",
+                        "updated_at",
+                    ])
 
                     if invite_fresh.speaker_id and invite_fresh.role == UserProfile.ROLE_SPEAKER:
                         speaker = invite_fresh.speaker
@@ -177,6 +188,13 @@ def invite_accept_view(request: HttpRequest, token: str) -> HttpResponse:
                         request=request,
                         target=invite_fresh,
                         metadata={"email": invite_fresh.email, "role": invite_fresh.role},
+                    )
+                    audit.log(
+                        action=AuditLog.ACTION_CONSENT_GIVEN,
+                        actor=user,
+                        request=request,
+                        target=user,
+                        metadata={"doc_version": settings.LEGAL_DOC_VERSION},
                     )
 
                 user.backend = "accounts.auth_backends.UsernameOrEmailBackend"
