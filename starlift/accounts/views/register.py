@@ -56,11 +56,23 @@ def register_view(request: HttpRequest) -> HttpResponse:
 
             # Signal created the profile with role=guest by default — just
             # make the intent explicit and reset verification flags.
+            now = timezone.now()
             profile, _ = UserProfile.objects.get_or_create(user=user)
             profile.role = UserProfile.ROLE_GUEST
             profile.email_verified = False
             profile.pending_email = None
-            profile.save(update_fields=["role", "email_verified", "pending_email", "updated_at"])
+            profile.pdn_consent_at = now
+            profile.policy_accepted_at = now
+            profile.consent_doc_version = settings.LEGAL_DOC_VERSION
+            profile.save(update_fields=[
+                "role",
+                "email_verified",
+                "pending_email",
+                "pdn_consent_at",
+                "policy_accepted_at",
+                "consent_doc_version",
+                "updated_at",
+            ])
 
             raw = token_svc.make_token()
             ttl_hours = getattr(settings, "ACCOUNTS_EMAIL_CHANGE_TTL_HOURS", 24)
@@ -77,6 +89,13 @@ def register_view(request: HttpRequest) -> HttpResponse:
                 request=request,
                 target=user,
                 metadata={"email": user.email, "username": user.username},
+            )
+            audit.log(
+                action=AuditLog.ACTION_CONSENT_GIVEN,
+                actor=user,
+                request=request,
+                target=user,
+                metadata={"doc_version": settings.LEGAL_DOC_VERSION},
             )
 
         try:
