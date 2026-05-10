@@ -25,6 +25,9 @@ class UserProfile(models.Model):
     pending_email = models.EmailField(null=True, blank=True)
     bio = models.TextField(blank=True, default="")
     avatar = models.ImageField(upload_to="avatars/users/", null=True, blank=True)
+    pdn_consent_at = models.DateTimeField(null=True, blank=True)
+    policy_accepted_at = models.DateTimeField(null=True, blank=True)
+    consent_doc_version = models.CharField(max_length=32, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -179,6 +182,7 @@ class AuditLog(models.Model):
     ACTION_GUEST_PROMOTED = "guest_promoted"
     ACTION_GUEST_DELETED = "guest_deleted"
     ACTION_EMAIL_VERIFIED = "email_verified"
+    ACTION_CONSENT_GIVEN = "consent_given"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
