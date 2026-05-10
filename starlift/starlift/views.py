@@ -21,7 +21,7 @@ from accounts.services.speaker_avatar import mirror_speaker_uploaded_avatar_to_p
 from . import analytics as analytics_lib
 from . import home_metrics
 from .forms import FeedbackForm, SpeakerForm, SpeakerSelfEditForm
-from .models import Event, Feedback, Speaker
+from .models import Event, EventRequest, Feedback, Speaker
 
 RU_MONTHS_GEN = {
     "января": 1,
@@ -295,13 +295,66 @@ def home_api(request):
 
 @member_required
 def speakers_view(request):
-    return render(request, "speakers.html")
+    from django.db.models import Prefetch
+    from accounts.models import UserProfile
+
+    speakers = Speaker.objects.prefetch_related(
+        "events",
+        Prefetch("feedbacks", queryset=Feedback.objects.select_related("event").order_by("-created_at")),
+        Prefetch("user__profile", queryset=UserProfile.objects.only("user_id", "avatar")),
+    ).all()
+
+    speakers_data = []
+    for speaker in speakers:
+        feedbacks_data = [
+            {
+                "score": f.score,
+                "comment": f.comment,
+                "date": f.created_at.strftime("%d.%m.%Y %H:%M"),
+                "event_title": f.event.title,
+            }
+            for f in speaker.feedbacks.all()
+        ]
+        ev_list = []
+        for e in speaker.events.all():
+            st = (e.status or "").lower()
+            if st not in ("past", "future"):
+                st = "future"
+            ev_list.append({"id": e.id, "t": e.title, "s": st, "d": e.date or "", "loc": (e.location or "")[:200]})
+
+        avatar = speaker.card_avatar_url
+        if speaker.user_id:
+            try:
+                prof = speaker.user.profile
+                if prof.avatar and getattr(prof.avatar, "name", ""):
+                    try:
+                        avatar = prof.avatar.url
+                    except ValueError:
+                        pass
+            except Exception:
+                pass
+
+        speakers_data.append({
+            "id": speaker.id,
+            "name": speaker.name,
+            "sub": speaker.sub,
+            "stack": speaker.stack,
+            "city": speaker.city,
+            "status": speaker.link_status_display,
+            "nps": round(float(speaker.nps), 1) if speaker.nps else 0,
+            "img": speaker.img,
+            "avatar": avatar,
+            "events": ev_list,
+            "feedbacks": feedbacks_data,
+        })
+
+    return render(request, "speakers.html", {"speakers_json": json.dumps(speakers_data)})
 
 @member_required
 def events_view(request):
     return render(request, 'events.html')
 
-@member_required
+@role_required('admin')
 def analytics_view(request):
     filters = analytics_lib.parse_filters(request.GET)
     dashboard = analytics_lib.build_dashboard(filters)
@@ -326,19 +379,26 @@ def analytics_view(request):
 @member_required
 def speakers_api(request):
     try:
-        speakers = Speaker.objects.prefetch_related("events").all()
+        from django.db.models import Prefetch
+        from accounts.models import UserProfile
+
+        speakers = Speaker.objects.prefetch_related(
+            "events",
+            Prefetch("feedbacks", queryset=Feedback.objects.select_related("event").order_by("-created_at")),
+            Prefetch("user__profile", queryset=UserProfile.objects.only("user_id", "avatar")),
+        ).all()
+
         speakers_data = []
         for speaker in speakers:
-            # Получаем отзывы
-            feedbacks_qs = speaker.feedbacks.all().order_by('-created_at')
-            feedbacks_data = []
-            for f in feedbacks_qs:
-                feedbacks_data.append({
+            feedbacks_data = [
+                {
                     "score": f.score,
                     "comment": f.comment,
                     "date": f.created_at.strftime("%d.%m.%Y %H:%M"),
-                    "event_title": f.event.title
-                })
+                    "event_title": f.event.title,
+                }
+                for f in speaker.feedbacks.all()
+            ]
 
             ev_list = []
             for e in speaker.events.all():
@@ -353,6 +413,19 @@ def speakers_api(request):
                     "loc": (e.location or "")[:200],
                 })
 
+            # Resolve avatar without extra DB query (profile already prefetched)
+            avatar = speaker.card_avatar_url
+            if speaker.user_id:
+                try:
+                    prof = speaker.user.profile
+                    if prof.avatar and getattr(prof.avatar, "name", ""):
+                        try:
+                            avatar = prof.avatar.url
+                        except ValueError:
+                            pass
+                except Exception:
+                    pass
+
             speakers_data.append({
                 "id": speaker.id,
                 "name": speaker.name,
@@ -360,9 +433,9 @@ def speakers_api(request):
                 "stack": speaker.stack,
                 "city": speaker.city,
                 "status": speaker.link_status_display,
-                "nps": int(speaker.nps) if speaker.nps else 0,
+                "nps": round(float(speaker.nps), 1) if speaker.nps else 0,
                 "img": speaker.img,
-                "avatar": speaker.avatar_url,
+                "avatar": avatar,
                 "events": ev_list,
                 "feedbacks": feedbacks_data
             })
@@ -387,7 +460,9 @@ def events_api(request):
             speakers_qs = event.speakers.all()
             has_speakers = bool(speakers_qs)
 
-            if is_empty_desc and is_empty_link and not has_speakers and not has_schedule:
+            # Скрываем только полностью пустые мероприятия из автопарсинга;
+            # ручные/админские/самостоятельно поданные показываем всегда.
+            if event.source == 'parser' and is_empty_desc and is_empty_link and not has_speakers and not has_schedule:
                 continue
 
             speakers_data = [
@@ -565,3 +640,254 @@ def generate_qr_view(request, speaker_id, event_id):
         'event': event,
     }
     return render(request, 'qr_display.html', context)
+
+
+def _get_speaker_for_user(user):
+    """Returns Speaker linked to user, or None."""
+    return Speaker.objects.filter(user=user).first()
+
+
+@member_required
+def submit_event_request_view(request):
+    """Спикер подаёт заявку на создание нового мероприятия."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    speaker = _get_speaker_for_user(request.user)
+    if not speaker:
+        return JsonResponse({'error': 'no_speaker_profile'}, status=403)
+
+    title = (request.POST.get('proposed_title') or '').strip()
+    if not title:
+        return JsonResponse({'error': 'title_required'}, status=400)
+
+    raw_date = (request.POST.get('proposed_event_date') or '').strip()
+    parsed_date = None
+    if raw_date:
+        try:
+            from datetime import datetime
+            parsed_date = datetime.strptime(raw_date, '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse({'error': 'bad_date'}, status=400)
+
+    req = EventRequest.objects.create(
+        kind=EventRequest.KIND_CREATE,
+        speaker=speaker,
+        proposed_title=title,
+        proposed_description=(request.POST.get('proposed_description') or '').strip(),
+        proposed_event_date=parsed_date,
+        proposed_location=(request.POST.get('proposed_location') or '').strip(),
+        proposed_link=(request.POST.get('proposed_link') or '').strip(),
+        topic=(request.POST.get('topic') or '').strip(),
+        comment=(request.POST.get('comment') or '').strip(),
+    )
+    return JsonResponse({'ok': True, 'id': req.id})
+
+
+@member_required
+def submit_join_request_view(request, event_id):
+    """Спикер подаёт заявку на участие в существующем мероприятии."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    speaker = _get_speaker_for_user(request.user)
+    if not speaker:
+        return JsonResponse({'error': 'no_speaker_profile'}, status=403)
+
+    event = get_object_or_404(Event, pk=event_id)
+
+    if event.speakers.filter(pk=speaker.pk).exists():
+        return JsonResponse({'error': 'already_participant'}, status=400)
+
+    if EventRequest.objects.filter(
+        kind=EventRequest.KIND_JOIN,
+        speaker=speaker, event=event,
+        status=EventRequest.STATUS_PENDING,
+    ).exists():
+        return JsonResponse({'error': 'already_pending'}, status=400)
+
+    topic = (request.POST.get('topic') or '').strip()
+    if not topic:
+        return JsonResponse({'error': 'topic_required'}, status=400)
+
+    req = EventRequest.objects.create(
+        kind=EventRequest.KIND_JOIN,
+        speaker=speaker,
+        event=event,
+        topic=topic,
+        comment=(request.POST.get('comment') or '').strip(),
+    )
+    return JsonResponse({'ok': True, 'id': req.id})
+
+
+_RU_MONTHS_GEN_BY_NUM = {
+    1: 'января', 2: 'февраля', 3: 'марта', 4: 'апреля', 5: 'мая', 6: 'июня',
+    7: 'июля', 8: 'августа', 9: 'сентября', 10: 'октября', 11: 'ноября', 12: 'декабря',
+}
+
+
+def _parse_event_post(request):
+    """Parse common Event fields from POST. Returns dict, raises ValueError on bad data."""
+    from datetime import datetime
+    title = (request.POST.get('title') or '').strip()
+    if not title:
+        raise ValueError('title_required')
+    raw_date = (request.POST.get('event_date') or '').strip()
+    parsed_date = None
+    human_date = None
+    if raw_date:
+        try:
+            parsed_date = datetime.strptime(raw_date, '%Y-%m-%d').date()
+            human_date = f"{parsed_date.day} {_RU_MONTHS_GEN_BY_NUM[parsed_date.month]} {parsed_date.year}"
+        except (ValueError, KeyError):
+            raise ValueError('bad_date')
+    return {
+        'title': title,
+        'description': (request.POST.get('description') or '').strip() or None,
+        'event_date': parsed_date,
+        'date': human_date,
+        'location': (request.POST.get('location') or '').strip() or None,
+        'link': (request.POST.get('link') or '').strip() or None,
+        'topic': (request.POST.get('topic') or '').strip() or None,
+        'schedule': (request.POST.get('schedule') or '').strip() or None,
+    }
+
+
+@role_required('admin')
+def admin_event_create(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    try:
+        data = _parse_event_post(request)
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    today = timezone.now().date()
+    status = 'past' if (data['event_date'] and data['event_date'] < today) else 'future'
+    ev = Event.objects.create(source='internal', status=status, **data)
+    speaker_ids = request.POST.getlist('speaker_ids')
+    if speaker_ids:
+        ev.speakers.set(Speaker.objects.filter(pk__in=speaker_ids))
+    return JsonResponse({'ok': True, 'id': ev.id})
+
+
+@role_required('admin')
+def admin_event_edit(request, event_id):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    ev = get_object_or_404(Event, pk=event_id)
+    try:
+        data = _parse_event_post(request)
+    except ValueError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    today = timezone.now().date()
+    for f, v in data.items():
+        setattr(ev, f, v)
+    if data['event_date']:
+        ev.status = 'past' if data['event_date'] < today else 'future'
+    ev.save()
+    speaker_ids = request.POST.getlist('speaker_ids')
+    if speaker_ids:
+        ev.speakers.set(Speaker.objects.filter(pk__in=speaker_ids))
+    return JsonResponse({'ok': True, 'id': ev.id})
+
+
+@role_required('admin')
+def admin_event_remove_speaker(request, event_id, speaker_id):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    ev = get_object_or_404(Event, pk=event_id)
+    sp = get_object_or_404(Speaker, pk=speaker_id)
+    ev.speakers.remove(sp)
+    return JsonResponse({'ok': True})
+
+
+@role_required('admin')
+def admin_event_delete(request, event_id):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    ev = get_object_or_404(Event, pk=event_id)
+    ev.delete()
+    return JsonResponse({'ok': True})
+
+
+@role_required('admin')
+def admin_pending_requests_api(request):
+    """Список pending заявок для уведомлений админа."""
+    qs = EventRequest.objects.filter(
+        status=EventRequest.STATUS_PENDING
+    ).select_related('speaker', 'event').order_by('-created_at')[:30]
+    items = []
+    for r in qs:
+        items.append({
+            'id': r.id,
+            'kind': r.kind,
+            'speaker_name': r.speaker.name,
+            'event_title': r.event.title if r.event else r.proposed_title,
+            'topic': r.topic,
+            'created_at': r.created_at.isoformat(),
+        })
+    total = EventRequest.objects.filter(status=EventRequest.STATUS_PENDING).count()
+    return JsonResponse({'count': total, 'requests': items})
+
+
+@role_required('admin')
+def admin_quick_approve(request, request_id):
+    """Быстрое одобрение из колокольчика."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method_not_allowed'}, status=405)
+    from django.db import transaction as _tx
+    req = get_object_or_404(EventRequest, pk=request_id)
+    if req.status != EventRequest.STATUS_PENDING:
+        return JsonResponse({'error': 'already_processed'}, status=400)
+    with _tx.atomic():
+        if req.kind == EventRequest.KIND_CREATE:
+            today = timezone.now().date()
+            pd = req.proposed_event_date
+            human_date = f"{pd.day} {_RU_MONTHS_GEN_BY_NUM[pd.month]} {pd.year}" if pd else None
+            ev = Event.objects.create(
+                title=req.proposed_title,
+                description=req.proposed_description or None,
+                event_date=pd,
+                date=human_date,
+                location=req.proposed_location or None,
+                link=req.proposed_link or None,
+                source='self',
+                status='past' if (pd and pd < today) else 'future',
+            )
+            ev.speakers.add(req.speaker)
+            req.event = ev
+        elif req.kind == EventRequest.KIND_JOIN and req.event:
+            req.event.speakers.add(req.speaker)
+        req.status = EventRequest.STATUS_APPROVED
+        req.reviewed_at = timezone.now()
+        req.reviewed_by = request.user
+        req.save()
+    return JsonResponse({'ok': True})
+
+
+@member_required
+def my_event_requests_api(request):
+    """Список заявок текущего спикера."""
+    speaker = _get_speaker_for_user(request.user)
+    if not speaker:
+        return JsonResponse({'requests': []})
+
+    requests_qs = EventRequest.objects.filter(speaker=speaker).select_related('event')
+    items = []
+    for r in requests_qs:
+        items.append({
+            'id': r.id,
+            'kind': r.kind,
+            'kind_label': r.get_kind_display(),
+            'status': r.status,
+            'status_label': r.get_status_display(),
+            'topic': r.topic,
+            'comment': r.comment,
+            'event': {'id': r.event.id, 'title': r.event.title} if r.event else None,
+            'proposed_title': r.proposed_title,
+            'proposed_description': r.proposed_description,
+            'proposed_event_date': r.proposed_event_date.isoformat() if r.proposed_event_date else None,
+            'proposed_location': r.proposed_location,
+            'proposed_link': r.proposed_link,
+            'rejection_reason': r.rejection_reason,
+            'created_at': r.created_at.isoformat(),
+        })
+    return JsonResponse({'requests': items})
