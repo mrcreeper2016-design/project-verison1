@@ -12,7 +12,13 @@ from assistant.agent.tools import (
 @override_settings(ASSISTANT_TOOL_RESULT_MAX_BYTES=128)
 class ToolDecoratorTests(TestCase):
     def setUp(self):
+        # Snapshot the registry so we can restore it after each test.
+        # Other test modules rely on the built-in tools being present.
+        self._registry_snapshot = dict(TOOL_REGISTRY)
+
+    def tearDown(self):
         TOOL_REGISTRY.clear()
+        TOOL_REGISTRY.update(self._registry_snapshot)
 
     def test_registers_tool_with_schema(self):
         @assistant_tool(
