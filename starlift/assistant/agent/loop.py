@@ -69,19 +69,23 @@ def run_turn(conversation: Conversation, *, client) -> Iterator[AgentEvent]:
         pending_tool_name = ""
         pending_tool_args = ""
         chunk_in = chunk_out = 0
-        for chunk in client.stream_chat(
-            messages=messages,
-            tools=_tool_schemas(),
-            max_output_tokens=settings.ASSISTANT_MAX_OUTPUT_TOKENS_PER_TURN,
-        ):
-            chunk_in = chunk.prompt_tokens or chunk_in
-            chunk_out = chunk.completion_tokens or chunk_out
-            if chunk.delta_text:
-                assistant_text += chunk.delta_text
-                yield AgentEvent("delta", {"text": chunk.delta_text})
-            if chunk.tool_call_name:
-                pending_tool_name = chunk.tool_call_name
-                pending_tool_args += chunk.tool_call_args_json
+        try:
+            for chunk in client.stream_chat(
+                messages=messages,
+                tools=_tool_schemas(),
+                max_output_tokens=settings.ASSISTANT_MAX_OUTPUT_TOKENS_PER_TURN,
+            ):
+                chunk_in = chunk.prompt_tokens or chunk_in
+                chunk_out = chunk.completion_tokens or chunk_out
+                if chunk.delta_text:
+                    assistant_text += chunk.delta_text
+                    yield AgentEvent("delta", {"text": chunk.delta_text})
+                if chunk.tool_call_name:
+                    pending_tool_name = chunk.tool_call_name
+                    pending_tool_args += chunk.tool_call_args_json
+        except Exception as exc:  # noqa: BLE001 — surface provider errors as SSE events
+            yield AgentEvent("error", {"reason": "provider_error", "detail": str(exc)[:300]})
+            return
         turn_token_in += chunk_in
         turn_token_out += chunk_out
 

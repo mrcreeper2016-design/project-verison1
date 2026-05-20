@@ -4,60 +4,96 @@
 {% block content %}
 <link rel="stylesheet" href="{% static 'assistant/chat.css' %}">
 
-<div class="chat-layout">
+<div class="chat-page">
     <aside class="chat-sidebar animate-fade">
+        <div class="chat-sidebar-header">
+            <h2><i class="fa-solid fa-comments" style="color:var(--sber-green);"></i> Беседы</h2>
+        </div>
         <a class="chat-new-btn" href="{% url 'assistant:home' %}?new=1">
             <i class="fa-solid fa-plus"></i> Новая беседа
         </a>
-        <h3>Беседы</h3>
+
+        <div class="chat-sidebar-section-label">История</div>
         <div class="chat-sidebar-list">
             {% for c in conversations_sidebar %}
             <a class="chat-sidebar-item {% if c.id == conversation.id %}active{% endif %}"
                href="{% url 'assistant:chat_detail' conversation_id=c.id %}">
-                {{ c.title|default:"Без названия"|truncatechars:36 }}
+                {{ c.title|default:"Без названия"|truncatechars:40 }}
             </a>
             {% empty %}
-            <span style="color:var(--text-muted); font-size:12px; padding: 6px 10px;">
-                Пока пусто
-            </span>
+            <div class="chat-sidebar-empty">Пока пусто</div>
             {% endfor %}
         </div>
     </aside>
 
-    <section class="chat-main content-block animate-fade" style="padding: 16px;">
-        <div class="chat-header">
-            <h2 class="chat-title">
-                <i class="fa-solid fa-robot" style="color:var(--sber-green);"></i>
-                {{ conversation.title|default:"Новая беседа" }}
-            </h2>
-        </div>
+    <section class="chat-main animate-fade">
+        <header class="chat-header">
+            <div class="chat-header-title">
+                <div class="chat-header-avatar">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div style="min-width:0;">
+                    <h1 class="chat-title">
+                        {{ conversation.title|default:"Ассистент Starlift" }}
+                    </h1>
+                    <p class="chat-subtitle">Помогаю искать спикеров, события и считать NPS</p>
+                </div>
+            </div>
+        </header>
 
         <div id="chat-thread" class="chat-thread">
             {% if not messages %}
-            <div class="chat-empty-hint">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
-                Спросите ассистента про спикеров, события или NPS-аналитику.
+            <div class="chat-empty">
+                <div class="chat-empty-icon">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <h3>Спросите что угодно</h3>
+                <p>Найду спикеров по стеку, покажу аналитику NPS, расскажу про ближайшие события. Используйте подсказки или напишите свой запрос.</p>
+                <div class="chat-empty-hints">
+                    <button type="button" class="chat-empty-hint" data-prompt="Найди спикеров по Python с NPS выше 8">
+                        Топ Python-спикеров
+                    </button>
+                    <button type="button" class="chat-empty-hint" data-prompt="Покажи ближайшие события">
+                        Ближайшие события
+                    </button>
+                    <button type="button" class="chat-empty-hint" data-prompt="Какой NPS за последние 30 дней?">
+                        NPS за месяц
+                    </button>
+                </div>
             </div>
             {% endif %}
+
             {% for m in messages %}
                 {% if m.role == 'user' %}
-                <div class="chat-msg user"><div class="chat-text">{{ m.content }}</div></div>
+                <div class="chat-msg user">
+                    <div class="chat-avatar">{{ user.first_name|default:user.username|slice:":1"|upper }}</div>
+                    <div class="chat-bubble">{{ m.content }}</div>
+                </div>
                 {% elif m.role == 'assistant' %}
-                <div class="chat-msg assistant"><div class="chat-text">{{ m.content }}</div></div>
+                <div class="chat-msg assistant">
+                    <div class="chat-avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="chat-bubble">{{ m.content }}</div>
+                </div>
                 {% elif m.role == 'tool' %}
-                <div class="chat-tool-chip">
-                    <i class="fa-solid fa-magnifying-glass"></i> {{ m.tool_name }}
+                <div class="chat-tool-chip done">
+                    <i class="fa-solid fa-bolt"></i> {{ m.tool_name }}
                 </div>
                 {% endif %}
             {% endfor %}
         </div>
 
-        <div class="chat-input-row">
-            <input id="chat-input" class="chat-input" type="text"
-                   placeholder="Напишите ваш вопрос…" autocomplete="off">
-            <button id="chat-send-btn" class="btn-action btn-contact chat-send-btn">
-                <i class="fa-solid fa-paper-plane"></i>
-            </button>
+        <div class="chat-composer">
+            <div class="chat-composer-row">
+                <textarea id="chat-input" class="chat-input" rows="1"
+                          placeholder="Напишите сообщение…" autocomplete="off"></textarea>
+                <button id="chat-send-btn" class="chat-send" type="button" aria-label="Отправить">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+            <div class="chat-composer-hint">
+                <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
+                <span id="chat-status"></span>
+            </div>
         </div>
     </section>
 </div>
@@ -65,6 +101,7 @@
 <div id="chat-root"
      data-conversation-id="{{ conversation.id }}"
      data-csrf="{{ csrf_token }}"
+     data-user-initial="{{ user.first_name|default:user.username|slice:':1'|upper }}"
      data-autostart="{% if messages|length == 1 and messages.0.role == 'user' %}1{% else %}0{% endif %}"
      style="display:none;"></div>
 
