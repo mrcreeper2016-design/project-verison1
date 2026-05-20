@@ -50,15 +50,15 @@
     .score-buttons {
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: clamp(6px, 1.5vw, 10px);
         justify-content: center;
         max-width: 350px;
         margin-bottom: 20px;
     }
 
     .score-btn {
-        width: 50px;
-        height: 50px;
+        width: clamp(40px, 11vw, 50px);
+        height: clamp(40px, 11vw, 50px);
         border-radius: 12px;
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.1);

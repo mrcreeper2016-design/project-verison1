@@ -518,6 +518,33 @@
             max-height: 42vh;
         }
     }
+
+    @media (max-width: 768px) {
+        .events-page { padding: 0; }
+        .events-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+        .events-title { font-size: 22px !important; }
+        .event-card { padding: 14px; }
+        #eventModalOverlay .modal-content.event-detail-modal {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-height: 100vh !important;
+            border-radius: 0 !important;
+            padding: 16px 14px !important;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .schedule-item {
+            grid-template-columns: 1fr !important;
+            gap: 4px !important;
+        }
+        .stacked-avatars .avatar {
+            width: 28px !important;
+            height: 28px !important;
+            margin-left: -6px;
+        }
+        .stacked-avatars .avatar:first-child { margin-left: 0; }
+    }
 </style>
 
 <div class="events-page">
