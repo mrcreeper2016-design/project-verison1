@@ -17,8 +17,20 @@ from dotenv import load_dotenv
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env file
-load_dotenv(os.path.join(BASE_DIR, '.env'))
+# Pick which .env file to load:
+#   1. Explicit ENV_FILE=/path/to/file  — wins if set.
+#   2. DJANGO_ENV=production            — loads .env.production.
+#   3. Fallback                         — loads .env.
+# Existing OS environment variables always override what's in the file.
+_explicit = os.environ.get('ENV_FILE')
+_env_name = os.environ.get('DJANGO_ENV', '').lower()
+if _explicit:
+    _env_path = _explicit
+elif _env_name == 'production' and (BASE_DIR / '.env.production').exists():
+    _env_path = str(BASE_DIR / '.env.production')
+else:
+    _env_path = str(BASE_DIR / '.env')
+load_dotenv(_env_path)
 
 
 # Quick-start development settings - unsuitable for production
