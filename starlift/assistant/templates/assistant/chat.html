@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'assistant/chat.css' %}">
+
+<div class="chat-layout">
+    <aside class="chat-sidebar animate-fade">
+        <a class="chat-new-btn" href="{% url 'assistant:home' %}?new=1">
+            <i class="fa-solid fa-plus"></i> Новая беседа
+        </a>
+        <h3>Беседы</h3>
+        <div class="chat-sidebar-list">
+            {% for c in conversations_sidebar %}
+            <a class="chat-sidebar-item {% if c.id == conversation.id %}active{% endif %}"
+               href="{% url 'assistant:chat_detail' conversation_id=c.id %}">
+                {{ c.title|default:"Без названия"|truncatechars:36 }}
+            </a>
+            {% empty %}
+            <span style="color:var(--text-muted); font-size:12px; padding: 6px 10px;">
+                Пока пусто
+            </span>
+            {% endfor %}
+        </div>
+    </aside>
+
+    <section class="chat-main content-block animate-fade" style="padding: 16px;">
+        <div class="chat-header">
+            <h2 class="chat-title">
+                <i class="fa-solid fa-robot" style="color:var(--sber-green);"></i>
+                {{ conversation.title|default:"Новая беседа" }}
+            </h2>
+        </div>
+
+        <div id="chat-thread" class="chat-thread">
+            {% if not messages %}
+            <div class="chat-empty-hint">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                Спросите ассистента про спикеров, события или NPS-аналитику.
+            </div>
+            {% endif %}
+            {% for m in messages %}
+                {% if m.role == 'user' %}
+                <div class="chat-msg user"><div class="chat-text">{{ m.content }}</div></div>
+                {% elif m.role == 'assistant' %}
+                <div class="chat-msg assistant"><div class="chat-text">{{ m.content }}</div></div>
+                {% elif m.role == 'tool' %}
+                <div class="chat-tool-chip">
+                    <i class="fa-solid fa-magnifying-glass"></i> {{ m.tool_name }}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <div class="chat-input-row">
+            <input id="chat-input" class="chat-input" type="text"
+                   placeholder="Напишите ваш вопрос…" autocomplete="off">
+            <button id="chat-send-btn" class="btn-action btn-contact chat-send-btn">
+                <i class="fa-solid fa-paper-plane"></i>
+            </button>
+        </div>
+    </section>
+</div>
+
+<div id="chat-root"
+     data-conversation-id="{{ conversation.id }}"
+     data-csrf="{{ csrf_token }}"
+     data-autostart="{% if messages|length == 1 and messages.0.role == 'user' %}1{% else %}0{% endif %}"
+     style="display:none;"></div>
+
+<script src="{% static 'assistant/chat.js' %}"></script>
+{% endblock %}
