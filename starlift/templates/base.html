@@ -1041,8 +1041,23 @@
 
         /* Phones / large mobiles — off-canvas drawer */
         @media (max-width: 768px) {
-            body { height: auto; min-height: 100vh; overflow-x: hidden; }
-            main { padding: 16px 14px; }
+            html, body {
+                height: auto;
+                min-height: 100vh;
+                overflow-x: hidden;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            body { display: block; }
+            main {
+                padding: 16px 14px;
+                overflow: visible;
+                height: auto;
+                min-height: 100vh;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .main-header { position: static; }
 
             .burger-btn { display: inline-flex; }
             .main-header {
@@ -1277,7 +1292,12 @@
             sidebar.classList.toggle('open', open);
             sidebarBackdrop.classList.toggle('show', open);
             burgerBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-            document.body.style.overflow = open ? 'hidden' : '';
+            // Lock background scroll only while drawer is open
+            if (open) {
+                document.documentElement.style.overflow = 'hidden';
+            } else {
+                document.documentElement.style.overflow = '';
+            }
         }
         if (burgerBtn) {
             burgerBtn.addEventListener('click', (e) => {
