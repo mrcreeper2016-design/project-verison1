@@ -189,6 +189,7 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+
 if USE_OBJECT_STORAGE:
     STORAGE_ENDPOINT_URL = os.getenv("STORAGE_ENDPOINT_URL", "").strip()
     STORAGE_BUCKET_NAME = os.getenv("STORAGE_BUCKET_NAME", "").strip()
