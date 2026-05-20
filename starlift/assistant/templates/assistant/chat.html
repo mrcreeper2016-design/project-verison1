@@ -16,10 +16,16 @@
         <div class="chat-sidebar-section-label">История</div>
         <div class="chat-sidebar-list">
             {% for c in conversations_sidebar %}
-            <a class="chat-sidebar-item {% if c.id == conversation.id %}active{% endif %}"
-               href="{% url 'assistant:chat_detail' conversation_id=c.id %}">
-                {{ c.title|default:"Без названия"|truncatechars:40 }}
-            </a>
+            <div class="chat-sidebar-row {% if c.id == conversation.id %}active{% endif %}" data-conv-id="{{ c.id }}">
+                <a class="chat-sidebar-item-link"
+                   href="{% url 'assistant:chat_detail' conversation_id=c.id %}">
+                    {{ c.title|default:"Без названия"|truncatechars:34 }}
+                </a>
+                <button type="button" class="chat-sidebar-delete" data-conv-id="{{ c.id }}"
+                        title="Удалить беседу" aria-label="Удалить беседу">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
             {% empty %}
             <div class="chat-sidebar-empty">Пока пусто</div>
             {% endfor %}
@@ -74,18 +80,15 @@
                     <div class="chat-avatar"><i class="fa-solid fa-robot"></i></div>
                     <div class="chat-bubble">{{ m.content }}</div>
                 </div>
-                {% elif m.role == 'tool' %}
-                <div class="chat-tool-chip done">
-                    <i class="fa-solid fa-bolt"></i> {{ m.tool_name }}
-                </div>
                 {% endif %}
+                {# m.role == 'tool' — intentionally hidden from the user #}
             {% endfor %}
         </div>
 
         <div class="chat-composer">
             <div class="chat-composer-row">
                 <textarea id="chat-input" class="chat-input" rows="1"
-                          placeholder="Напишите сообщение…" autocomplete="off"></textarea>
+                          placeholder="Напишите ваш вопрос…" autocomplete="off"></textarea>
                 <button id="chat-send-btn" class="chat-send" type="button" aria-label="Отправить">
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>

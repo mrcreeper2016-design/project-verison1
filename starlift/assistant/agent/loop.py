@@ -26,8 +26,32 @@ from assistant.agent.budget import (
     check_global_budget,
 )
 from assistant.agent.prompts import build_context_messages, build_system_prompt
+from assistant.agent.safety import FENCE_CLOSE, FENCE_OPEN, sanitize_tool_result
 from assistant.agent.tools import TOOL_REGISTRY, ToolResultTooLargeError
 from assistant.models import Conversation, Message
+
+
+import re as _re
+
+_FENCE_LEAK_RE = _re.compile(
+    r"\[/?USER[_\s]?CONTENT\]",  # [USER_CONTENT], [/USER_CONTENT], [USER CONTENT], [/USER CONTENT]
+    _re.IGNORECASE,
+)
+
+
+def _strip_fence_markers(text: str) -> str:
+    """Drop safety fence markers from streamed assistant text.
+
+    Weaker GigaChat models sometimes leak the [USER_CONTENT] / [/USER_CONTENT]
+    markers we use to mark untrusted DB fields. Strip them on the wire so
+    the end user never sees the internal scaffolding.
+
+    Tolerates slight variations: underscore vs space, with or without slash,
+    case-insensitive — the model often paraphrases the marker.
+    """
+    if not text:
+        return text
+    return _FENCE_LEAK_RE.sub("", text)
 
 
 @dataclass
@@ -78,8 +102,10 @@ def run_turn(conversation: Conversation, *, client) -> Iterator[AgentEvent]:
                 chunk_in = chunk.prompt_tokens or chunk_in
                 chunk_out = chunk.completion_tokens or chunk_out
                 if chunk.delta_text:
-                    assistant_text += chunk.delta_text
-                    yield AgentEvent("delta", {"text": chunk.delta_text})
+                    cleaned = _strip_fence_markers(chunk.delta_text)
+                    assistant_text += cleaned
+                    if cleaned:
+                        yield AgentEvent("delta", {"text": cleaned})
                 if chunk.tool_call_name:
                     pending_tool_name = chunk.tool_call_name
                     if chunk.tool_call_args:
@@ -114,17 +140,20 @@ def run_turn(conversation: Conversation, *, client) -> Iterator[AgentEvent]:
             )
             summary = _summarize_tool_result(pending_tool_name, result)
             yield AgentEvent("tool_end", {"id": tool_msg.id, "summary": summary})
-            # GigaChat requires the assistant's function_call to appear in history
-            # before the corresponding function-role result.
+            # GigaChat requires the assistant's function_call to appear in
+            # history before the corresponding function-role result.
             messages.append({
                 "role": "assistant",
                 "content": "",
                 "function_call": {"name": pending_tool_name, "arguments": args},
             })
+            # Sanitize before sending to the LLM: wrap untrusted user-content
+            # fields with fences, redact PII, cap lengths.
+            safe_result = sanitize_tool_result(result)
             messages.append({
                 "role": "function",
                 "name": pending_tool_name,
-                "content": json.dumps(result, ensure_ascii=False),
+                "content": json.dumps(safe_result, ensure_ascii=False),
             })
             continue
 

@@ -299,22 +299,22 @@
         }
 
         .theme-toggle {
-            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            box-shadow: 0 4px 16px 0 rgba(31, 38, 135, 0.05), inset 0 2px 2px rgba(255, 255, 255, 0.2);
-            font-size: 20px; 
-            color: var(--sber-green); cursor: pointer; 
+            background: rgba(255, 255, 255, 0.25);
+            -webkit-backdrop-filter: blur(18px) saturate(140%);
+            backdrop-filter: blur(18px) saturate(140%);
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            box-shadow: 0 4px 16px rgba(10, 128, 59, 0.10);
+            font-size: 20px;
+            color: var(--sber-green); cursor: pointer;
             width: 42px; height: 42px; border-radius: 50px;
             display: flex; align-items: center; justify-content: center;
             transition: var(--transition);
         }
-        
+
         [data-theme="dark"] .theme-toggle {
-            background: linear-gradient(135deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.05) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.2), inset 0 2px 2px rgba(255, 255, 255, 0.05);
+            background: rgba(20, 29, 25, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
         }
 
         .theme-toggle i {
@@ -374,25 +374,25 @@
         .notif-empty { padding: 24px 12px; text-align: center; color: var(--text-muted); font-size: 13px; }
 
         .admin-profile-container { position: relative; }
-        .admin-profile { 
-            display: flex; align-items: center; gap: 12px; cursor: pointer; 
-            padding: 6px 16px 6px 20px; border-radius: 50px; 
-            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%);
-            backdrop-filter: blur(20px) saturate(180%);
-            -webkit-backdrop-filter: blur(20px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            box-shadow: 0 4px 16px 0 rgba(31, 38, 135, 0.05), inset 0 2px 2px rgba(255, 255, 255, 0.2);
-            transition: var(--transition); 
+        .admin-profile {
+            display: flex; align-items: center; gap: 12px; cursor: pointer;
+            padding: 6px 16px 6px 20px; border-radius: 50px;
+            background: rgba(255, 255, 255, 0.25);
+            -webkit-backdrop-filter: blur(18px) saturate(140%);
+            backdrop-filter: blur(18px) saturate(140%);
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            box-shadow: 0 4px 16px rgba(10, 128, 59, 0.10);
+            transition: var(--transition);
         }
-        
+
         [data-theme="dark"] .admin-profile {
-            background: linear-gradient(135deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.05) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.2), inset 0 2px 2px rgba(255, 255, 255, 0.05);
+            background: rgba(20, 29, 25, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
         }
-        
-        .admin-profile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px 0 rgba(31, 38, 135, 0.1), inset 0 2px 2px rgba(255, 255, 255, 0.3); }
-        [data-theme="dark"] .admin-profile:hover { box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.3), inset 0 2px 2px rgba(255, 255, 255, 0.1); }
+
+        .admin-profile:hover { transform: translateY(-2px); box-shadow: 0 6px 22px rgba(10, 128, 59, 0.16); }
+        [data-theme="dark"] .admin-profile:hover { box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45); }
 
         .admin-avatar { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--sber-green); object-fit: cover; }
         .admin-info { display: flex; flex-direction: column; text-align: right; }
@@ -1714,5 +1714,57 @@
         });
 
     </script>
+
+    {% if user.is_authenticated and user.profile.is_member %}
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'assistant/chat.css' %}">
+    <link rel="stylesheet" href="{% static 'assistant/fab.css' %}">
+
+    <button type="button" class="assistant-fab" id="assistant-fab" aria-label="Открыть чат с ассистентом">
+        <i class="fa-solid fa-robot"></i>
+        <span class="assistant-fab-dot"></span>
+    </button>
+
+    <aside class="assistant-drawer" id="assistant-drawer" aria-hidden="true">
+        <header class="assistant-drawer-header">
+            <div class="assistant-drawer-title">
+                <div class="chat-header-avatar"><i class="fa-solid fa-robot"></i></div>
+                <h2 class="assistant-drawer-name">Агент STARLIFT</h2>
+            </div>
+            <div class="assistant-drawer-actions">
+                <button type="button" class="assistant-drawer-action" data-chat-clear title="Очистить">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button type="button" class="assistant-drawer-action" id="assistant-close" title="Закрыть">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="assistant-chat-root"
+             data-csrf="{{ csrf_token }}"
+             data-user-avatar="{{ header_avatar_url }}"
+             data-user-initial="{{ user.first_name|default:user.username|slice:':1'|upper }}"
+             data-hydrate="lazy">
+            <div data-chat-thread class="chat-thread assistant-drawer-thread"></div>
+            <div class="chat-composer assistant-drawer-composer">
+                <div class="chat-composer-row">
+                    <textarea data-chat-input class="chat-input" rows="1"
+                              placeholder="Напишите ваш вопрос…" autocomplete="off"></textarea>
+                    <button data-chat-send class="chat-send" type="button" aria-label="Отправить">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="chat-composer-hint">
+                    <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
+                    <span data-chat-status></span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <script src="{% static 'assistant/widget.js' %}"></script>
+    <script src="{% static 'assistant/fab.js' %}" defer></script>
+    {% endif %}
 </body>
 </html>

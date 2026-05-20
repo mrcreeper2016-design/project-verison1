@@ -29,25 +29,36 @@ def _scope_for(user):
         "Поиск спикеров с фильтрами. Результаты ВСЕГДА отсортированы по убыванию "
         "рейтинга, поэтому для запросов «топ-N», «лучшие», «самые высокие» НЕ нужно "
         "передавать nps_min — достаточно limit. nps_min используй только когда "
-        "пользователь явно назвал порог рейтинга."
+        "пользователь явно назвал порог рейтинга. Для запросов «спикеры компании X», "
+        "«из Сбера», «из Яндекса» — передавай название компании в параметр company."
     ),
     parameters={
         "type": "object",
         "properties": {
             "query": {
                 "type": "string",
-                "description": "Свободный поиск по имени и био.",
+                "description": (
+                    "Свободный поиск по имени, био, компании и стеку спикера. "
+                    "Используй когда не понятно по какому полю искать."
+                ),
+            },
+            "company": {
+                "type": "string",
+                "description": "Название компании спикера: 'Сбер', 'Яндекс', 'СберТех', 'Tinkoff'.",
             },
             "stack": {
                 "type": "string",
-                "description": "Подстрока стека: 'Python', 'ML', 'DevOps'.",
+                "description": "Технологический стек: 'Python', 'ML', 'DevOps', 'Go'.",
             },
             "city": {"type": "string"},
             "nps_min": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 10,
-                "description": "Минимальный рейтинг от 0.0 до 10.0 (средняя оценка отзывов). НЕ указывай, если пользователь не задал порог явно.",
+                "description": (
+                    "Минимальный рейтинг от 0.0 до 10.0 (средняя оценка отзывов). "
+                    "НЕ указывай, если пользователь не задал порог явно."
+                ),
             },
             "limit": {
                 "type": "integer",
@@ -59,10 +70,17 @@ def _scope_for(user):
         },
     },
 )
-def search_speakers(*, query="", stack="", city="", nps_min=None, limit=10, _user=None):
+def search_speakers(*, query="", company="", stack="", city="", nps_min=None, limit=10, _user=None):
     qs = _scope_for(_user)
     if query:
-        qs = qs.filter(Q(name__icontains=query) | Q(bio__icontains=query))
+        qs = qs.filter(
+            Q(name__icontains=query)
+            | Q(bio__icontains=query)
+            | Q(sub__icontains=query)
+            | Q(stack__icontains=query)
+        )
+    if company:
+        qs = qs.filter(sub__icontains=company)
     if stack:
         qs = qs.filter(stack__icontains=stack)
     if city:
@@ -75,6 +93,7 @@ def search_speakers(*, query="", stack="", city="", nps_min=None, limit=10, _use
             {
                 "id": s.id,
                 "name": s.name,
+                "company": s.sub or "",
                 "stack": s.stack or "",
                 "city": s.city or "",
                 "nps": s.nps,
@@ -102,9 +121,9 @@ def get_speaker_profile(*, speaker_id, _user=None):
     return {
         "id": s.id,
         "name": s.name,
+        "company": s.sub or "",
         "stack": s.stack or "",
         "city": s.city or "",
-        "sub": s.sub or "",
         "bio": bio,
         "nps": s.nps,
         "status": s.status,

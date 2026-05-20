@@ -29,6 +29,20 @@
         const empty = thread.querySelector('.chat-empty');
         if (empty) empty.remove();
     }
+    function linkifyMarkdownRefs(plainText) {
+        const e = escapeHtml(plainText);
+        return e
+            .replace(/\[([^\]]+)\]\(#speaker-(\d+)\)/g,
+                '<a class="chat-link chat-link-speaker" href="/speakers/#open-speaker-$2" data-speaker-id="$2">$1</a>')
+            .replace(/\[([^\]]+)\]\(#event-(\d+)\)/g,
+                '<a class="chat-link chat-link-event" href="/events/#event-$2" data-event-id="$2">$1</a>');
+    }
+    function finalizeBubble(bubble) {
+        if (!bubble) return;
+        const raw = bubble.textContent || '';
+        if (raw.indexOf('](#') === -1) return;
+        bubble.innerHTML = linkifyMarkdownRefs(raw);
+    }
 
     function appendUser(text) {
         hideEmpty();
@@ -64,13 +78,9 @@
         return bubble;
     }
 
-    function appendToolChip(name, args) {
-        const chip = el('div', 'chat-tool-chip loading',
-            `<i class="fa-solid fa-bolt"></i> ${escapeHtml(name)}`);
-        chip.title = JSON.stringify(args || {});
-        thread.appendChild(chip);
-        scrollDown();
-        return chip;
+    function appendToolChip(_name, _args) {
+        // Tool chips are intentionally hidden from the UI.
+        return null;
     }
 
     function appendError(reason) {
@@ -101,31 +111,22 @@
         setStatus('Думаю…');
         let assistantBubble = null;
         const es = new EventSource(`/assistant/c/${conversationId}/stream/`);
-        let currentChip = null;
 
         es.addEventListener('delta', (e) => {
             if (!assistantBubble) {
+                removeTyping();
                 assistantBubble = startAssistantMessage();
             }
             const data = JSON.parse(e.data);
             assistantBubble.textContent += data.text;
             scrollDown();
         });
-        es.addEventListener('tool_start', (e) => {
-            removeTyping();
-            const data = JSON.parse(e.data);
-            currentChip = appendToolChip(data.name, data.args);
-            setStatus(`Использую инструмент ${data.name}…`);
+        // Tool calls happen behind the scenes — keep the typing indicator
+        // and just update the subtle status text below the composer.
+        es.addEventListener('tool_start', () => {
+            setStatus('Ищу данные…');
         });
-        es.addEventListener('tool_end', (e) => {
-            const data = JSON.parse(e.data);
-            if (currentChip) {
-                currentChip.classList.remove('loading');
-                currentChip.classList.add('done');
-                if (data.summary) {
-                    currentChip.innerHTML += ` · ${escapeHtml(data.summary)}`;
-                }
-            }
+        es.addEventListener('tool_end', () => {
             setStatus('Думаю…');
         });
         es.addEventListener('error', (e) => {
@@ -148,6 +149,7 @@
         es.addEventListener('done', () => {
             removeTyping();
             es.close();
+            finalizeBubble(assistantTextEl);
             unlockInput();
         });
     }
@@ -213,4 +215,41 @@
     } else {
         input.focus();
     }
+
+    // Linkify any pre-rendered assistant bubbles (chat detail page renders
+    // history server-side and may contain stored [Name](#speaker-N) refs).
+    document.querySelectorAll('.chat-msg.assistant .chat-bubble').forEach(finalizeBubble);
+
+    // ── Sidebar: delete conversation ──────────────────────────────────────
+    document.querySelectorAll('.chat-sidebar-delete').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const convId = btn.dataset.convId;
+            if (!convId) return;
+            if (!confirm('Удалить эту беседу безвозвратно?')) return;
+            btn.disabled = true;
+            try {
+                const resp = await fetch(`/assistant/conversations/${convId}/delete/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!resp.ok) {
+                    btn.disabled = false;
+                    return;
+                }
+                // If we just deleted the currently-open conversation,
+                // bounce to /assistant/ which will create or reuse one.
+                if (convId === conversationId) {
+                    window.location.href = '/assistant/';
+                    return;
+                }
+                const row = btn.closest('.chat-sidebar-row');
+                if (row) row.remove();
+            } catch (err) {
+                btn.disabled = false;
+            }
+        });
+    });
 })();

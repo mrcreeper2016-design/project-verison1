@@ -16,22 +16,6 @@
         margin: 6px 0 0; color: var(--text-muted);
         font-size: 14px; line-height: 1.5;
     }
-    .home-live {
-        display: inline-flex; align-items: center; gap: 10px;
-        font-size: 12px; font-weight: 600; color: var(--text-muted);
-        padding: 8px 14px; border-radius: 999px;
-        background: var(--glass-bg); border: 1px solid var(--glass-border);
-        backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    }
-    .home-live .pulse {
-        width: 8px; height: 8px; border-radius: 50%;
-        background: var(--sber-green);
-        box-shadow: 0 0 0 0 rgba(10, 128, 59, 0.4);
-        animation: homePulse 2s infinite;
-    }
-    .home-live[data-state="error"] .pulse { background: #EB5757; box-shadow: 0 0 0 0 rgba(235, 87, 87, 0.4); }
-    .home-live[data-state="error"] { color: #B53030; }
-    [data-theme="dark"] .home-live[data-state="error"] { color: #EB5757; }
     @keyframes homePulse {
         0%   { box-shadow: 0 0 0 0 rgba(10, 128, 59, 0.35); }
         70%  { box-shadow: 0 0 0 10px rgba(10, 128, 59, 0); }
@@ -360,103 +344,226 @@
         </h1>
         <p class="hero-subtitle">Оперативный центр по спикерам, ближайшим мероприятиям и активности команды</p>
 
-        <form class="prompt-container" id="home-assistant-form" autocomplete="off">
-            {% csrf_token %}
-            <input type="text" name="first_message" class="prompt-input" id="home-assistant-input"
-                   placeholder="Спросите ассистента: «Найди ML-спикеров с NPS > 8»"
-                   aria-label="Сообщение ассистенту">
-            <button class="voice-btn" type="submit" aria-label="Отправить">
-                <i class="fa-solid fa-paper-plane"></i>
+        {% if user.is_authenticated and user.profile.is_member %}
+        <section class="home-chat-card home-chat-card--collapsed animate-fade" id="home-chat-card">
+            <button type="button" class="home-chat-card-header home-chat-card-toggle" id="home-chat-toggle"
+                    aria-expanded="false" aria-controls="home-chat-body">
+                <div class="chat-header-title">
+                    <div class="chat-header-avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="home-chat-card-titles">
+                        <h2 class="assistant-drawer-name">Агент STARLIFT</h2>
+                        <span class="home-chat-card-sub">Нажмите, чтобы открыть чат</span>
+                    </div>
+                </div>
+                <div class="home-chat-card-actions">
+                    <span class="assistant-drawer-action assistant-drawer-action--ghost"
+                          data-chat-clear-proxy title="Очистить" aria-hidden="true" tabindex="-1">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </span>
+                    <span class="assistant-drawer-action home-chat-card-chevron" aria-hidden="true">
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </span>
+                </div>
             </button>
-        </form>
-        <div class="home-assistant-hints">
-            <button type="button" class="home-assistant-hint" data-prompt="Покажи топ-5 спикеров за месяц">
-                <i class="fa-solid fa-medal"></i> Топ-5 за месяц
-            </button>
-            <button type="button" class="home-assistant-hint" data-prompt="Ближайшие события по ML">
-                <i class="fa-regular fa-calendar"></i> Ближайшие по ML
-            </button>
-            <button type="button" class="home-assistant-hint" data-prompt="Какой NPS за последние 30 дней?">
-                <i class="fa-solid fa-chart-line"></i> NPS за 30 дней
-            </button>
-        </div>
 
-        <style>
-            .home-assistant-hints {
-                display: flex;
-                gap: 8px;
-                flex-wrap: wrap;
-                justify-content: center;
-                margin-top: 14px;
-            }
-            .home-assistant-hint {
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-                padding: 6px 12px;
-                border-radius: 14px;
-                font-size: 12px;
-                font-weight: 600;
-                background: var(--light-green);
-                color: var(--sber-green);
-                border: 1px solid var(--border-color);
-                cursor: pointer;
-                transition: var(--transition);
-                font-family: inherit;
-            }
-            .home-assistant-hint:hover {
-                background: var(--sber-green);
-                color: #fff;
-                border-color: var(--sber-green);
-            }
-            .home-assistant-hint i {
-                font-size: 11px;
-            }
-        </style>
+            <div class="home-chat-card-body" id="home-chat-body">
+                <div class="assistant-chat-root"
+                     data-csrf="{{ csrf_token }}"
+                     data-user-avatar="{{ header_avatar_url }}"
+                     data-user-initial="{{ user.first_name|default:user.username|slice:':1'|upper }}"
+                     data-hydrate="lazy">
+                    <div data-chat-thread class="chat-thread home-chat-thread"></div>
+                    <div class="chat-composer home-chat-composer">
+                        <div class="chat-composer-row">
+                            <textarea data-chat-input class="chat-input" rows="1"
+                                      placeholder="Напишите ваш вопрос…" autocomplete="off"></textarea>
+                            <button data-chat-send class="chat-send" type="button" aria-label="Отправить">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        <div class="chat-composer-hint">
+                            <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
+                            <span data-chat-status></span>
+                        </div>
+                    </div>
+                    <button type="button" class="home-chat-clear-real" data-chat-clear hidden></button>
+                </div>
+            </div>
+        </section>
 
         <script>
-        (function() {
-            const form = document.getElementById('home-assistant-form');
-            const input = document.getElementById('home-assistant-input');
-            if (!form || !input) return;
-            const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
+        (function () {
+            const card = document.getElementById('home-chat-card');
+            const toggle = document.getElementById('home-chat-toggle');
+            const body = document.getElementById('home-chat-body');
+            if (!card || !toggle || !body) return;
 
-            async function go(text) {
-                const t = (text || '').trim();
-                if (!t) return;
-                input.disabled = true;
-                try {
-                    const resp = await fetch('/assistant/conversations/', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-                        credentials: 'same-origin',
-                        body: JSON.stringify({ first_message: t }),
-                    });
-                    if (!resp.ok) {
-                        input.disabled = false;
-                        return;
+            // Real (hidden) clear button used by the widget; header has only a
+            // visual proxy so we can intercept clicks and prevent the parent
+            // toggle from also firing.
+            const realClear = card.querySelector('.home-chat-clear-real');
+            const proxyClear = card.querySelector('[data-chat-clear-proxy]');
+            if (proxyClear && realClear) {
+                proxyClear.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    realClear.click();
+                });
+            }
+
+            function setCollapsed(collapsed) {
+                card.classList.toggle('home-chat-card--collapsed', collapsed);
+                toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                if (!collapsed) {
+                    // hydrate widget on first open, focus the input
+                    const root = card.querySelector('.assistant-chat-root');
+                    const input = card.querySelector('[data-chat-input]');
+                    if (root && root.__widget && !root.__widget.hydrated) {
+                        root.__widget.hydrate().then(() => input && input.focus());
+                    } else if (input) {
+                        input.focus();
                     }
-                    const data = await resp.json();
-                    window.location.href = `/assistant/c/${data.conversation_id}/`;
-                } catch (err) {
-                    input.disabled = false;
                 }
             }
 
-            form.addEventListener('submit', (e) => {
-                e.preventDefault();
-                go(input.value);
-            });
-            document.querySelectorAll('.home-assistant-hint').forEach(btn => {
-                btn.addEventListener('click', () => go(btn.dataset.prompt));
+            toggle.addEventListener('click', () => {
+                const isCollapsed = card.classList.contains('home-chat-card--collapsed');
+                setCollapsed(!isCollapsed);
             });
         })();
         </script>
 
-        <div class="home-live" id="home-live" data-state="idle" title="Статус подключения к данным" style="margin-top: 16px;">
-            <span class="pulse"></span>
-            <span id="home-live-label">Подключение…</span>
-        </div>
+        <style>
+            .home-chat-card {
+                width: 100%;
+                max-width: 760px;
+                margin: 22px auto 0;
+                background: var(--white);
+                -webkit-backdrop-filter: blur(14px);
+                backdrop-filter: blur(14px);
+                border: 1px solid var(--border-color);
+                border-radius: 20px;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                box-shadow: 0 10px 28px rgba(10, 128, 59, 0.08);
+                text-align: left;
+            }
+            .home-chat-card > .assistant-chat-root {
+                display: flex;
+                flex-direction: column;
+                flex: 1;
+                min-height: 0;
+            }
+            .home-chat-card-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                padding: 14px 16px;
+                background: transparent;
+                flex-shrink: 0;
+            }
+            /* Header is also the toggle button when card is collapsible */
+            .home-chat-card-toggle {
+                width: 100%;
+                border: none;
+                cursor: pointer;
+                font: inherit;
+                color: inherit;
+                text-align: left;
+                transition: background-color 0.15s ease;
+            }
+            .home-chat-card-toggle:hover { background: rgba(10, 128, 59, 0.04); }
+            [data-theme="dark"] .home-chat-card-toggle:hover { background: rgba(255, 255, 255, 0.04); }
+            .home-chat-card-titles {
+                display: flex;
+                flex-direction: column;
+                line-height: 1.3;
+                min-width: 0;
+            }
+            .home-chat-card-sub {
+                font-size: 12px;
+                color: var(--text-muted);
+                font-weight: 500;
+            }
+            .home-chat-card-actions { display: flex; gap: 6px; align-items: center; }
+            .home-chat-card-chevron {
+                color: var(--text-muted);
+                transition: transform 0.25s ease, color 0.15s ease;
+            }
+            .assistant-drawer-action--ghost {
+                background: transparent;
+                border: 1px solid var(--border-color);
+            }
+            .home-chat-card:not(.home-chat-card--collapsed) .home-chat-card-chevron {
+                transform: rotate(180deg);
+                color: var(--sber-green);
+            }
+
+            /* ── Smooth collapse via grid-template-rows: 1fr ↔ 0fr ── */
+            .home-chat-card-body {
+                display: grid;
+                grid-template-rows: 1fr;
+                transition: grid-template-rows 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+                min-height: 0;
+            }
+            .home-chat-card--collapsed .home-chat-card-body {
+                grid-template-rows: 0fr;
+            }
+            /* The grid child clips its overflow during the row transition. */
+            .home-chat-card-body > .assistant-chat-root {
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+                overflow: hidden;
+                opacity: 1;
+                transition: opacity 0.22s ease;
+            }
+            .home-chat-card--collapsed .home-chat-card-body > .assistant-chat-root {
+                opacity: 0;
+                pointer-events: none;
+            }
+
+            /* Header border softens in/out instead of snapping. */
+            .home-chat-card-header {
+                border-bottom: 1px solid transparent;
+                transition: border-color 0.25s ease;
+            }
+            .home-chat-card:not(.home-chat-card--collapsed) .home-chat-card-header {
+                border-bottom-color: var(--border-color);
+            }
+
+            /* "Нажмите, чтобы открыть чат" caption fades. */
+            .home-chat-card-sub {
+                max-height: 18px;
+                opacity: 1;
+                overflow: hidden;
+                transition: max-height 0.25s ease, opacity 0.2s ease;
+            }
+            .home-chat-card:not(.home-chat-card--collapsed) .home-chat-card-sub {
+                max-height: 0;
+                opacity: 0;
+            }
+            .home-chat-thread.home-chat-thread {
+                flex: 1;
+                min-height: 260px;
+                max-height: 460px;
+                padding: 18px 20px 8px;
+                overflow-y: auto;
+            }
+            .home-chat-composer.home-chat-composer {
+                flex-shrink: 0;
+                padding: 10px 14px 14px;
+                border-top: 1px solid var(--border-color);
+                background: transparent;
+            }
+            @media (max-width: 700px) {
+                .home-chat-card { margin: 16px 8px 0; border-radius: 16px; }
+                .home-chat-thread.home-chat-thread { max-height: 60vh; }
+            }
+        </style>
+        {% endif %}
+
     </div>
 
     <div class="home-kpi-grid" id="home-kpi-grid"></div>

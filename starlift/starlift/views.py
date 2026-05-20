@@ -262,9 +262,9 @@ def explore_view(request):
 def index_view(request):
     """Home dashboard shell.
 
-    The page is fully data-driven via ``home_api``; we only hand the template
-    initial filter options so the dropdowns are usable before the first poll
-    finishes.
+    The page is fully data-driven via ``home_api``. A compact prompt input
+    sits in the hero section as a quick launcher for the floating assistant
+    chat (which also renders globally via base.html).
     """
     options = home_metrics.filter_options()
     context = {

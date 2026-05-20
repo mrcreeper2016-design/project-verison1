@@ -14,19 +14,35 @@ from . import assistant_tool
 @assistant_tool(
     name="find_events",
     description=(
-        "Find events. By default returns upcoming events sorted by date. "
-        "Supports filtering by topic substring, location, external flag, "
-        "and time window (period_days)."
+        "Поиск мероприятий. По умолчанию возвращает будущие, отсортированные по дате. "
+        "Для поиска ВСЕХ мероприятий конкретного спикера (включая прошедшие) — "
+        "сначала найди спикера через search_speakers, затем передай его id в "
+        "speaker_id, и установи include_past=true."
     ),
     parameters={
         "type": "object",
         "properties": {
-            "topic": {"type": "string"},
+            "topic": {
+                "type": "string",
+                "description": "Подстрока темы или стека: 'ML', 'DevOps', 'Python'.",
+            },
             "location": {"type": "string"},
             "is_external": {"type": "boolean"},
+            "speaker_id": {
+                "type": "integer",
+                "description": (
+                    "ID спикера для поиска ЕГО мероприятий. Сначала вызови "
+                    "search_speakers чтобы получить id."
+                ),
+            },
+            "include_past": {
+                "type": "boolean",
+                "description": "Если true — включает прошедшие события. По умолчанию false.",
+                "default": False,
+            },
             "period_days": {
                 "type": "integer",
-                "description": "Look ahead this many days. 0 means upcoming with no upper bound.",
+                "description": "Окно будущих событий в днях. 0 — без ограничения.",
                 "minimum": 0,
                 "maximum": 365,
                 "default": 0,
@@ -35,11 +51,14 @@ from . import assistant_tool
         },
     },
 )
-def find_events(*, topic="", location="", is_external=None, period_days=0, limit=10, _user=None):
+def find_events(*, topic="", location="", is_external=None, speaker_id=None,
+                include_past=False, period_days=0, limit=10, _user=None):
     today = timezone.now().date()
-    qs = Event.objects.filter(
-        Q(event_date__gte=today) | Q(event_date__isnull=True, status="future")
-    )
+    qs = Event.objects.all()
+    if not include_past:
+        qs = qs.filter(Q(event_date__gte=today) | Q(event_date__isnull=True, status="future"))
+    if speaker_id:
+        qs = qs.filter(speakers__id=speaker_id)
     if topic:
         qs = qs.filter(Q(topic__icontains=topic) | Q(speakers__stack__icontains=topic))
     if location:
@@ -48,7 +67,9 @@ def find_events(*, topic="", location="", is_external=None, period_days=0, limit
         qs = qs.filter(is_external=is_external)
     if period_days:
         qs = qs.filter(event_date__lte=today + timedelta(days=period_days))
-    qs = qs.distinct().order_by("event_date", "id")[: max(1, min(int(limit), 10))]
+    # When filtering by speaker, order by date DESC so recent past events show up first.
+    order = ["-event_date", "-id"] if speaker_id and include_past else ["event_date", "id"]
+    qs = qs.distinct().order_by(*order)[: max(1, min(int(limit), 10))]
     return {
         "events": [
             {
