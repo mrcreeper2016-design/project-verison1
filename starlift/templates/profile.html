@@ -332,6 +332,19 @@
             grid-template-columns: 1fr;
         }
     }
+
+    @media (max-width: 768px) {
+        .profile-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+        .profile-title { font-size: 22px !important; }
+        .profile-card { padding: 16px !important; }
+        .avatar-display, .avatar-preview { width: clamp(72px, 20vw, 120px) !important; height: clamp(72px, 20vw, 120px) !important; }
+    }
+
+    @media (max-width: 480px) {
+        .toggle-switch { width: 56px; height: 32px; }
+        .slider::before { width: 24px; height: 24px; }
+        .toggle-switch input:checked + .slider::before { transform: translateX(24px); }
+    }
 </style>
 
 <div class="profile-page">

@@ -147,9 +147,21 @@
             min-width: 100%;
         }
 
-        .table-wrapper {
+        .table-wrapper:not(.responsive-table) {
             overflow-x: auto;
         }
+    }
+
+    @media (max-width: 768px) {
+        .speaker-toolbar {
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .speaker-toolbar .search-box { min-width: 100%; }
+        .modal-body-split { flex-direction: column; gap: 16px; }
+        .modal-left { width: 100% !important; }
+        .modal-avatar-wrapper { height: 220px !important; }
+        .speaker-detail-grid { grid-template-columns: 1fr !important; padding: 14px; }
     }
 
     .numeric-stepper {
@@ -391,7 +403,7 @@
         </div>
 
         <div class="speaker-table-wrap">
-            <div class="table-wrapper">
+            <div class="table-wrapper responsive-table">
                 <table id="speakerTable">
                     <thead>
                         <tr>
@@ -618,18 +630,18 @@
 
         body.innerHTML = data.map((s, i) => `
             <tr class="${i % 2 !== 0 ? 'alt-row' : ''}">
-                <td onclick="showEvents(${s.id})">
+                <td data-label="ФИО" onclick="showEvents(${s.id})">
                     <div class="speaker-info">
                         <img src="${getAvatarUrl(s, 150)}" class="avatar" style="object-fit: cover;">
                         <div><strong>${s.name}</strong></div>
                     </div>
                 </td>
-                <td onclick="showEvents(${s.id})" style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${s.sub ? escapeHtml(s.sub) : '—'}</td>
-                <td onclick="showEvents(${s.id})">${previewDescriptionCell(s.stack)}</td>
-                <td onclick="showEvents(${s.id})"><span class="${s.status === 'Авторизован' ? 'badge-active' : 'badge-inactive'}">${s.status}</span></td>
-                <td onclick="showEvents(${s.id})"><div class="nps-val">${s.nps > 0 ? Number(s.nps).toFixed(1) : '—'}</div></td>
+                <td data-label="Компания" onclick="showEvents(${s.id})" style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${s.sub ? escapeHtml(s.sub) : '—'}</td>
+                <td data-label="Описание" onclick="showEvents(${s.id})">${previewDescriptionCell(s.stack)}</td>
+                <td data-label="Статус" onclick="showEvents(${s.id})"><span class="${s.status === 'Авторизован' ? 'badge-active' : 'badge-inactive'}">${s.status}</span></td>
+                <td data-label="NPS" onclick="showEvents(${s.id})"><div class="nps-val">${s.nps > 0 ? Number(s.nps).toFixed(1) : '—'}</div></td>
                 ${window.isAdmin ? `
-                <td class="actions-cell" onclick="event.stopPropagation()">
+                <td data-label="" class="actions-cell" onclick="event.stopPropagation()">
                     <a href="/speakers/edit/${s.id}/" class="btn-action" style="color: var(--text-main); text-decoration: none;" title="Редактировать"><i class="fa-solid fa-pen"></i></a>
                     <form method="POST" action="/speakers/delete/${s.id}/" style="display:inline;" onsubmit="return confirm('Вы уверены, что хотите удалить этого спикера?');">
                         <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">

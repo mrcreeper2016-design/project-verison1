@@ -19,7 +19,7 @@
         -webkit-backdrop-filter: blur(10px);
         border: 1px solid var(--glass-border);
         border-radius: 20px;
-        padding: 50px;
+        padding: clamp(20px, 5vw, 50px);
         max-width: 90vw;
         display: flex;
         flex-direction: column;
@@ -39,20 +39,22 @@
     }
 
     .qr-title {
-        font-size: 2.8rem;
+        font-size: clamp(1.6rem, 6vw, 2.8rem);
         margin-bottom: 10px;
         text-transform: uppercase;
         letter-spacing: 1px;
         color: var(--text-main);
         font-weight: 800;
+        text-align: center;
     }
 
     .qr-subtitle {
-        font-size: 1.8rem;
+        font-size: clamp(1.1rem, 4vw, 1.8rem);
         margin-top: 0;
-        margin-bottom: 40px;
+        margin-bottom: clamp(16px, 4vw, 40px);
         color: var(--sber-green);
         font-weight: 600;
+        text-align: center;
     }
 
     .qr-box {
@@ -70,8 +72,9 @@
     }
 
     .qr-img {
-        width: 350px;
-        height: 350px;
+        width: min(85vw, 350px);
+        height: auto;
+        aspect-ratio: 1;
         object-fit: contain;
         display: block;
     }
