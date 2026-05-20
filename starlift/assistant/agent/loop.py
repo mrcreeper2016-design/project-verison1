@@ -67,7 +67,7 @@ def run_turn(conversation: Conversation, *, client) -> Iterator[AgentEvent]:
             return
 
         pending_tool_name = ""
-        pending_tool_args = ""
+        pending_tool_args: dict = {}
         chunk_in = chunk_out = 0
         try:
             for chunk in client.stream_chat(
@@ -82,7 +82,8 @@ def run_turn(conversation: Conversation, *, client) -> Iterator[AgentEvent]:
                     yield AgentEvent("delta", {"text": chunk.delta_text})
                 if chunk.tool_call_name:
                     pending_tool_name = chunk.tool_call_name
-                    pending_tool_args += chunk.tool_call_args_json
+                    if chunk.tool_call_args:
+                        pending_tool_args.update(chunk.tool_call_args)
         except Exception as exc:  # noqa: BLE001 — surface provider errors as SSE events
             yield AgentEvent("error", {"reason": "provider_error", "detail": str(exc)[:300]})
             return
@@ -90,10 +91,7 @@ def run_turn(conversation: Conversation, *, client) -> Iterator[AgentEvent]:
         turn_token_out += chunk_out
 
         if pending_tool_name:
-            try:
-                args = json.loads(pending_tool_args or "{}")
-            except json.JSONDecodeError:
-                args = {}
+            args = pending_tool_args
             entry = TOOL_REGISTRY.get(pending_tool_name)
             if not entry:
                 yield AgentEvent("error", {"reason": "unknown_tool", "tool": pending_tool_name})
@@ -116,10 +114,17 @@ def run_turn(conversation: Conversation, *, client) -> Iterator[AgentEvent]:
             )
             summary = _summarize_tool_result(pending_tool_name, result)
             yield AgentEvent("tool_end", {"id": tool_msg.id, "summary": summary})
+            # GigaChat requires the assistant's function_call to appear in history
+            # before the corresponding function-role result.
+            messages.append({
+                "role": "assistant",
+                "content": "",
+                "function_call": {"name": pending_tool_name, "arguments": args},
+            })
             messages.append({
                 "role": "function",
                 "name": pending_tool_name,
-                "content": f"<<untrusted_data>>{json.dumps(result, ensure_ascii=False)}<</untrusted_data>>",
+                "content": json.dumps(result, ensure_ascii=False),
             })
             continue
 

@@ -1,7 +1,6 @@
 """Reusable fakes for testing the agent loop without hitting GigaChat."""
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from typing import Iterator
 
@@ -36,7 +35,7 @@ class FakeGigaChatClient:
         if turn.tool_name:
             yield StreamChunk(
                 tool_call_name=turn.tool_name,
-                tool_call_args_json=json.dumps(turn.tool_args),
+                tool_call_args=dict(turn.tool_args),
                 finish_reason="function_call",
                 prompt_tokens=turn.prompt_tokens,
                 completion_tokens=turn.completion_tokens,

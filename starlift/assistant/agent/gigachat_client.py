@@ -15,8 +15,8 @@ class StreamChunk:
     """One piece of streamed output from the model."""
     delta_text: str = ""
     tool_call_name: str = ""
-    tool_call_args_json: str = ""   # accumulated JSON string (may be partial)
-    finish_reason: str = ""         # "stop" | "function_call" | ""
+    tool_call_args: dict | None = None   # GigaChat returns the full dict in one chunk
+    finish_reason: str = ""               # "stop" | "function_call" | ""
     prompt_tokens: int = 0
     completion_tokens: int = 0
 
@@ -54,10 +54,23 @@ class GigaChatClient:
             delta = choice.delta
             fc = getattr(delta, "function_call", None)
             usage = getattr(chunk, "usage", None)
+            tool_args = None
+            if fc is not None:
+                raw_args = getattr(fc, "arguments", None)
+                if isinstance(raw_args, dict):
+                    tool_args = raw_args
+                elif isinstance(raw_args, str) and raw_args:
+                    import json as _json
+                    try:
+                        tool_args = _json.loads(raw_args)
+                    except _json.JSONDecodeError:
+                        tool_args = {}
+                else:
+                    tool_args = {}
             yield StreamChunk(
                 delta_text=getattr(delta, "content", "") or "",
                 tool_call_name=getattr(fc, "name", "") if fc else "",
-                tool_call_args_json=getattr(fc, "arguments", "") if fc else "",
+                tool_call_args=tool_args,
                 finish_reason=choice.finish_reason or "",
                 prompt_tokens=usage.prompt_tokens if usage else 0,
                 completion_tokens=usage.completion_tokens if usage else 0,
