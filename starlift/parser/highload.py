@@ -133,7 +133,7 @@ def _parse_one_report(report, *, base_url: str) -> list[dict[str, str]]:
             t = stack.get_text(separator=" ", strip=True)
             if t:
                 stacks.append(t)
-    stack_joined = ", ".join(stacks)
+    stack_joined = " | ".join(stacks)
 
     authors_block = report.find("div", class_="thesis__authors")
     if authors_block is None:

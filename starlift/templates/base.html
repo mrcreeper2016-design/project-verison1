@@ -338,14 +338,21 @@
         }
         .notif-badge.has { display: inline-block; }
         .notif-dropdown {
-            display: none;
-            position: absolute; top: 52px; right: 0;
+            position: absolute; top: 110%; right: 0;
             width: 360px; max-height: 480px; overflow-y: auto;
-            background: var(--white); border: 1px solid var(--border-color);
-            border-radius: 16px; box-shadow: 0 18px 40px rgba(0,0,0,0.18);
+            background: linear-gradient(135deg, var(--white) 0%, rgba(255,255,255,0) 100%);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(16px) saturate(150%);
+            -webkit-backdrop-filter: blur(16px) saturate(150%);
+            border-radius: 16px;
+            box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.15), 0 10px 25px rgba(0,0,0,0.1);
             z-index: 1500; padding: 8px;
+            opacity: 0; visibility: hidden; transform: translateY(-10px);
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s, border-color 0.3s;
         }
-        .notif-dropdown.show { display: block; }
+        .notif-dropdown.show {
+            opacity: 1; visibility: visible; transform: translateY(0);
+        }
         .notif-dropdown-header {
             padding: 10px 12px; border-bottom: 1px solid var(--border-color);
             font-weight: 700; font-size: 14px; color: var(--text-main);
@@ -878,7 +885,8 @@
             background: var(--sber-green); color: #fff; flex: 1;
         }
         .btn-contact:hover {
-            background: var(--sber-green-hover); transform: scale(1.02); box-shadow: 0 4px 10px rgba(10, 128, 59, 0.3);
+            background: var(--sber-green-hover); color: #fff; text-decoration: none;
+            transform: scale(1.02); box-shadow: 0 4px 10px rgba(10, 128, 59, 0.3);
         }
         .modal-right {
             flex: 1; display: flex; flex-direction: column;
@@ -1413,10 +1421,20 @@
                 const willOpen = !dropdown.classList.contains('show');
                 dropdown.classList.toggle('show', willOpen);
                 toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-                if (willOpen) loadNotifs();
+                if (willOpen) {
+                    const otherMenu = document.getElementById('dropdownMenu');
+                    if (otherMenu) otherMenu.classList.remove('show');
+                    loadNotifs();
+                }
             });
             document.addEventListener('click', (e) => {
                 if (!e.target.closest('.notif-wrap')) {
+                    dropdown.classList.remove('show');
+                    toggle.setAttribute('aria-expanded', 'false');
+                }
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
                     dropdown.classList.remove('show');
                     toggle.setAttribute('aria-expanded', 'false');
                 }
@@ -1435,11 +1453,22 @@
         if (trigger && menu) {
             trigger.addEventListener('click', (e) => {
                 e.stopPropagation();
-                menu.classList.toggle('show');
+                const willOpen = !menu.classList.contains('show');
+                menu.classList.toggle('show', willOpen);
+                if (willOpen) {
+                    const notif = document.getElementById('notifDropdown');
+                    if (notif) {
+                        notif.classList.remove('show');
+                        const nt = document.getElementById('notifToggle');
+                        if (nt) nt.setAttribute('aria-expanded', 'false');
+                    }
+                }
             });
         }
-        document.addEventListener('click', () => {
-            if (menu) menu.classList.remove('show');
+        document.addEventListener('click', (e) => {
+            if (menu && !e.target.closest('.admin-profile-container')) {
+                menu.classList.remove('show');
+            }
         });
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && menu) {

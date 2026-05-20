@@ -251,7 +251,14 @@ class InviteSignupForm(forms.Form):
 class ProfileEditForm(forms.Form):
     first_name = forms.CharField(label="Имя", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
     last_name = forms.CharField(label="Фамилия", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
-    avatar = forms.ImageField(label="Аватар", required=False, widget=forms.FileInput(attrs={"class": _INPUT_CLASS}))
+    avatar = forms.ImageField(
+        label="Аватар",
+        required=False,
+        widget=forms.FileInput(attrs={
+            "class": "avatar-file-input",
+            "accept": "image/jpeg,image/png,image/webp",
+        }),
+    )
     bio = forms.CharField(
         label="О себе",
         required=False,
@@ -275,7 +282,14 @@ class SpeakerProfileMainForm(forms.Form):
 
     first_name = forms.CharField(label="Имя", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
     last_name = forms.CharField(label="Фамилия", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
-    avatar = forms.ImageField(label="Аватар", required=False, widget=forms.FileInput(attrs={"class": _INPUT_CLASS}))
+    avatar = forms.ImageField(
+        label="Аватар",
+        required=False,
+        widget=forms.FileInput(attrs={
+            "class": "avatar-file-input",
+            "accept": "image/jpeg,image/png,image/webp,image/gif",
+        }),
+    )
     company = forms.CharField(
         label="Компания",
         max_length=200,

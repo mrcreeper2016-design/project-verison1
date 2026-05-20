@@ -16,7 +16,7 @@ class Speaker(models.Model):
 
     name = models.CharField(max_length=200)
     sub = models.CharField(max_length=200)
-    stack = models.CharField(max_length=200)
+    stack = models.TextField(blank=True, default="")
     city = models.CharField(max_length=100)
     status = models.CharField(
         max_length=50,

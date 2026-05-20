@@ -1045,11 +1045,24 @@ function renderEventModal(eventId) {
     document.getElementById('eventLocationLine').textContent = ev.location && ev.location !== 'None' ? ev.location : 'Онлайн/Офлайн';
     document.getElementById('eventCountLine').textContent = ev.date && ev.date !== 'None' ? ev.date : 'Дата уточняется';
 
-    let formatHtml = 'Информация недоступна';
-    if (ev.link && ev.link !== 'None') {
-        formatHtml = `<a href="${escapeHtml(ev.link)}" target="_blank" rel="noopener noreferrer">Перейти по ссылке</a>`;
+    const goLink = document.getElementById('eventGoLink');
+    const goLabel = document.getElementById('eventGoLinkLabel');
+    if (goLink) {
+        const hasLink = ev.link && ev.link !== 'None' && String(ev.link).trim() !== '';
+        if (hasLink) {
+            goLink.href = ev.link;
+            goLink.style.pointerEvents = '';
+            goLink.style.opacity = '';
+            goLink.style.cursor = 'pointer';
+            if (goLabel) goLabel.textContent = 'Перейти на мероприятие';
+        } else {
+            goLink.href = '#';
+            goLink.style.pointerEvents = 'none';
+            goLink.style.opacity = '0.55';
+            goLink.style.cursor = 'not-allowed';
+            if (goLabel) goLabel.textContent = 'Ссылка недоступна';
+        }
     }
-    document.getElementById('eventFormatLine').innerHTML = formatHtml;
 
     const spWrap = document.getElementById('eventSpeakersList');
     const spList = ev.speakers || [];
@@ -1114,13 +1127,19 @@ function renderEventModal(eventId) {
     }
 
     const schedEl = document.getElementById('eventScheduleList');
-    let scheduleHtml = '<p style="color:var(--text-muted);font-size:14px;margin:0;">Смотрите подробное расписание на официальном сайте мероприятия.</p>';
-    if (ev.schedule && ev.schedule !== 'None' && String(ev.schedule).trim() !== '') {
-        scheduleHtml = ev.schedule;
-    }
+    const schedHead = document.getElementById('eventScheduleHeading');
+    const hasSchedule = ev.schedule && ev.schedule !== 'None' && String(ev.schedule).trim() !== '';
     if (schedEl) {
-        schedEl.innerHTML = scheduleHtml;
-        schedEl.classList.add('event-schedule-scroll');
+        if (hasSchedule) {
+            schedEl.innerHTML = ev.schedule;
+            schedEl.classList.add('event-schedule-scroll');
+            schedEl.style.display = '';
+            if (schedHead) schedHead.style.display = '';
+        } else {
+            schedEl.innerHTML = '';
+            schedEl.style.display = 'none';
+            if (schedHead) schedHead.style.display = 'none';
+        }
     }
 }
 
@@ -1208,13 +1227,16 @@ if (document.readyState === 'loading') {
                                 <span id="eventCountLine"></span>
                             </div>
                         </div>
-                        <div class="speaker-chip">
-                            <div class="avatar" style="background: var(--sber-green); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800;">...</div>
-                            <div>
-                                <strong>Подробнее</strong>
-                                <span id="eventFormatLine"></span>
-                            </div>
-                        </div>
+                        <a id="eventGoLink" href="#" target="_blank" rel="noopener noreferrer"
+                           style="display:flex; align-items:center; justify-content:center; gap:10px;
+                                  padding:14px 20px; border-radius:14px;
+                                  background: var(--sber-green); color:#fff;
+                                  font-size:15px; font-weight:700; text-decoration:none;
+                                  box-shadow: 0 6px 16px rgba(10,128,59,0.25);
+                                  transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            <span id="eventGoLinkLabel">Перейти на мероприятие</span>
+                        </a>
                     </div>
                 </div>
 
@@ -1238,7 +1260,7 @@ if (document.readyState === 'loading') {
                     </div>
                     {% endif %}
 
-                    <h3 class="section-title" style="margin: 18px 0 14px; font-size: 18px;"><i class="fa-solid fa-clock"></i> Расписание</h3>
+                    <h3 class="section-title" id="eventScheduleHeading" style="margin: 18px 0 14px; font-size: 18px;"><i class="fa-solid fa-clock"></i> Расписание</h3>
                     <div class="schedule-list" id="eventScheduleList"></div>
                 </div>
             </div>

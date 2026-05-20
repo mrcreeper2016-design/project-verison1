@@ -16,8 +16,9 @@ Design goals:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from hashlib import blake2s
 from typing import Any
 
@@ -26,6 +27,55 @@ from django.utils import timezone
 
 from . import analytics as analytics_lib
 from .models import Event, Feedback, Speaker
+
+
+_RU_MONTHS = {
+    "январ": 1, "феврал": 2, "март": 3, "апрел": 4,
+    "ма": 5, "июн": 6, "июл": 7, "август": 8,
+    "сентябр": 9, "октябр": 10, "ноябр": 11, "декабр": 12,
+}
+_DATE_RE = re.compile(
+    r"(?P<day>\d{1,2})(?:\s*[-–—]\s*\d{1,2})?\s+(?P<month>[А-Яа-яёЁ]+)(?:\s+(?P<year>\d{4}))?",
+    re.IGNORECASE,
+)
+
+
+def parse_event_date(raw: str | None, today: date | None = None) -> date | None:
+    """Parse a Russian human-readable event date like "10 Мая 2026" / "4-5 марта 2025" / "7 ноября".
+
+    Takes the first day in a range. If the year is omitted, picks the nearest future
+    occurrence (this year if the month hasn't passed yet, otherwise next year).
+    """
+    if not raw:
+        return None
+    m = _DATE_RE.search(raw)
+    if not m:
+        return None
+    day = int(m.group("day"))
+    month_word = m.group("month").lower().replace("ё", "е")
+    month = None
+    for prefix, num in _RU_MONTHS.items():
+        if month_word.startswith(prefix):
+            month = num
+            break
+    if month is None:
+        return None
+    today = today or timezone.now().date()
+    year_str = m.group("year")
+    if year_str:
+        year = int(year_str)
+    else:
+        year = today.year
+        try:
+            candidate = date(year, month, day)
+        except ValueError:
+            return None
+        if candidate < today:
+            year += 1
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -173,8 +223,10 @@ def compute_kpis(filters: HomeFilters) -> dict[str, Any]:
 def upcoming_events(filters: HomeFilters, limit: int = UPCOMING_LIMIT) -> list[dict[str, Any]]:
     today = timezone.now().date()
 
-    # Primary: event_date today or in the future.
-    # Fallback: events without event_date but explicitly marked status='future'.
+    # Keep events that are explicitly future-dated OR have no event_date but a
+    # parseable human ``date`` string that resolves to today/future. Past
+    # events are filtered out in Python below because ``Event.date`` is a
+    # free-form string and most rows have ``event_date=NULL``.
     qs = Event.objects.filter(
         Q(event_date__gte=today) | Q(event_date__isnull=True, status="future")
     )
@@ -187,19 +239,30 @@ def upcoming_events(filters: HomeFilters, limit: int = UPCOMING_LIMIT) -> list[d
     qs = (
         qs.distinct()
         .annotate(speakers_count=Count("speakers", distinct=True))
-        .order_by(F("event_date").asc(nulls_last=True), "id")
     )
 
+    # Resolve a real date for each candidate, drop anything that turns out to
+    # be in the past, then sort by it (events with no parseable date go last).
+    candidates: list[tuple[date | None, Event]] = []
+    for ev in qs:
+        resolved = ev.event_date or parse_event_date(ev.date, today=today)
+        if resolved and resolved < today:
+            continue
+        candidates.append((resolved, ev))
+
+    far_future = date.max
+    candidates.sort(key=lambda pair: (pair[0] or far_future, pair[1].id))
+
     items: list[dict[str, Any]] = []
-    for ev in qs[:limit]:
+    for resolved, ev in candidates[:limit]:
         description = (ev.description or "").strip()
         if len(description) > 160:
             description = description[:157] + "…"
         items.append({
             "id": ev.id,
             "title": ev.title,
-            "date_iso": ev.event_date.isoformat() if ev.event_date else None,
-            "date_label": ev.event_date.strftime("%d.%m.%Y") if ev.event_date else (ev.date or ""),
+            "date_iso": resolved.isoformat() if resolved else None,
+            "date_label": resolved.strftime("%d.%m.%Y") if resolved else (ev.date or ""),
             "location": ev.location or "",
             "description": description,
             "status": ev.status or "future",
@@ -307,6 +370,7 @@ def activity_feed(limit: int = ACTIVITY_LIMIT) -> list[dict[str, Any]]:
             "title": f"Новое мероприятие «{ev.title}»",
             "subtitle": ev.location or ev.topic or "",
             "speaker_id": None,
+            "event_id": ev.id,
         })
 
     items.sort(key=lambda row: row["timestamp"], reverse=True)

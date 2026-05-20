@@ -167,9 +167,11 @@
     /* ---------- Dashboard grid ---------- */
     .home-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
-        gap: 20px; align-items: start;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px; align-items: stretch;
     }
+    .home-grid > .home-panel { min-width: 0; }
+    .home-grid > .home-panel-wide { grid-column: 1 / -1; }
     @media (max-width: 1100px) { .home-grid { grid-template-columns: 1fr; } }
 
     .home-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
@@ -200,40 +202,44 @@
     /* ---------- Events ---------- */
     .home-event-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 14px;
+        grid-template-columns: 1fr;
+        gap: 8px;
     }
-    @media (max-width: 720px) { .home-event-grid { grid-template-columns: 1fr; } }
+    a.home-event-card, a.home-speaker-row { text-decoration: none; color: inherit; }
+    a.home-event-card:focus-visible, a.home-speaker-row:focus-visible {
+        outline: 2px solid var(--sber-green); outline-offset: 2px;
+    }
+    a.home-timeline-item { text-decoration: none; color: inherit; display: block; cursor: pointer; }
+    a.home-timeline-item:hover .home-timeline-title { color: var(--sber-green); }
     .home-event-card {
-        position: relative; padding: 16px; border-radius: 18px;
+        position: relative; padding: 10px 12px; border-radius: 14px;
         border: 1px solid var(--border-color); background: var(--panel-bg);
         transition: var(--transition);
-        display: flex; flex-direction: column; gap: 10px; min-width: 0;
+        display: flex; flex-direction: column; gap: 6px; min-width: 0;
     }
     .home-event-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 14px 28px rgba(10, 128, 59, 0.08);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(10, 128, 59, 0.08);
         border-color: rgba(10, 128, 59, 0.22);
     }
     .home-event-meta {
         display: flex; justify-content: space-between; align-items: center; gap: 10px;
     }
     .home-event-date {
-        font-size: 12px; font-weight: 700; color: var(--sber-green);
+        font-size: 11px; font-weight: 700; color: var(--sber-green);
         text-transform: uppercase; letter-spacing: 0.06em;
     }
     .home-event-name {
-        margin: 0; font-size: 16px; line-height: 1.3;
+        margin: 0; font-size: 14px; line-height: 1.25;
         font-weight: 700; color: var(--text-main);
         word-break: break-word;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+        overflow: hidden;
     }
-    .home-event-desc {
-        margin: 0; color: var(--text-muted); font-size: 13px;
-        line-height: 1.55;
-    }
+    .home-event-desc { display: none; }
     .home-event-footer {
         display: flex; justify-content: space-between; gap: 10px;
-        align-items: center; font-size: 12px; color: var(--text-muted);
+        align-items: center; font-size: 11px; color: var(--text-muted);
         margin-top: auto;
     }
     .home-event-footer .loc {
@@ -370,42 +376,38 @@
     <div class="home-kpi-grid" id="home-kpi-grid"></div>
 
     <div class="home-grid">
-        <div class="home-col">
-            <section class="home-panel" aria-live="polite">
-                <div class="home-panel-header">
-                    <div>
-                        <h2 class="home-panel-title"><i class="fa-regular fa-calendar-days"></i> Ближайшие мероприятия</h2>
-                        <p class="home-panel-sub">События на горизонте, отсортированы по дате</p>
-                    </div>
-                    <span class="home-panel-tag" id="home-upcoming-tag">—</span>
+        <section class="home-panel" aria-live="polite">
+            <div class="home-panel-header">
+                <div>
+                    <h2 class="home-panel-title"><i class="fa-regular fa-calendar-days"></i> Ближайшие мероприятия</h2>
+                    <p class="home-panel-sub">События на горизонте, отсортированы по дате</p>
                 </div>
-                <div id="home-upcoming" class="home-event-grid"></div>
-            </section>
+                <span class="home-panel-tag" id="home-upcoming-tag">—</span>
+            </div>
+            <div id="home-upcoming" class="home-event-grid"></div>
+        </section>
 
-            <section class="home-panel" aria-live="polite">
-                <div class="home-panel-header">
-                    <div>
-                        <h2 class="home-panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Лента активности</h2>
-                        <p class="home-panel-sub">Отзывы, новые спикеры и мероприятия за последние 60 дней</p>
-                    </div>
-                    <span class="home-panel-tag" id="home-activity-tag">—</span>
+        <section class="home-panel" aria-live="polite">
+            <div class="home-panel-header">
+                <div>
+                    <h2 class="home-panel-title"><i class="fa-solid fa-medal"></i> Топ спикеров</h2>
+                    <p class="home-panel-sub">Сортировка: средний балл → количество отзывов</p>
                 </div>
-                <div id="home-activity" class="home-timeline"></div>
-            </section>
-        </div>
+                <span class="home-panel-tag" id="home-top-tag">—</span>
+            </div>
+            <div id="home-top-speakers" class="home-speaker-list"></div>
+        </section>
 
-        <div class="home-col">
-            <section class="home-panel" aria-live="polite">
-                <div class="home-panel-header">
-                    <div>
-                        <h2 class="home-panel-title"><i class="fa-solid fa-medal"></i> Топ спикеров</h2>
-                        <p class="home-panel-sub">Сортировка: средний балл → количество отзывов</p>
-                    </div>
-                    <span class="home-panel-tag" id="home-top-tag">—</span>
+        <section class="home-panel home-panel-wide" aria-live="polite">
+            <div class="home-panel-header">
+                <div>
+                    <h2 class="home-panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Лента активности</h2>
+                    <p class="home-panel-sub">Отзывы, новые спикеры и мероприятия за последние 60 дней</p>
                 </div>
-                <div id="home-top-speakers" class="home-speaker-list"></div>
-            </section>
-        </div>
+                <span class="home-panel-tag" id="home-activity-tag">—</span>
+            </div>
+            <div id="home-activity" class="home-timeline"></div>
+        </section>
     </div>
 </div>
 
@@ -574,8 +576,9 @@
             const speakers = ev.speakers_count
                 ? `<span><i class="fa-solid fa-people-group"></i> ${fmtCount(ev.speakers_count)}</span>`
                 : '';
+            const href = ev.id ? `/events/#event-${ev.id}` : '/events/';
             return `
-                <article class="home-event-card">
+                <a class="home-event-card" href="${href}">
                     <div class="home-event-meta">
                         <span class="home-event-date"><i class="fa-regular fa-clock"></i> ${dateLabel}</span>
                         <span class="badge-future">Планируется</span>
@@ -589,7 +592,7 @@
                             ${externalBadge}
                         </span>
                     </div>
-                </article>`;
+                </a>`;
         }).join('');
         els.upcomingTag.textContent = `${events.length} ${plural(events.length, ['событие', 'события', 'событий'])}`;
     }
@@ -613,8 +616,9 @@
                 ? '<span class="recommended-flag-inline" title="DevRel рекомендует">★</span>'
                 : '';
             const subParts = [sp.stack, sp.city].filter(Boolean).map(escapeHtml).join(' · ');
+            const href = sp.id ? `/speakers/#open-speaker-${sp.id}` : '/speakers/';
             return `
-                <div class="home-speaker-row">
+                <a class="home-speaker-row" href="${href}">
                     ${avatar}
                     <div class="home-speaker-meta">
                         <div class="home-speaker-name">
@@ -628,7 +632,7 @@
                         <span class="home-nps-pill"><i class="fa-solid fa-star"></i> ${escapeHtml(avg)}</span>
                         <small>${fmtCount(sp.feedbacks_count)} ${plural(sp.feedbacks_count, ['отзыв','отзыва','отзывов'])} · ${fmtCount(sp.events_count)} ${plural(sp.events_count, ['событие','события','событий'])}</small>
                     </div>
-                </div>`;
+                </a>`;
         }).join('');
         els.topTag.textContent = `TOP ${speakers.length}`;
     }
@@ -645,8 +649,14 @@
             return;
         }
         els.activity.classList.add('home-timeline');
-        els.activity.innerHTML = items.map(it => `
-            <div class="home-timeline-item home-timeline-type-${escapeHtml(it.type)}">
+        els.activity.innerHTML = items.map(it => {
+            let href = null;
+            if (it.event_id) href = `/events/#event-${it.event_id}`;
+            else if (it.speaker_id) href = `/speakers/#open-speaker-${it.speaker_id}`;
+            const tag = href ? 'a' : 'div';
+            const hrefAttr = href ? ` href="${href}"` : '';
+            return `
+            <${tag} class="home-timeline-item home-timeline-type-${escapeHtml(it.type)}"${hrefAttr}>
                 <span class="home-timeline-dot"></span>
                 <div class="home-timeline-time">${escapeHtml(fmtRelTime(it.timestamp))}</div>
                 <div class="home-timeline-title">
@@ -654,7 +664,8 @@
                     ${escapeHtml(it.title)}
                 </div>
                 ${it.subtitle ? `<div class="home-timeline-sub">${escapeHtml(it.subtitle)}</div>` : ''}
-            </div>`).join('');
+            </${tag}>`;
+        }).join('');
         els.activityTag.textContent = `${items.length} ${plural(items.length, ['событие', 'события', 'событий'])}`;
     }
 

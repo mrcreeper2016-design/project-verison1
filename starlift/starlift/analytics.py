@@ -530,8 +530,14 @@ def _topic_counts(filters: AnalyticsFilters) -> dict[str, dict[str, Any]]:
 def _split_topics(stack: str | None) -> list[str]:
     if not stack:
         return []
-    parts = [p.strip() for p in stack.replace(";", ",").split(",")]
-    return [p for p in parts if p]
+    if "|" in stack:
+        sep = "|"
+    elif ";" in stack:
+        sep = ";"
+    else:
+        sep = ","
+    parts = [p.strip() for p in stack.split(sep)]
+    return [p for p in parts if len(p) >= 3 and any(ch.isalpha() for ch in p)]
 
 
 def thematic_profile(filters: AnalyticsFilters) -> list[dict[str, Any]]:
