@@ -36,6 +36,7 @@ urlpatterns = [
     path('privacy/', PrivacyView.as_view(), name='privacy'),
     path('consent/', ConsentView.as_view(), name='consent'),
     path('terms/', TermsView.as_view(), name='terms'),
+    path('assistant/', include('assistant.urls')),
 ]
 
 if settings.MEDIA_URL.startswith("/"):
