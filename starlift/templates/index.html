@@ -360,12 +360,98 @@
         </h1>
         <p class="hero-subtitle">Оперативный центр по спикерам, ближайшим мероприятиям и активности команды</p>
 
-        <div class="prompt-container">
-            <input type="text" class="prompt-input" placeholder="Добавьте свои данные или задайте вопрос..." aria-label="Будущий ввод для чата">
-            <button class="voice-btn" type="button" aria-label="Голосовой ввод">
-                <i class="fa-solid fa-microphone"></i>
+        <form class="prompt-container" id="home-assistant-form" autocomplete="off">
+            {% csrf_token %}
+            <input type="text" name="first_message" class="prompt-input" id="home-assistant-input"
+                   placeholder="Спросите ассистента: «Найди ML-спикеров с NPS > 8»"
+                   aria-label="Сообщение ассистенту">
+            <button class="voice-btn" type="submit" aria-label="Отправить">
+                <i class="fa-solid fa-paper-plane"></i>
+            </button>
+        </form>
+        <div class="home-assistant-hints">
+            <button type="button" class="home-assistant-hint" data-prompt="Покажи топ-5 спикеров за месяц">
+                <i class="fa-solid fa-medal"></i> Топ-5 за месяц
+            </button>
+            <button type="button" class="home-assistant-hint" data-prompt="Ближайшие события по ML">
+                <i class="fa-regular fa-calendar"></i> Ближайшие по ML
+            </button>
+            <button type="button" class="home-assistant-hint" data-prompt="Какой NPS за последние 30 дней?">
+                <i class="fa-solid fa-chart-line"></i> NPS за 30 дней
             </button>
         </div>
+
+        <style>
+            .home-assistant-hints {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+                justify-content: center;
+                margin-top: 14px;
+            }
+            .home-assistant-hint {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 6px 12px;
+                border-radius: 14px;
+                font-size: 12px;
+                font-weight: 600;
+                background: var(--light-green);
+                color: var(--sber-green);
+                border: 1px solid var(--border-color);
+                cursor: pointer;
+                transition: var(--transition);
+                font-family: inherit;
+            }
+            .home-assistant-hint:hover {
+                background: var(--sber-green);
+                color: #fff;
+                border-color: var(--sber-green);
+            }
+            .home-assistant-hint i {
+                font-size: 11px;
+            }
+        </style>
+
+        <script>
+        (function() {
+            const form = document.getElementById('home-assistant-form');
+            const input = document.getElementById('home-assistant-input');
+            if (!form || !input) return;
+            const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            async function go(text) {
+                const t = (text || '').trim();
+                if (!t) return;
+                input.disabled = true;
+                try {
+                    const resp = await fetch('/assistant/conversations/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ first_message: t }),
+                    });
+                    if (!resp.ok) {
+                        input.disabled = false;
+                        return;
+                    }
+                    const data = await resp.json();
+                    window.location.href = `/assistant/c/${data.conversation_id}/`;
+                } catch (err) {
+                    input.disabled = false;
+                }
+            }
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                go(input.value);
+            });
+            document.querySelectorAll('.home-assistant-hint').forEach(btn => {
+                btn.addEventListener('click', () => go(btn.dataset.prompt));
+            });
+        })();
+        </script>
 
         <div class="home-live" id="home-live" data-state="idle" title="Статус подключения к данным" style="margin-top: 16px;">
             <span class="pulse"></span>
