@@ -183,6 +183,7 @@ class AuditLog(models.Model):
     ACTION_GUEST_DELETED = "guest_deleted"
     ACTION_EMAIL_VERIFIED = "email_verified"
     ACTION_CONSENT_GIVEN = "consent_given"
+    ACTION_ASSISTANT_QUERY = "assistant_query"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
