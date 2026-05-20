@@ -91,8 +91,8 @@ def run_turn(conversation: Conversation, *, client) -> Iterator[AgentEvent]:
         turn_token_out += chunk_out
 
         if pending_tool_name:
-            args = pending_tool_args
             entry = TOOL_REGISTRY.get(pending_tool_name)
+            args = _sanitize_args(pending_tool_args, entry)
             if not entry:
                 yield AgentEvent("error", {"reason": "unknown_tool", "tool": pending_tool_name})
                 return
@@ -138,6 +138,36 @@ def run_turn(conversation: Conversation, *, client) -> Iterator[AgentEvent]:
         )
         yield AgentEvent("done", {"message_id": final_msg.id})
         return
+
+
+def _sanitize_args(raw: dict, entry) -> dict:
+    """Clean up arguments produced by the LLM.
+
+    GigaChat sometimes emits keys with stray whitespace (``' stack'``) or
+    placeholder-looking values (``'{}'``, ``'{},\n'``). Filter both:
+
+    * strip whitespace from every key,
+    * drop keys that are not in the tool's JSON-schema ``properties``,
+    * drop string values that are empty or look like JSON-syntax fragments,
+    * keep all other values as-is so the tool decides what's valid.
+    """
+    if not isinstance(raw, dict) or not entry:
+        return raw if isinstance(raw, dict) else {}
+    allowed = set((entry.schema.get("parameters") or {}).get("properties", {}).keys())
+    out: dict = {}
+    for key, value in raw.items():
+        clean_key = key.strip() if isinstance(key, str) else key
+        if clean_key not in allowed:
+            continue
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                continue
+            if stripped in ("{}", "[]", "null") or stripped.startswith("{}"):
+                continue
+            value = stripped
+        out[clean_key] = value
+    return out
 
 
 def _summarize_tool_result(name: str, result: Any) -> str:

@@ -26,18 +26,36 @@ def _scope_for(user):
 @assistant_tool(
     name="search_speakers",
     description=(
-        "Search for speaker cards. Supports filtering by free-text query "
-        "(matches name or bio), tech stack substring, city, and minimum NPS. "
-        "Returns compact list."
+        "Поиск спикеров с фильтрами. Результаты ВСЕГДА отсортированы по убыванию "
+        "рейтинга, поэтому для запросов «топ-N», «лучшие», «самые высокие» НЕ нужно "
+        "передавать nps_min — достаточно limit. nps_min используй только когда "
+        "пользователь явно назвал порог рейтинга."
     ),
     parameters={
         "type": "object",
         "properties": {
-            "query": {"type": "string", "description": "Free-text search across name and bio."},
-            "stack": {"type": "string", "description": "Tech stack substring, e.g. 'Python'."},
+            "query": {
+                "type": "string",
+                "description": "Свободный поиск по имени и био.",
+            },
+            "stack": {
+                "type": "string",
+                "description": "Подстрока стека: 'Python', 'ML', 'DevOps'.",
+            },
             "city": {"type": "string"},
-            "nps_min": {"type": "integer", "minimum": 0, "maximum": 100},
-            "limit": {"type": "integer", "minimum": 1, "maximum": 10, "default": 10},
+            "nps_min": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 10,
+                "description": "Минимальный рейтинг от 0.0 до 10.0 (средняя оценка отзывов). НЕ указывай, если пользователь не задал порог явно.",
+            },
+            "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "default": 10,
+                "description": "Сколько спикеров вернуть. Для 'топ-10' — 10, для 'топ-3' — 3.",
+            },
         },
     },
 )
