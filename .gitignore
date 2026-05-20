@@ -12,6 +12,8 @@ media/
 
 # Virtual Environments
 .env
+.env.production
+.env.local
 .venv/
 venv/
 ENV/
