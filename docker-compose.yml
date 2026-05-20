@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - ./starlift/.env.production
+    environment:
+      RUN_MIGRATIONS: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - mediafiles:/app/media
+    ports:
+      - "80:8000"
+
+  parser:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - ./starlift/.env.production
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_started
+    command: ["python", "manage.py", "sync_highload", "--interval-minutes", "30"]
+
+volumes:
+  pgdata:
+  mediafiles:
