@@ -1,0 +1,13 @@
+<div style="font-family: Inter, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; color: #142C1E;">
+    <h2 style="color: #0A803B; margin: 0 0 12px;">Приглашение в {{ site_name }}</h2>
+    <p>Здравствуйте!</p>
+    <p>{% if inviter_name %}<strong>{{ inviter_name }}</strong> приглашает{% else %}Вас приглашают{% endif %} присоединиться к платформе <strong>{{ site_name }}</strong> в роли: <strong>{{ role }}</strong>.</p>
+    <p style="margin: 20px 0;">
+        <a href="{{ link }}" style="display: inline-block; padding: 12px 20px; background: #0A803B; color: #fff; border-radius: 10px; text-decoration: none; font-weight: 600;">
+            Создать учётную запись
+        </a>
+    </p>
+    <p style="color: #5B7565; font-size: 13px;">Ссылка действительна ограниченное время. Если вы не ожидали этого приглашения, проигнорируйте письмо.</p>
+    <hr style="border: 0; border-top: 1px solid #DDF0E4; margin: 24px 0;">
+    <p style="color: #5B7565; font-size: 12px;">— Команда {{ site_name }}</p>
+</div>

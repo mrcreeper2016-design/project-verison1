@@ -1,0 +1,105 @@
+{% extends 'accounts/console/_base.html' %}
+
+{% block console_content %}
+<style>
+    .req-card { padding: 16px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--white); margin-bottom: 12px; display: grid; gap: 10px; }
+    .req-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+    .req-meta { font-size: 12px; color: var(--text-muted); }
+    .req-title { font-weight: 700; font-size: 15px; color: var(--text-main); margin: 0; }
+    .req-body { font-size: 13px; color: var(--text-main); line-height: 1.5; }
+    .req-body dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; }
+    .req-body dt { color: var(--text-muted); }
+    .req-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-sm { padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 600; border: none; cursor: pointer; }
+    .btn-approve { background: var(--sber-green); color: #fff; }
+    .btn-reject { background: rgba(217,62,78,0.1); color: #D93E4E; border: 1px solid rgba(217,62,78,0.3); }
+    .reject-form { display: none; margin-top: 8px; gap: 8px; }
+    .reject-form.show { display: flex; flex-wrap: wrap; }
+    .reject-form textarea { flex: 1; min-width: 200px; padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); font-family: inherit; font-size: 13px; min-height: 60px; }
+</style>
+
+<div class="filter-bar" style="margin-bottom: 16px;">
+    <form method="get" class="filter-bar">
+        <select name="status" onchange="this.form.submit()">
+            <option value="pending" {% if status == 'pending' %}selected{% endif %}>На рассмотрении ({{ pending_count }})</option>
+            <option value="approved" {% if status == 'approved' %}selected{% endif %}>Одобренные</option>
+            <option value="rejected" {% if status == 'rejected' %}selected{% endif %}>Отклонённые</option>
+            <option value="" {% if not status %}selected{% endif %}>Все</option>
+        </select>
+        <select name="kind" onchange="this.form.submit()">
+            <option value="" {% if not kind %}selected{% endif %}>Любой тип</option>
+            <option value="create" {% if kind == 'create' %}selected{% endif %}>Создание мероприятия</option>
+            <option value="join" {% if kind == 'join' %}selected{% endif %}>Заявка на участие</option>
+        </select>
+    </form>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="empty-state" style="margin-bottom: 12px; color: {% if 'success' in message.tags %}var(--sber-green){% else %}#D93E4E{% endif %};">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+{% if not page.object_list %}
+    <div class="empty-state">Заявок нет.</div>
+{% else %}
+    {% for req in page.object_list %}
+    <div class="req-card">
+        <div class="req-head">
+            <div>
+                <h3 class="req-title">
+                    {% if req.kind == 'create' %}
+                        <i class="fa-solid fa-plus-circle" style="color: var(--sber-green);"></i> Новое мероприятие: {{ req.proposed_title }}
+                    {% else %}
+                        <i class="fa-solid fa-user-plus" style="color: var(--sber-green);"></i> Заявка на участие: {{ req.event.title|default:"—" }}
+                    {% endif %}
+                </h3>
+                <div class="req-meta">
+                    От спикера <strong>{{ req.speaker.name }}</strong>
+                    · {{ req.created_at|date:"d.m.Y H:i" }}
+                </div>
+            </div>
+            <span class="chip {% if req.status == 'pending' %}chip-amber{% elif req.status == 'approved' %}chip-green{% else %}chip-red{% endif %}">
+                {{ req.get_status_display }}
+            </span>
+        </div>
+
+        <div class="req-body">
+            <dl>
+                {% if req.kind == 'create' %}
+                    {% if req.proposed_description %}<dt>Описание:</dt><dd>{{ req.proposed_description }}</dd>{% endif %}
+                    {% if req.proposed_event_date %}<dt>Дата:</dt><dd>{{ req.proposed_event_date|date:"d.m.Y" }}</dd>{% endif %}
+                    {% if req.proposed_location %}<dt>Место:</dt><dd>{{ req.proposed_location }}</dd>{% endif %}
+                    {% if req.proposed_link %}<dt>Ссылка:</dt><dd><a href="{{ req.proposed_link }}" target="_blank">{{ req.proposed_link }}</a></dd>{% endif %}
+                {% endif %}
+                {% if req.topic %}<dt>Тема доклада:</dt><dd>{{ req.topic }}</dd>{% endif %}
+                {% if req.comment %}<dt>Комментарий:</dt><dd>{{ req.comment }}</dd>{% endif %}
+                {% if req.status == 'rejected' and req.rejection_reason %}
+                    <dt>Причина отказа:</dt><dd style="color: #D93E4E;">{{ req.rejection_reason }}</dd>
+                {% endif %}
+                {% if req.reviewed_by %}
+                    <dt>Рассмотрел:</dt><dd>{{ req.reviewed_by.username }} ({{ req.reviewed_at|date:"d.m.Y H:i" }})</dd>
+                {% endif %}
+            </dl>
+        </div>
+
+        {% if req.status == 'pending' %}
+        <div class="req-actions">
+            <form method="post" action="{% url 'accounts:event_request_action' req.id 'approve' %}" class="inline-form">
+                {% csrf_token %}
+                <input type="hidden" name="return_status" value="{{ status }}">
+                <button type="submit" class="btn-sm btn-approve"><i class="fa-solid fa-check"></i> Одобрить</button>
+            </form>
+            <button type="button" class="btn-sm btn-reject" onclick="this.nextElementSibling.classList.toggle('show')"><i class="fa-solid fa-xmark"></i> Отклонить</button>
+            <form method="post" action="{% url 'accounts:event_request_action' req.id 'reject' %}" class="reject-form">
+                {% csrf_token %}
+                <input type="hidden" name="return_status" value="{{ status }}">
+                <textarea name="rejection_reason" placeholder="Причина отклонения (видна спикеру)" required></textarea>
+                <button type="submit" class="btn-sm btn-reject">Отправить отказ</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+{% endif %}
+{% endblock %}

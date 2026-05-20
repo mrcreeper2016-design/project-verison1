@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir *)",
+      "Bash(python manage.py makemigrations)",
+      "Bash(Get-ChildItem -Path \"F:\\\\h1tn3s\\\\github\\\\project-verison1\" -Recurse -Name)",
+      "PowerShell(head *)",
+      "PowerShell(Get-ChildItem -Path \"F:\\\\h1tn3s\\\\github\\\\project-verison1\\\\starlift\\\\static\" -Recurse | Where-Object { $_.Extension -eq \".js\" } | Select-Object FullName)"
+    ]
+  }
+}

@@ -104,7 +104,7 @@
                     <i class="fa-solid fa-cloud-arrow-up"></i>
                     <p>Перетащите фото сюда или нажмите</p>
                 </div>
-                <img id="imagePreview" class="dropzone-preview" alt="Превью" {% if form.instance.img %}src="{% if form.instance.img|slice:':4' == 'http' or form.instance.img|slice:':6' == '/media' %}{{ form.instance.img }}{% else %}https://i.pravatar.cc/300?img={{ form.instance.img }}{% endif %}" style="display:inline-block;"{% endif %}>
+                <img id="imagePreview" class="dropzone-preview" alt="Превью" {% if form.instance.avatar_url %}src="{{ form.instance.avatar_url }}"{% elif form.instance.img %}src="{% if form.instance.img|slice:':4' == 'http' or form.instance.img|slice:':6' == '/media' %}{{ form.instance.img }}{% else %}https://i.pravatar.cc/300?img={{ form.instance.img }}{% endif %}"{% endif %} {% if form.instance.avatar_url or form.instance.img %}style="display:inline-block;"{% endif %}>
                 <input type="file" name="upload_image" id="id_upload_image" style="display: none;" accept="image/jpeg, image/png, image/webp">
             </div>
             

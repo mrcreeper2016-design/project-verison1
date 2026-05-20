@@ -150,8 +150,8 @@
 
     .toggle-switch {
         position: relative;
-        width: 56px;
-        height: 32px;
+        width: 52px;
+        height: 30px;
         flex: 0 0 auto;
     }
 
@@ -164,11 +164,12 @@
     .slider {
         position: absolute;
         inset: 0;
-        background: rgba(112, 117, 122, 0.25);
+        background: rgba(112, 117, 122, 0.2);
         border: 1px solid var(--border-color);
         border-radius: 999px;
         cursor: pointer;
-        transition: var(--transition);
+        transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
     }
 
     .slider::before {
@@ -176,21 +177,32 @@
         position: absolute;
         left: 3px;
         top: 3px;
-        width: 24px;
-        height: 24px;
+        width: 22px;
+        height: 22px;
         border-radius: 50%;
-        background: #fff;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.12);
-        transition: var(--transition);
+        background: linear-gradient(180deg, #fff 0%, #f3f5f4 100%);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .toggle-switch input:checked + .slider {
-        background: var(--sber-green);
+        background: linear-gradient(180deg, var(--sber-green) 0%, var(--sber-green-hover) 100%);
         border-color: var(--sber-green);
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.08);
     }
 
     .toggle-switch input:checked + .slider::before {
-        transform: translateX(24px);
+        transform: translateX(22px);
+    }
+
+    [data-theme="dark"] .slider {
+        background: rgba(40, 44, 42, 0.9);
+        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+    }
+
+    [data-theme="dark"] .slider::before {
+        background: linear-gradient(180deg, #3d4540 0%, #2a302d 100%);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.06);
     }
 
     .catalog-blocks {

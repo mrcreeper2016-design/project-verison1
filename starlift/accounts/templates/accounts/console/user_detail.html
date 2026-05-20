@@ -1,0 +1,177 @@
+{% extends 'accounts/console/_base.html' %}
+
+{% block title %}{{ target.username }} — Пользователь{% endblock %}
+
+{% block console_content %}
+{% if messages %}
+    {% for msg in messages %}
+    <div style="padding:10px 12px; border-radius:10px; margin-bottom:12px; font-size:13px;
+                {% if msg.tags == 'error' %}background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3);
+                {% elif msg.tags == 'warning' %}background:rgba(224,165,0,0.15); color:#B87C00; border:1px solid rgba(224,165,0,0.3);
+                {% else %}background:var(--light-green); color:var(--sber-green); border:1px solid rgba(10,128,59,0.25);{% endif %}">{{ msg }}</div>
+    {% endfor %}
+{% endif %}
+
+<div style="margin-bottom:12px;">
+    <a href="{% url 'accounts:users' %}" style="color:var(--text-muted); text-decoration:none; font-size:13px;"><i class="fa-solid fa-arrow-left"></i> К списку</a>
+</div>
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; align-items:start;">
+    <div style="display:grid; gap:20px;">
+        <div class="content-block" style="padding:22px; display:grid; gap:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                <h2 style="margin:0; font-size:20px; font-weight:800;">{{ target.get_full_name|default:target.username }}</h2>
+                <div style="display:flex; gap:6px;">
+                    {% if profile.role == 'admin' %}<span class="chip chip-green">Админ</span>
+                    {% elif profile.role == 'speaker' %}<span class="chip chip-gray">Спикер</span>
+                    {% else %}<span class="chip chip-red" title="Ожидает подтверждения">Гость</span>{% endif %}
+                    {% if target.is_active %}<span class="chip chip-green">Активен</span>{% else %}<span class="chip chip-red">Отключён</span>{% endif %}
+                    {% if is_locked %}<span class="chip chip-red"><i class="fa-solid fa-lock"></i> Блок</span>{% endif %}
+                </div>
+            </div>
+            <div style="display:grid; gap:6px; font-size:13px;">
+                <div><span style="color:var(--text-muted);">Username:</span> <strong>{{ target.username }}</strong></div>
+                <div><span style="color:var(--text-muted);">Email:</span> {{ target.email|default:"—" }} {% if profile.email_verified %}<i class="fa-solid fa-circle-check" style="color:var(--sber-green);"></i>{% endif %}</div>
+                {% if profile.pending_email %}<div><span style="color:var(--text-muted);">Pending email:</span> {{ profile.pending_email }}</div>{% endif %}
+                <div><span style="color:var(--text-muted);">Создан:</span> {{ target.date_joined|date:"d.m.Y H:i" }}</div>
+                <div><span style="color:var(--text-muted);">Последний вход:</span> {{ target.last_login|date:"d.m.Y H:i"|default:"—" }}</div>
+            </div>
+        </div>
+
+        <div class="content-block" style="padding:22px; display:grid; gap:12px;">
+            <h3 style="margin:0; font-size:15px; font-weight:700;"><i class="fa-solid fa-wrench"></i> Действия</h3>
+
+            {% if profile.role == 'guest' %}
+            <div style="padding:10px 12px; border-radius:10px; background:var(--light-green); border:1px solid rgba(10,128,59,0.25); display:flex; gap:10px; align-items:center;">
+                <i class="fa-solid fa-user-clock" style="color:var(--sber-green); font-size:18px;"></i>
+                <div style="flex:1; font-size:13px;">
+                    <div style="font-weight:700; color:var(--sber-green);">Ожидает подтверждения</div>
+                    <div style="color:var(--text-main);">Пользователь зарегистрировался самостоятельно. Выдайте роль спикера, чтобы открыть доступ к дашборду.</div>
+                </div>
+                <form method="post" onsubmit="return confirm('Подтвердить пользователя и выдать роль спикера?');" style="margin:0;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="change_role">
+                    <input type="hidden" name="role" value="speaker">
+                    <button type="submit" class="btn-action btn-contact" style="padding:8px 14px; font-size:13px;">
+                        <i class="fa-solid fa-user-check"></i> Подтвердить как спикера
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+
+            <form method="post" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="unlock">
+                <button type="submit" class="btn-action" style="background:var(--white); color:var(--text-main); border:1px solid var(--border-color); padding:8px 14px; font-size:13px;" {% if not is_locked %}disabled title="Нет активной блокировки"{% endif %}>
+                    <i class="fa-solid fa-lock-open"></i> Снять lockout
+                </button>
+            </form>
+
+            <form method="post" style="display:flex; gap:8px; align-items:center;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="change_role">
+                <select name="role" class="select-compact">
+                    <option value="guest" {% if profile.role == 'guest' %}selected{% endif %}>Гость</option>
+                    <option value="speaker" {% if profile.role == 'speaker' %}selected{% endif %}>Спикер</option>
+                    <option value="admin" {% if profile.role == 'admin' %}selected{% endif %}>Админ</option>
+                </select>
+                <button type="submit" class="btn-action btn-contact" style="padding:8px 14px; font-size:13px;"><i class="fa-solid fa-user-shield"></i> Сменить роль</button>
+            </form>
+
+            <form method="post" onsubmit="return confirm('{% if target.is_active %}Отключить{% else %}Включить{% endif %} аккаунт {{ target.username }}?');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_active">
+                {% if target.is_active %}
+                <button type="submit" class="btn-action" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3); padding:8px 14px; font-size:13px;"><i class="fa-solid fa-user-slash"></i> Отключить аккаунт</button>
+                {% else %}
+                <button type="submit" class="btn-action btn-contact" style="padding:8px 14px; font-size:13px;"><i class="fa-solid fa-user-check"></i> Включить аккаунт</button>
+                {% endif %}
+            </form>
+
+            {% if profile.role == 'guest' %}
+            <form method="post" onsubmit="return confirm('Удалить гостевого пользователя {{ target.username }}? Это действие нельзя отменить.');">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_guest">
+                <button type="submit" class="btn-action" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3); padding:8px 14px; font-size:13px;">
+                    <i class="fa-solid fa-trash"></i> Удалить гостя
+                </button>
+            </form>
+            {% endif %}
+        </div>
+
+        <div class="content-block" id="speaker-link" style="padding:22px; display:grid; gap:12px;">
+            <h3 style="margin:0; font-size:15px; font-weight:700;"><i class="fa-solid fa-link"></i> Связь со спикером</h3>
+            {% if linked_speaker %}
+            <div class="readonly-box" style="padding:10px 12px; background:var(--white); border:1px solid var(--border-color); border-radius:12px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                <div>
+                    <strong>{{ linked_speaker.name }}</strong>
+                    <div style="color:var(--text-muted); font-size:12px;">{{ linked_speaker.stack }} · {{ linked_speaker.city }}</div>
+                </div>
+                <form method="post" onsubmit="return confirm('Снять связь со спикером?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="link_speaker">
+                    <input type="hidden" name="speaker_id" value="">
+                    <button type="submit" class="btn-action" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3); padding:6px 10px; font-size:12px;"><i class="fa-solid fa-link-slash"></i> Разорвать</button>
+                </form>
+            </div>
+            {% else %}
+            <p style="margin:0; color:var(--text-muted); font-size:13px;">Не связан со спикером.</p>
+            {% endif %}
+
+            <form method="post" style="display:flex; gap:8px; align-items:center;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="link_speaker">
+                <select name="speaker_id" class="select-compact" style="flex:1;">
+                    <option value="">— Выберите спикера —</option>
+                    {% for s in available_speakers %}
+                    <option value="{{ s.pk }}">{{ s.name }} ({{ s.city }})</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn-action btn-contact" style="padding:8px 14px; font-size:13px;"><i class="fa-solid fa-link"></i> Связать</button>
+            </form>
+        </div>
+    </div>
+
+    <div style="display:grid; gap:20px;">
+        <div class="content-block" style="padding:22px; display:grid; gap:10px;">
+            <h3 style="margin:0; font-size:15px; font-weight:700;"><i class="fa-solid fa-right-to-bracket"></i> Последние попытки входа</h3>
+            {% if recent_attempts %}
+            <table class="console-table">
+                <thead><tr><th>Когда</th><th>IP</th><th>Результат</th></tr></thead>
+                <tbody>
+                    {% for a in recent_attempts %}
+                    <tr>
+                        <td>{{ a.created_at|date:"d.m.Y H:i:s" }}</td>
+                        <td style="font-family:monospace; font-size:12px;">{{ a.ip|default:"—" }}</td>
+                        <td>{% if a.success %}<span class="chip chip-green">OK</span>{% else %}<span class="chip chip-red">FAIL</span>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="margin:0; color:var(--text-muted); font-size:13px;">Нет записей.</p>
+            {% endif %}
+        </div>
+
+        <div class="content-block" style="padding:22px; display:grid; gap:10px;">
+            <h3 style="margin:0; font-size:15px; font-weight:700;"><i class="fa-solid fa-clipboard-list"></i> Аудит</h3>
+            {% if recent_events %}
+            <table class="console-table">
+                <thead><tr><th>Когда</th><th>Событие</th><th>Автор</th></tr></thead>
+                <tbody>
+                    {% for e in recent_events %}
+                    <tr>
+                        <td>{{ e.created_at|date:"d.m.Y H:i" }}</td>
+                        <td><span class="chip chip-gray" style="font-family:monospace; font-size:11px;">{{ e.action }}</span></td>
+                        <td>{{ e.actor.username|default:"—" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="margin:0; color:var(--text-muted); font-size:13px;">Событий нет.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

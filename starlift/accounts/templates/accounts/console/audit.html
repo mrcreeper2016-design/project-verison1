@@ -1,0 +1,56 @@
+{% extends 'accounts/console/_base.html' %}
+
+{% block title %}Аудит — StarLift{% endblock %}
+
+{% block console_content %}
+<div class="content-block" style="padding:22px; display:grid; gap:16px;">
+    <form method="get" class="filter-bar">
+        <input type="text" name="q" value="{{ q }}" placeholder="Поиск по actor / target / IP" style="min-width:260px;">
+        <select name="action">
+            <option value="">Все действия</option>
+            {% for a in known_actions %}
+            <option value="{{ a }}" {% if a == action %}selected{% endif %}>{{ a }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn-action btn-contact" style="padding:8px 14px; font-size:13px;"><i class="fa-solid fa-magnifying-glass"></i> Фильтр</button>
+    </form>
+
+    {% if page.object_list %}
+    <table class="console-table">
+        <thead>
+            <tr>
+                <th>Когда</th>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Target</th>
+                <th>IP</th>
+                <th>Metadata</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in page.object_list %}
+            <tr>
+                <td style="white-space:nowrap;">{{ e.created_at|date:"d.m.Y H:i:s" }}</td>
+                <td>{% if e.actor %}<a href="{% url 'accounts:user_detail' e.actor.pk %}" style="color:var(--text-main); font-weight:600; text-decoration:none;">{{ e.actor.username }}</a>{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+                <td><span class="chip chip-gray" style="font-family:monospace; font-size:11px;">{{ e.action }}</span></td>
+                <td>{% if e.target_type %}<span style="color:var(--text-muted); font-size:11px;">{{ e.target_type }}:</span> {{ e.target_id }}{% else %}—{% endif %}</td>
+                <td style="font-family:monospace; font-size:12px;">{{ e.ip|default:"—" }}</td>
+                <td style="font-family:monospace; font-size:11px; color:var(--text-muted); max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ e.metadata }}">{% if e.metadata %}{{ e.metadata }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; padding-top:10px; color:var(--text-muted); font-size:13px;">
+        <span>Всего: {{ page.paginator.count }}</span>
+        <div style="display:flex; gap:6px;">
+            {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}&q={{ q }}&action={{ action }}" class="chip chip-gray" style="text-decoration:none;">← Назад</a>{% endif %}
+            <span style="padding:2px 8px;">Стр. {{ page.number }} / {{ page.paginator.num_pages }}</span>
+            {% if page.has_next %}<a href="?page={{ page.next_page_number }}&q={{ q }}&action={{ action }}" class="chip chip-gray" style="text-decoration:none;">Вперёд →</a>{% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state"><i class="fa-solid fa-clipboard-list" style="font-size:22px; display:block; margin-bottom:8px;"></i>Записей не найдено</div>
+    {% endif %}
+</div>
+{% endblock %}

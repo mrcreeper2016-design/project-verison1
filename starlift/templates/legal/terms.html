@@ -1,0 +1,20 @@
+{% extends 'accounts/auth_base.html' %}
+{% block title %}Пользовательское соглашение — StarLift{% endblock %}
+
+{% block extra_css %}
+.auth-card { max-width: 760px; }
+.legal-doc h2, .legal-doc h3 { color: var(--text-main); }
+.legal-doc h3 { font-size: 16px; margin-top: 18px; }
+.legal-doc p, .legal-doc li { color: var(--text-main); font-size: 14px; line-height: 1.6; }
+.legal-doc em { color: var(--text-muted); font-style: normal; font-size: 12px; }
+.legal-doc a { color: var(--sber-green); }
+.back-link { display: inline-block; margin-top: 18px; color: var(--sber-green); text-decoration: none; font-weight: 600; font-size: 13px; }
+.back-link:hover { text-decoration: underline; }
+{% endblock %}
+
+{% block content %}
+<div class="legal-doc">
+    {% include 'legal/_terms_body.html' %}
+</div>
+<a class="back-link" href="javascript:history.back()"><i class="fa-solid fa-arrow-left"></i> Назад</a>
+{% endblock %}

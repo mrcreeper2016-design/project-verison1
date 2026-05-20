@@ -8,6 +8,17 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='50,5 61,35 95,35 68,55 78,85 50,65 22,85 32,55 5,35 39,35' fill='%230A803B'/%3E%3Cpath d='M20,80 L55,45 L65,55 L90,20' fill='none' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        (function applyThemeBeforePaint() {
+            try {
+                const savedTheme = localStorage.getItem('theme');
+                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.setAttribute('data-theme', savedTheme || (systemDark ? 'dark' : 'light'));
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
     <style>
         :root {
             --sber-green: #0A803B;
@@ -97,6 +108,25 @@
             scrollbar-color: var(--border-color) transparent;
         }
 
+        /* Дефолтный стиль ссылок — единообразно по всему сайту.
+           Конкретные классы (.btn-primary, .nav-item и т.п.) уже задают свой
+           цвет/декорацию и продолжат это делать благодаря правилу specificity. */
+        a {
+            color: var(--sber-green);
+            text-decoration: none;
+            transition: color .2s ease, text-decoration-color .2s ease;
+        }
+        a:hover {
+            color: var(--sber-green-hover);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        a:focus-visible {
+            outline: 2px solid var(--sber-green);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
         .mesh-gradient {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -148,12 +178,12 @@
             to { opacity: 0; transform: translateY(15px); }
         }
         @keyframes fadeOutOverlay {
-            from { opacity: 1; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); background: rgba(0,0,0,0.3); }
-            to { opacity: 0; backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); background: rgba(0,0,0,0); }
+            from { opacity: 1; }
+            to { opacity: 0; }
         }
         @keyframes fadeInOverlay {
-            from { opacity: 0; backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); background: rgba(0,0,0,0); }
-            to { opacity: 1; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); background: rgba(0,0,0,0.3); }
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
         .animate-fade { 
             animation: fadeInUp 0.3s ease both; 
@@ -297,6 +327,45 @@
 
         [data-theme="dark"] .theme-toggle:hover { box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.3), inset 0 2px 2px rgba(255, 255, 255, 0.1); }
 
+        .notif-wrap { position: relative; }
+        .notif-badge {
+            position: absolute; top: -4px; right: -4px;
+            min-width: 18px; height: 18px; padding: 0 5px;
+            border-radius: 9px; background: #D93E4E; color: #fff;
+            font-size: 11px; font-weight: 800; line-height: 18px; text-align: center;
+            box-shadow: 0 2px 6px rgba(217,62,78,0.5);
+            display: none;
+        }
+        .notif-badge.has { display: inline-block; }
+        .notif-dropdown {
+            display: none;
+            position: absolute; top: 52px; right: 0;
+            width: 360px; max-height: 480px; overflow-y: auto;
+            background: var(--white); border: 1px solid var(--border-color);
+            border-radius: 16px; box-shadow: 0 18px 40px rgba(0,0,0,0.18);
+            z-index: 1500; padding: 8px;
+        }
+        .notif-dropdown.show { display: block; }
+        .notif-dropdown-header {
+            padding: 10px 12px; border-bottom: 1px solid var(--border-color);
+            font-weight: 700; font-size: 14px; color: var(--text-main);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .notif-item { padding: 12px; border-radius: 10px; transition: background 0.15s; }
+        .notif-item:hover { background: var(--light-green); }
+        .notif-item + .notif-item { border-top: 1px solid var(--border-color); }
+        .notif-item-title { font-weight: 700; font-size: 13px; color: var(--text-main); margin: 0 0 2px; }
+        .notif-item-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+        .notif-actions { display: flex; gap: 6px; }
+        .notif-actions button, .notif-actions a {
+            padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 600;
+            border: none; cursor: pointer; text-decoration: none;
+            display: inline-flex; align-items: center; gap: 4px;
+        }
+        .notif-actions .notif-approve { background: var(--sber-green); color: #fff; }
+        .notif-actions .notif-open { background: var(--white); color: var(--text-main); border: 1px solid var(--border-color); }
+        .notif-empty { padding: 24px 12px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
         .admin-profile-container { position: relative; }
         .admin-profile { 
             display: flex; align-items: center; gap: 12px; cursor: pointer; 
@@ -438,46 +507,80 @@
             text-align: center;
         }
 
+        /**
+         * Круглые чекбоксы в стиле интерфейса (glass + зелёная отметка).
+         * Классы: .sl-checkbox (основной), .custom-checkbox — алиас для старых разметок.
+         */
+        .sl-checkbox,
         .custom-checkbox {
             appearance: none;
             -webkit-appearance: none;
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             margin: 0;
-            border-radius: 6px;
-            border: 1.5px solid var(--border-color);
-            background: var(--white);
+            flex-shrink: 0;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+            background: var(--panel-bg);
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.22);
             cursor: pointer;
             position: relative;
-            transition: var(--transition);
+            transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
             vertical-align: middle;
         }
 
+        [data-theme="dark"] .sl-checkbox,
+        [data-theme="dark"] .custom-checkbox {
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+        }
+
+        .sl-checkbox:hover,
         .custom-checkbox:hover {
             border-color: var(--sber-green);
-            box-shadow: 0 0 0 4px var(--light-green);
+            box-shadow: 0 0 0 4px var(--light-green), inset 0 1px 2px rgba(255, 255, 255, 0.12);
+            transform: scale(1.06);
         }
 
+        .sl-checkbox:checked,
         .custom-checkbox:checked {
-            background: var(--sber-green);
-            border-color: var(--sber-green);
+            background: linear-gradient(160deg, var(--sber-green) 0%, var(--sber-green-hover) 100%);
+            border-color: var(--sber-green-hover);
+            box-shadow:
+                0 2px 10px rgba(10, 128, 59, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
 
+        [data-theme="dark"] .sl-checkbox:checked,
+        [data-theme="dark"] .custom-checkbox:checked {
+            box-shadow:
+                0 2px 12px rgba(33, 160, 56, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.12);
+        }
+
+        .sl-checkbox:checked::after,
         .custom-checkbox:checked::after {
-            content: '\2713';
+            content: '';
             position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 13px;
-            color: #fff;
-            font-weight: 800;
+            left: 6px;
+            top: 2px;
+            width: 5px;
+            height: 10px;
+            border: solid #fff;
+            border-width: 0 2.5px 2.5px 0;
+            transform: rotate(45deg);
+            border-radius: 0 1px 0 0;
+            box-sizing: border-box;
         }
 
+        .sl-checkbox:focus-visible,
         .custom-checkbox:focus-visible {
             outline: none;
             box-shadow: 0 0 0 4px var(--light-green);
+        }
+
+        .sl-checkbox:focus-visible:checked,
+        .custom-checkbox:focus-visible:checked {
+            box-shadow: 0 0 0 4px var(--light-green), 0 2px 10px rgba(10, 128, 59, 0.3);
         }
 
         .table-row-selected {
@@ -583,20 +686,23 @@
             box-shadow: 0 0 0 4px var(--light-green);
         }
 
+        .filters-container {
+            position: relative;
+            z-index: 200;
+        }
+
         .filters-panel {
             position: absolute;
             top: calc(100% + 10px);
             right: 0;
             width: 380px;
             max-width: calc(100vw - 40px);
-            background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
-            backdrop-filter: blur(40px) saturate(200%);
-            -webkit-backdrop-filter: blur(40px) saturate(200%);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15), inset 0 2px 2px rgba(255, 255, 255, 0.2);
+            background: #fff;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
             border-radius: 20px;
             padding: 16px;
-            z-index: 1500;
+            z-index: 200;
             opacity: 0;
             visibility: hidden;
             transform: translateY(-10px);
@@ -604,11 +710,9 @@
         }
 
         [data-theme="dark"] .filters-panel {
-            background: linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 2px 2px rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(40px) saturate(200%);
-            -webkit-backdrop-filter: blur(40px) saturate(200%);
+            background: #1a1f1c;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
         }
 
         .filters-panel.show {
@@ -706,27 +810,37 @@
 
 
         .modal-overlay {
-            position: fixed; inset: -20px;
-            background: rgba(0,0,0,0.3); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.35);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             display: none; justify-content: center; align-items: center; z-index: 2000;
-            animation: fadeInOverlay 0.3s ease forwards;
+            animation: fadeInOverlay 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .modal-content {
-            background: var(--white); padding: 30px; border-radius: 24px;
-            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+            background: rgba(var(--white-rgb, 255,255,255), 0.55);
+            padding: 30px; border-radius: 24px;
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            border: 1px solid rgba(255,255,255,0.45);
             width: 800px; max-width: 90%; position: relative;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-            animation: fadeInUp 0.3s ease;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.6);
+            animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1);
             transition: background-color 0.3s, color 0.3s;
+        }
+        [data-theme="dark"] .modal-content {
+            background: rgba(30,32,38, 0.65);
+            border-color: rgba(255,255,255,0.1);
+            box-shadow: 0 24px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
         }
         .modal-close { position: absolute; top: 20px; right: 20px; cursor: pointer; font-size: 20px; color: var(--text-muted); transition: var(--transition); z-index: 10; }
         .modal-close:hover { color: var(--sber-green); transform: scale(1.1); }
         
         .modal-overlay.closing {
-            animation: fadeOutOverlay 0.3s ease forwards;
+            animation: fadeOutOverlay 0.4s cubic-bezier(0.4, 0, 1, 1) forwards;
         }
         .modal-overlay.closing .modal-content {
-            animation: fadeOutDown 0.3s ease forwards;
+            animation: fadeOutDown 0.35s cubic-bezier(0.4, 0, 1, 1) forwards;
         }
 
         .modal-body-split {
@@ -847,12 +961,25 @@
                 <div class="logo-text">STARLIFT</div>
             </div>
             <nav class="nav-menu">
+                {% if user.is_authenticated %}
                 <a href="{% url 'home' %}" class="nav-item"><i class="fa-solid fa-house"></i> <span>Главная</span></a>
                 <a href="{% url 'speakers' %}" class="nav-item"><i class="fa-solid fa-user-group"></i> <span>Спикеры</span></a>
                 <a href="{% url 'events' %}" class="nav-item"><i class="fa-regular fa-calendar-days"></i> <span>Мероприятия</span></a>
+                {% if user.profile.role != 'speaker' %}
                 <a href="{% url 'analytics' %}" class="nav-item"><i class="fa-solid fa-chart-simple"></i> <span>Аналитика</span></a>
+                {% endif %}
                 <a href="{% url 'qr_generator' %}" class="nav-item"><i class="fa-solid fa-qrcode"></i> <span>QR-код</span></a>
-                <a href="{% url 'profile' %}" class="nav-item"><i class="fa-solid fa-gear"></i> <span>Настройки</span></a>
+                {% else %}
+                <a href="{% url 'explore' %}" class="nav-item"><i class="fa-solid fa-compass"></i> <span>Обзор</span></a>
+                {% endif %}
+                {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+                <a href="{% url 'accounts:console_home' %}" class="nav-item"><i class="fa-solid fa-sliders"></i> <span>Админ-консоль</span></a>
+                {% endif %}
+                {% if user.is_authenticated %}
+                <a href="{% url 'accounts:profile' %}" class="nav-item"><i class="fa-solid fa-gear"></i> <span>Настройки</span></a>
+                {% else %}
+                <a href="{% url 'accounts:login' %}" class="nav-item"><i class="fa-solid fa-right-to-bracket"></i> <span>Вход</span></a>
+                {% endif %}
             </nav>
         </div>
         <div class="sidebar-bottom-logo animate-fade" style="animation-delay: 0.5s;">
@@ -862,23 +989,66 @@
 
     <main>
         <header class="main-header animate-fade">
+            {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+            <div class="notif-wrap">
+                <button class="theme-toggle" id="notifToggle" title="Уведомления" aria-haspopup="true" aria-expanded="false">
+                    <i class="fa-solid fa-bell"></i>
+                    <span class="notif-badge" id="notifBadge">0</span>
+                </button>
+                <div class="notif-dropdown" id="notifDropdown" role="menu">
+                    <div class="notif-dropdown-header">
+                        <span>Заявки на рассмотрении</span>
+                        <a href="{% url 'accounts:event_requests' %}" class="nav-item" style="font-size: 12px; color: var(--sber-green); text-decoration: none; padding: 0;">Все →</a>
+                    </div>
+                    <div id="notifList">
+                        <div class="notif-empty">Загрузка…</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
             <button class="theme-toggle" id="themeToggle" title="Переключить тему">
                 <i class="fa-solid fa-moon"></i>
             </button>
             <div class="admin-profile-container">
                 <div class="admin-profile" id="profileTrigger">
                     <div class="admin-info">
-                        <span class="admin-name">Анастасия Сберская</span>
-                        <span class="admin-role">Администратор</span>
+                        <span class="admin-name">{% if user.is_authenticated %}{{ user.get_full_name|default:user.username }}{% else %}Гость{% endif %}</span>
+                        <span class="admin-role">
+                            {% if user.is_authenticated %}
+                                {% if user.is_superuser %}Суперпользователь{% elif user.profile.role == 'admin' %}Администратор{% elif user.profile.role == 'speaker' %}Спикер{% else %}Пользователь{% endif %}
+                            {% else %}
+                                Гость
+                            {% endif %}
+                        </span>
                     </div>
-                    <img src="https://i.pravatar.cc/150?u=admin" alt="Admin" class="admin-avatar">
+                    {% if user.is_authenticated and header_avatar_url %}
+                    <img class="admin-avatar" src="{{ header_avatar_url }}" alt="{{ user.username }}">
+                    {% else %}
+                    <div class="admin-avatar" style="display:flex; align-items:center; justify-content:center; background:var(--light-green); color:var(--sber-green); font-weight:700;">
+                        {% if user.is_authenticated %}
+                            {{ user.first_name|default:user.username|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}
+                        {% else %}
+                            G
+                        {% endif %}
+                    </div>
+                    {% endif %}
                     <i class="fa-solid fa-chevron-down" style="font-size: 12px; color: #70757a;"></i>
                 </div>
                 <div class="dropdown-menu" id="dropdownMenu">
-                    <a href="{% url 'profile' %}" class="dropdown-item"><i class="fa-regular fa-user"></i> Мой профиль</a>
-                    <a href="#" class="dropdown-item"><i class="fa-solid fa-headset"></i> Поддержка</a>
-                    <hr style="margin: 5px 0; border: 0; border-top: 1px solid var(--border-color);">
-                    <a href="#" class="dropdown-item" style="color: #EB5757;"><i class="fa-solid fa-power-off"></i> Выход</a>
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'accounts:profile' %}" class="dropdown-item"><i class="fa-regular fa-user"></i> Мой профиль</a>
+                        {% if user.is_superuser or user.profile.role == 'admin' %}
+                        <a href="{% url 'accounts:console_home' %}" class="dropdown-item"><i class="fa-solid fa-sliders"></i> Админ-консоль</a>
+                        {% endif %}
+                        <a href="{% url 'accounts:password_change' %}" class="dropdown-item"><i class="fa-solid fa-key"></i> Сменить пароль</a>
+                        <hr style="margin: 5px 0; border: 0; border-top: 1px solid var(--border-color);">
+                        <form method="post" action="{% url 'accounts:logout' %}" style="margin:0;">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item" style="color: #EB5757; background:none; border:none; width:100%; text-align:left; cursor:pointer; font:inherit;"><i class="fa-solid fa-power-off"></i> Выход</button>
+                        </form>
+                    {% else %}
+                        <a href="{% url 'accounts:login' %}" class="dropdown-item"><i class="fa-solid fa-right-to-bracket"></i> Войти</a>
+                    {% endif %}
                 </div>
             </div>
         </header>
@@ -921,6 +1091,94 @@
             const currentTheme = document.documentElement.getAttribute('data-theme');
             setTheme(currentTheme === 'dark' ? 'light' : 'dark');
         });
+
+        // --- Колокольчик уведомлений (для админа) ---
+        {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+        (function() {
+            const toggle = document.getElementById('notifToggle');
+            const dropdown = document.getElementById('notifDropdown');
+            const badge = document.getElementById('notifBadge');
+            const list = document.getElementById('notifList');
+            if (!toggle || !dropdown || !badge || !list) return;
+
+            function getCsrf() {
+                const m = document.cookie.match(/csrftoken=([^;]+)/);
+                return m ? m[1] : '';
+            }
+            function escapeHtml(s) {
+                return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            }
+
+            async function loadNotifs() {
+                try {
+                    const r = await fetch('/api/admin/pending-requests/', { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    if (!r.ok) return;
+                    const data = await r.json();
+                    badge.textContent = data.count > 99 ? '99+' : String(data.count);
+                    badge.classList.toggle('has', data.count > 0);
+                    if (!data.requests.length) {
+                        list.innerHTML = '<div class="notif-empty">Новых заявок нет</div>';
+                        return;
+                    }
+                    list.innerHTML = data.requests.map(r => {
+                        const head = r.kind === 'create' ? 'Новое мероприятие' : 'Заявка на участие';
+                        const title = escapeHtml(r.event_title || '—');
+                        const meta = [escapeHtml(r.speaker_name)];
+                        if (r.topic) meta.push('Тема: ' + escapeHtml(r.topic));
+                        return `<div class="notif-item" data-req-id="${r.id}">
+                            <p class="notif-item-title">${escapeHtml(head)}: ${title}</p>
+                            <div class="notif-item-meta">${meta.join(' · ')}</div>
+                            <div class="notif-actions">
+                                <button type="button" class="notif-approve" data-action="approve"><i class="fa-solid fa-check"></i> Одобрить</button>
+                                <a class="notif-open" href="/console/event-requests/?status=pending">Открыть</a>
+                            </div>
+                        </div>`;
+                    }).join('');
+                } catch (e) { /* silent */ }
+            }
+
+            list.addEventListener('click', async (e) => {
+                const btn = e.target.closest('button[data-action="approve"]');
+                if (!btn) return;
+                const item = btn.closest('.notif-item');
+                const id = item && item.dataset.reqId;
+                if (!id) return;
+                btn.disabled = true;
+                try {
+                    const r = await fetch(`/api/admin/quick-approve/${id}/`, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': getCsrf(), 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+                    if (r.ok) {
+                        item.style.opacity = '0.4';
+                        loadNotifs();
+                    } else {
+                        btn.disabled = false;
+                    }
+                } catch (err) { btn.disabled = false; }
+            });
+
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const willOpen = !dropdown.classList.contains('show');
+                dropdown.classList.toggle('show', willOpen);
+                toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                if (willOpen) loadNotifs();
+            });
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.notif-wrap')) {
+                    dropdown.classList.remove('show');
+                    toggle.setAttribute('aria-expanded', 'false');
+                }
+            });
+
+            // первичная загрузка счётчика, обновление каждые 60 секунд и при возврате на вкладку
+            loadNotifs();
+            setInterval(loadNotifs, 60000);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) loadNotifs(); });
+        })();
+        {% endif %}
 
         const trigger = document.getElementById('profileTrigger');
         const menu = document.getElementById('dropdownMenu');
@@ -1009,6 +1267,30 @@
             particlesContainer.appendChild(particle);
         }
 
+        // --- Глобальный preload данных спикеров (для members) ---
+        {% if user.is_authenticated and user.profile.role != 'guest' %}
+        (function() {
+            var _fetching = false;
+            function prefetchSpeakers() {
+                if (_fetching) return;
+                _fetching = true;
+                fetch('/api/speakers/', { credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(function(r) { return r.ok ? r.json() : null; })
+                    .then(function(data) { if (Array.isArray(data)) window.__starliftSpeakersCache = data; })
+                    .catch(function() {})
+                    .finally(function() { _fetching = false; });
+            }
+            // Первый запрос через 800мс после загрузки (не блокирует рендер)
+            setTimeout(prefetchSpeakers, 800);
+            // Обновление каждые 5 минут
+            setInterval(prefetchSpeakers, 5 * 60 * 1000);
+            // Обновление при возврате на вкладку
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) prefetchSpeakers();
+            });
+        })();
+        {% endif %}
+
         // --- SPA Navigation ---
         document.addEventListener('DOMContentLoaded', () => {
             const pageContent = document.getElementById('page-content');
@@ -1045,7 +1327,14 @@
                     await new Promise(resolve => setTimeout(resolve, 300)); 
 
                     // 2. Загрузка новой страницы
-                    const response = await fetch(url);
+                    const response = await fetch(url, { redirect: 'follow', credentials: 'same-origin' });
+                    // Если сервер завернул на логин (302 → /auth/login/), делаем полный reload
+                    // так как SPA-вставка HTML логина в текущий layout ломает верстку и CSRF.
+                    const landed = new URL(response.url, window.location.origin);
+                    if (response.redirected || landed.pathname.startsWith('/auth/')) {
+                        window.location.href = response.url;
+                        return;
+                    }
                     if (!response.ok) throw new Error('Network response was not ok');
                     const htmlString = await response.text();
 
@@ -1076,6 +1365,21 @@
 
                         // Запускаем кастомное событие для скриптов, ожидающих загрузки контента
                         document.dispatchEvent(new Event('spa-page-loaded'));
+
+                        // Страница «Спикеры»: подтянуть данные и открыть pending спикера если нужно.
+                        requestAnimationFrame(() => {
+                            if (!document.querySelector('.speakers-page')) return;
+                            if (typeof window.loadStarliftSpeakersData === 'function') {
+                                const p = window.loadStarliftSpeakersData();
+                                const pid = window.__pendingOpenSpeakerId;
+                                if (pid != null) {
+                                    window.__pendingOpenSpeakerId = null;
+                                    Promise.resolve(p).then(() => {
+                                        if (typeof window.showEvents === 'function') window.showEvents(pid);
+                                    });
+                                }
+                            }
+                        });
                     } else {
                         // Резервный вариант, если что-то пошло не так
                         window.location.href = url;
@@ -1092,6 +1396,12 @@
                     window.location.href = url; // Фолбэк на обычный переход при ошибке
                 }
             }
+
+            window.spaNavigateTo = navigateTo;
+            window.spaPushStateAndUpdate = function(url) {
+                window.history.pushState({}, '', url);
+                updateNavActive(url);
+            };
 
             function updateNavActive(url) {
                 const path = new URL(url).pathname;
@@ -1116,8 +1426,9 @@
                         // Если скрипт внешний
                         newScript.src = oldScript.src;
                     } else {
-                        // Если скрипт инлайновый
-                        newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+                        // text / textContent надёжнее innerHTML для узлов из DOMParser
+                        const code = oldScript.textContent || oldScript.text || oldScript.innerHTML || '';
+                        newScript.appendChild(document.createTextNode(code));
                     }
                     oldScript.parentNode.replaceChild(newScript, oldScript);
                 });

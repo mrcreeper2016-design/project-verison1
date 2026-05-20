@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .profile-page { display: grid; gap: 20px; max-width: 980px; }
+    .profile-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .profile-title { margin: 0; font-size: clamp(26px, 3vw, 36px); font-weight: 800; letter-spacing: -0.03em; color: var(--text-main); }
+    .profile-subtitle { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; line-height: 1.5; }
+    .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    @media (max-width: 900px) { .profile-grid { grid-template-columns: 1fr; } }
+    .profile-card { display: grid; gap: 16px; padding: 24px; }
+    .section-title { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 10px; }
+    .form-row { display: grid; gap: 6px; }
+    .form-row label { font-size: 13px; font-weight: 700; color: var(--text-muted); }
+    .form-row input, .form-row textarea { width: 100%; background: var(--white); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px 12px; font-size: 14px; font-family: inherit; outline: none; transition: var(--transition); }
+    .form-row input:focus, .form-row textarea:focus { border-color: var(--sber-green); box-shadow: 0 0 0 4px var(--light-green); }
+    .form-row textarea { min-height: 110px; resize: vertical; }
+    .field-errors { color: #D93E4E; font-size: 12px; }
+    .field-errors p { margin: 2px 0; }
+    .alert-inline { padding: 10px 12px; border-radius: 10px; font-size: 13px; border: 1px solid transparent; }
+    .alert-success { background: var(--light-green); color: var(--sber-green); border-color: rgba(10,128,59,0.25); }
+    .alert-warning { background: rgba(224,165,0,0.1); color: #B87C00; border-color: rgba(224,165,0,0.3); }
+    .alert-error { background: rgba(217,62,78,0.1); color: #D93E4E; border-color: rgba(217,62,78,0.3); }
+    .readonly-box { padding: 12px 14px; background: var(--white); border: 1px solid var(--border-color); border-radius: 12px; font-size: 14px; color: var(--text-main); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .role-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; background: var(--light-green); color: var(--sber-green); border: 1px solid var(--border-color); }
+</style>
+
+<div class="profile-page">
+    <div class="profile-header animate-fade">
+        <div>
+            <h1 class="profile-title">Личный кабинет</h1>
+            <p class="profile-subtitle">
+                {% if speaker_card_linked %}
+                Имя, фото и описание — как в списке спикеров на платформе.
+                {% elif is_speaker_role %}
+                Имя, фото и текст о себе. После привязки карточки спикера поле «Описание» появится здесь же.
+                {% else %}
+                Имя, фамилия, email, пароль и краткая информация. Изменения сохраняются сразу.
+                {% endif %}
+            </p>
+        </div>
+        <span class="role-badge"><i class="fa-solid fa-id-badge"></i> {{ profile.get_role_display }}</span>
+    </div>
+
+    {% if messages %}
+        {% for msg in messages %}
+        <div class="alert-inline {% if msg.tags == 'error' %}alert-error{% elif msg.tags == 'success' %}alert-success{% else %}alert-warning{% endif %}">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="profile-grid">
+        <div style="display:grid; gap:20px;">
+        <div class="content-block profile-card animate-fade">
+            <div class="section-title"><i class="fa-solid fa-user"></i> Основное</div>
+
+            <form method="post" enctype="multipart/form-data" style="display:grid; gap:12px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="profile">
+                <div class="form-row">
+                    <label for="{{ form.avatar.id_for_label }}">Аватар</label>
+                    <div class="readonly-box">
+                        {% if profile.avatar_url %}
+                        <img src="{{ profile.avatar_url }}" alt="{{ user.username }}" style="width:56px; height:56px; border-radius:12px; object-fit:cover; border:1px solid var(--border-color);">
+                        {% elif linked_speaker and linked_speaker.card_avatar_url %}
+                        <img src="{{ linked_speaker.card_avatar_url }}" alt="{{ user.username }}" style="width:56px; height:56px; border-radius:12px; object-fit:cover; border:1px solid var(--border-color);">
+                        {% else %}
+                        <div style="width:56px; height:56px; border-radius:12px; border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--sber-green); background:var(--light-green);">
+                            {{ user.first_name|default:user.username|slice:":1"|upper }}
+                        </div>
+                        {% endif %}
+                        <div style="display:grid; gap:6px;">
+                            {{ form.avatar }}
+                            <span style="font-size:12px; color:var(--text-muted);">JPG/PNG/WEBP, до 10 МБ — одно фото для аккаунта и карточки спикера.</span>
+                        </div>
+                    </div>
+                    {% if form.avatar.errors %}<div class="field-errors">{% for e in form.avatar.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                <div class="form-row">
+                    <label for="{{ form.first_name.id_for_label }}">Имя</label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}<div class="field-errors">{% for e in form.first_name.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                <div class="form-row">
+                    <label for="{{ form.last_name.id_for_label }}">Фамилия</label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}<div class="field-errors">{% for e in form.last_name.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                <div class="form-row">
+                    <label>Имя пользователя</label>
+                    <div class="readonly-box">
+                        <span>{{ user.username }}</span>
+                        <span style="font-size:12px; color:var(--text-muted);">Неизменно</span>
+                    </div>
+                </div>
+                {% if is_speaker_role and not linked_speaker %}
+                <div class="alert-inline alert-warning">
+                    Карточка спикера в базе ещё не привязана. Обратитесь к администратору — после привязки здесь же появится поле «Описание» для ленты спикеров.
+                </div>
+                {% endif %}
+                {% if speaker_card_linked %}
+                <div class="form-row">
+                    <label for="{{ form.company.id_for_label }}">{{ form.company.label }}</label>
+                    {{ form.company }}
+                    {% if form.company.errors %}<div class="field-errors">{% for e in form.company.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                </div>
+                {% endif %}
+                <div class="form-row">
+                    {% if speaker_card_linked %}
+                    <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+                    {{ form.description }}
+                    {% if form.description.errors %}<div class="field-errors">{% for e in form.description.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                    {% else %}
+                    <label for="{{ form.bio.id_for_label }}">{{ form.bio.label }}</label>
+                    {{ form.bio }}
+                    {% if form.bio.errors %}<div class="field-errors">{% for e in form.bio.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
+                    {% endif %}
+                </div>
+                <div style="display:flex; gap:10px; margin-top:4px;">
+                    <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-floppy-disk"></i> Сохранить</button>
+                </div>
+            </form>
+        </div>
+        </div>
+
+        <div style="display:grid; gap:20px;">
+            <div class="content-block profile-card animate-fade" style="animation-delay:0.08s;">
+                <div class="section-title"><i class="fa-solid fa-envelope"></i> Email</div>
+                <div class="readonly-box">
+                    <span>{{ user.email|default:"Не указан" }}</span>
+                    {% if profile.email_verified %}<span class="role-badge" style="background:var(--light-green);"><i class="fa-solid fa-check"></i> Подтверждён</span>{% else %}<span class="role-badge" style="background:rgba(224,165,0,0.15); color:#B87C00;"><i class="fa-solid fa-triangle-exclamation"></i> Не подтверждён</span>{% endif %}
+                </div>
+                {% if pending_email %}
+                <div class="alert-inline alert-warning">Ожидает подтверждения: <strong>{{ pending_email }}</strong>. Проверьте почту и перейдите по ссылке.</div>
+                {% endif %}
+                <div>
+                    <a href="{% url 'accounts:email_change' %}" class="btn-action" style="background:var(--white); color:var(--text-main); border:1px solid var(--border-color); text-decoration:none;"><i class="fa-solid fa-pen"></i> Сменить email</a>
+                </div>
+            </div>
+
+            <div class="content-block profile-card animate-fade" style="animation-delay:0.12s;">
+                <div class="section-title"><i class="fa-solid fa-shield-halved"></i> Пароль</div>
+                <p style="margin:0; color:var(--text-muted); font-size:13px;">Не менее 8 символов, не только цифры и не только специальные символы.</p>
+                <div>
+                    <a href="{% url 'accounts:password_change' %}" class="btn-action btn-contact" style="text-decoration:none;"><i class="fa-solid fa-key"></i> Сменить пароль</a>
+                </div>
+            </div>
+
+            <div class="content-block profile-card animate-fade" style="animation-delay:0.16s;">
+                <div class="section-title"><i class="fa-solid fa-arrow-right-from-bracket"></i> Сессия</div>
+                <p style="margin:0; color:var(--text-muted); font-size:13px;">Выход завершает текущую сессию и возвращает на страницу входа.</p>
+                <form method="post" action="{% url 'accounts:logout' %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-action" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3);"><i class="fa-solid fa-power-off"></i> Выйти из системы</button>
+                </form>
+            </div>
+
+            {% if profile.role == 'speaker' %}
+            <div class="content-block profile-card animate-fade" style="animation-delay:0.20s;">
+                <div class="section-title"><i class="fa-solid fa-inbox"></i> Мои заявки</div>
+                <div id="myRequestsList" style="display:grid; gap:10px; font-size:13px;">
+                    <p style="margin:0; color:var(--text-muted);">Загрузка…</p>
+                </div>
+            </div>
+            <script>
+            (function() {
+                const STATUS_CHIP = {
+                    pending: '<span style="display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; background:rgba(224,165,0,0.15); color:#B87C00;">На рассмотрении</span>',
+                    approved: '<span style="display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; background:var(--light-green); color:var(--sber-green);">Одобрено</span>',
+                    rejected: '<span style="display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; background:rgba(217,62,78,0.1); color:#D93E4E;">Отклонено</span>',
+                };
+                function escapeHtml(s) {
+                    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                }
+                fetch('/api/my-event-requests/', { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                    .then(r => r.ok ? r.json() : { requests: [] })
+                    .then(data => {
+                        const list = document.getElementById('myRequestsList');
+                        if (!list) return;
+                        const items = data.requests || [];
+                        if (!items.length) {
+                            list.innerHTML = '<p style="margin:0; color:var(--text-muted);">Заявок пока нет.</p>';
+                            return;
+                        }
+                        list.innerHTML = items.map(r => {
+                            const head = r.kind === 'create'
+                                ? `<i class="fa-solid fa-plus-circle" style="color:var(--sber-green);"></i> ${escapeHtml(r.proposed_title)}`
+                                : `<i class="fa-solid fa-user-plus" style="color:var(--sber-green);"></i> ${escapeHtml(r.event ? r.event.title : '—')}`;
+                            const meta = [];
+                            if (r.topic) meta.push('Тема: ' + escapeHtml(r.topic));
+                            if (r.proposed_event_date) meta.push('Дата: ' + escapeHtml(r.proposed_event_date));
+                            if (r.proposed_location) meta.push(escapeHtml(r.proposed_location));
+                            const rejected = r.status === 'rejected' && r.rejection_reason
+                                ? `<div style="margin-top:6px; padding:8px; border-radius:8px; background:rgba(217,62,78,0.07); color:#D93E4E; font-size:12px;"><strong>Причина отказа:</strong> ${escapeHtml(r.rejection_reason)}</div>`
+                                : '';
+                            return `<div style="padding:10px 12px; border:1px solid var(--border-color); border-radius:12px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+                                    <strong>${head}</strong>${STATUS_CHIP[r.status] || ''}
+                                </div>
+                                ${meta.length ? `<div style="margin-top:4px; color:var(--text-muted); font-size:12px;">${meta.join(' · ')}</div>` : ''}
+                                ${rejected}
+                            </div>`;
+                        }).join('');
+                    })
+                    .catch(() => {
+                        const list = document.getElementById('myRequestsList');
+                        if (list) list.innerHTML = '<p style="margin:0; color:#D93E4E;">Не удалось загрузить заявки.</p>';
+                    });
+            })();
+            </script>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

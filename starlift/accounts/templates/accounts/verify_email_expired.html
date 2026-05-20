@@ -1,0 +1,16 @@
+{% extends 'accounts/auth_base.html' %}
+
+{% block title %}Ссылка недействительна — StarLift{% endblock %}
+
+{% block content %}
+<h1 class="auth-title"><i class="fa-solid fa-triangle-exclamation" style="color:#E0A500;"></i> Ссылка недействительна</h1>
+<p class="auth-subtitle">
+    {% if reason == 'email_taken' %}
+        Этот email уже занят другим аккаунтом. Вернитесь в профиль и укажите другой адрес.
+    {% else %}
+        Ссылка для подтверждения email истекла или уже была использована. Запросите новую в настройках профиля.
+    {% endif %}
+</p>
+
+<a href="{% url 'accounts:profile' %}" class="btn-primary" style="text-decoration:none; display:inline-flex; justify-content:center; align-items:center; gap:8px;">В профиль</a>
+{% endblock %}

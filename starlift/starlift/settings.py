@@ -25,12 +25,19 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-$!y7q&gyioy-19s!8_5+vlbf@czrczz^v!w8#bd35!f)%(bxh!'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-$!y7q&gyioy-19s!8_5+vlbf@czrczz^v!w8#bd35!f)%(bxh!')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    "192.168.1.126",
+    ".ngrok-free.app",
+    ".ngrok-free.dev",
+]
+CSRF_TRUSTED_ORIGINS = ["https://*.ngrok-free.app", "https://*.ngrok-free.dev"]
 
 
 # Application definition
@@ -42,8 +49,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'accounts',
     'starlift',
 ]
+
+USE_OBJECT_STORAGE = os.getenv("USE_OBJECT_STORAGE", "false").lower() == "true"
+if USE_OBJECT_STORAGE:
+    INSTALLED_APPS.append("storages")
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -68,6 +80,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'accounts.context_processors.header_avatar_url',
             ],
         },
     },
@@ -100,6 +113,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {'min_length': 8},
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -107,7 +121,51 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
+    {
+        'NAME': 'accounts.password_validators.NotOnlySpecialCharsValidator',
+    },
 ]
+
+AUTHENTICATION_BACKENDS = [
+    'accounts.auth_backends.UsernameOrEmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+LOGIN_URL = '/auth/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/auth/login/'
+
+PASSWORD_RESET_TIMEOUT = 60 * 60  # 1 hour
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False  # CSRF cookie is read by JS for AJAX
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '25'))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'false').lower() == 'true'
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'false').lower() == 'true'
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', '10'))
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'no-reply@starlift.local')
+SITE_URL = os.getenv('SITE_URL', 'http://127.0.0.1:8000')
+SITE_NAME = 'StarLift'
+
+# Prefer SSL if both flags are set by mistake.
+if EMAIL_USE_SSL and EMAIL_USE_TLS:
+    EMAIL_USE_TLS = False
+
+# Auth tuning — exposed for tests and ops
+ACCOUNTS_LOCKOUT_THRESHOLD = int(os.getenv('ACCOUNTS_LOCKOUT_THRESHOLD', '6'))
+ACCOUNTS_LOCKOUT_WINDOW_SECONDS = int(os.getenv('ACCOUNTS_LOCKOUT_WINDOW_SECONDS', '60'))
+ACCOUNTS_INVITE_TTL_DAYS = int(os.getenv('ACCOUNTS_INVITE_TTL_DAYS', '7'))
+ACCOUNTS_EMAIL_CHANGE_TTL_HOURS = int(os.getenv('ACCOUNTS_EMAIL_CHANGE_TTL_HOURS', '24'))
+ACCOUNTS_RESET_EMAIL_MIN_INTERVAL_SECONDS = int(os.getenv('ACCOUNTS_RESET_EMAIL_MIN_INTERVAL_SECONDS', '300'))
 
 
 # Internationalization
@@ -127,7 +185,48 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-
-MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+if USE_OBJECT_STORAGE:
+    STORAGE_ENDPOINT_URL = os.getenv("STORAGE_ENDPOINT_URL", "").strip()
+    STORAGE_BUCKET_NAME = os.getenv("STORAGE_BUCKET_NAME", "").strip()
+    STORAGE_ACCESS_KEY = os.getenv("STORAGE_ACCESS_KEY", "").strip()
+    STORAGE_SECRET_KEY = os.getenv("STORAGE_SECRET_KEY", "").strip()
+    STORAGE_REGION = os.getenv("STORAGE_REGION", "").strip()
+    STORAGE_PUBLIC_BASE_URL = os.getenv("STORAGE_PUBLIC_BASE_URL", "").strip()
+    STORAGE_ADDRESSING_STYLE = os.getenv("STORAGE_ADDRESSING_STYLE", "auto").strip() or "auto"
+
+    if not STORAGE_BUCKET_NAME:
+        raise RuntimeError("USE_OBJECT_STORAGE=true requires STORAGE_BUCKET_NAME")
+    if not STORAGE_ACCESS_KEY or not STORAGE_SECRET_KEY:
+        raise RuntimeError("USE_OBJECT_STORAGE=true requires STORAGE_ACCESS_KEY and STORAGE_SECRET_KEY")
+
+    AWS_ACCESS_KEY_ID = STORAGE_ACCESS_KEY
+    AWS_SECRET_ACCESS_KEY = STORAGE_SECRET_KEY
+    AWS_STORAGE_BUCKET_NAME = STORAGE_BUCKET_NAME
+    AWS_S3_REGION_NAME = STORAGE_REGION or None
+    AWS_S3_ENDPOINT_URL = STORAGE_ENDPOINT_URL or None
+    AWS_S3_ADDRESSING_STYLE = STORAGE_ADDRESSING_STYLE
+    AWS_S3_SIGNATURE_VERSION = "s3v4"
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = False
+    AWS_S3_FILE_OVERWRITE = False
+
+    STORAGES = {
+        "default": {"BACKEND": "storages.backends.s3.S3Storage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    }
+
+    if STORAGE_PUBLIC_BASE_URL:
+        storage_base = STORAGE_PUBLIC_BASE_URL.rstrip("/")
+        custom_domain = storage_base.replace("https://", "").replace("http://", "")
+        AWS_S3_CUSTOM_DOMAIN = custom_domain
+        MEDIA_URL = f"{storage_base}/"
+    else:
+        MEDIA_URL = "/media/"
+else:
+    MEDIA_URL = '/media/'
+
+# Legal documents
+LEGAL_DOC_VERSION = "2026-05-10"
 

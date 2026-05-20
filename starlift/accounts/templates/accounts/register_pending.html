@@ -1,0 +1,28 @@
+{% extends 'accounts/auth_base.html' %}
+
+{% block title %}Проверьте почту — StarLift{% endblock %}
+
+{% block content %}
+<h1 class="auth-title">Почти готово</h1>
+<p class="auth-subtitle">
+    Мы отправили письмо со ссылкой для активации{% if email %} на <strong>{{ email }}</strong>{% endif %}.
+    Перейдите по ссылке из письма, чтобы подтвердить email и войти в систему.
+</p>
+
+<div class="alert alert-info" style="display:flex; gap:12px; align-items:flex-start;">
+    <i class="fa-solid fa-envelope" style="font-size:20px; margin-top:2px;"></i>
+    <div>
+        <div style="font-weight:700; margin-bottom:4px;">Что дальше</div>
+        <div style="font-size:13px; line-height:1.5;">
+            1. Найдите письмо от StarLift во входящих (или в «Спам»).<br>
+            2. Перейдите по ссылке — аккаунт активируется автоматически.<br>
+            3. После этого вы сможете войти и увидеть сводную статистику.
+        </div>
+    </div>
+</div>
+
+<div class="auth-footer-note">
+    Не пришло письмо? Проверьте папку «Спам» или свяжитесь с администратором.<br>
+    <a href="{% url 'accounts:login' %}" style="color: var(--sber-green); font-weight: 600;">← Вернуться ко входу</a>
+</div>
+{% endblock %}

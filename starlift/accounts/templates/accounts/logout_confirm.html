@@ -1,0 +1,17 @@
+{% extends 'accounts/auth_base.html' %}
+
+{% block title %}Выход — StarLift{% endblock %}
+
+{% block content %}
+<h1 class="auth-title">Выйти из системы?</h1>
+<p class="auth-subtitle">Вы уверены, что хотите завершить сессию?</p>
+
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn-primary"><i class="fa-solid fa-power-off"></i> Выйти</button>
+</form>
+
+<div class="auth-links" style="justify-content:center;">
+    <a href="{% url 'home' %}">Вернуться на главную</a>
+</div>
+{% endblock %}

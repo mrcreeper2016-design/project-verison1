@@ -1,9 +1,63 @@
 {% extends 'base.html' %}
 {% block content %}
+<script>window.__isAdmin = {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}true{% else %}false{% endif %};</script>
 <style>
+    .ev-form { display: grid; gap: 12px; }
+    .ev-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; }
+    @media (max-width: 600px) { .ev-form-grid { grid-template-columns: 1fr; } }
+    .ev-form label { display: grid; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-muted); min-width: 0; }
+    .ev-form input, .ev-form textarea {
+        box-sizing: border-box; width: 100%; max-width: 100%;
+        background: var(--white); color: var(--text-main);
+        border: 1px solid var(--border-color); border-radius: 10px;
+        padding: 9px 12px; font-size: 13px; font-family: inherit; outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+    .ev-form input:hover, .ev-form textarea:hover { border-color: rgba(10,128,59,0.45); }
+    .ev-form input:focus, .ev-form textarea:focus {
+        border-color: var(--sber-green); box-shadow: 0 0 0 4px var(--light-green);
+    }
+    .ev-form textarea { min-height: 70px; resize: vertical; line-height: 1.45; }
+    .ev-form input::placeholder, .ev-form textarea::placeholder { color: var(--text-muted); opacity: 0.6; }
+    [data-theme="dark"] .ev-form input, [data-theme="dark"] .ev-form textarea {
+        background: rgba(255,255,255,0.04);
+        border-color: rgba(255,255,255,0.12);
+    }
+    [data-theme="dark"] .ev-form input:focus, [data-theme="dark"] .ev-form textarea:focus {
+        background: rgba(255,255,255,0.07);
+        box-shadow: 0 0 0 4px rgba(10,128,59,0.18);
+    }
+    .ev-form input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(0.4); cursor: pointer;
+    }
+    [data-theme="dark"] .ev-form input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(0.85);
+    }
+    .ev-form-submit {
+        padding: 12px 16px; border-radius: 12px; background: var(--sber-green); color: #fff;
+        border: none; font-weight: 700; cursor: pointer; font-size: 14px;
+        transition: transform 0.15s, box-shadow 0.2s;
+    }
+    .ev-form-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(10,128,59,0.3); }
+    .ev-form-msg { font-size: 13px; min-height: 18px; }
+    .ev-form-modal-title { margin: 0 0 16px; font-size: 22px; font-weight: 800; color: var(--text-main); letter-spacing: -0.02em; }
+    .ev-form-subtitle { margin: 0 0 16px; color: var(--text-muted); font-size: 14px; }
+
     .events-page {
         display: grid;
         gap: 20px;
+    }
+
+    .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect( 0, 0, 0, 0 );
+        white-space: nowrap;
+        border: 0;
     }
 
     .events-header {
@@ -255,10 +309,213 @@
         gap: 10px;
     }
 
+    .events-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+        padding: 16px 18px;
+        border-radius: 18px;
+        border: 1px solid var(--border-color);
+        background: var(--glass-bg);
+        position: relative;
+        z-index: 10;
+    }
+
+    .events-search-wrap {
+        flex: 1;
+        min-width: 220px;
+    }
+
+    .events-search {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1px solid var(--border-color);
+        background: var(--panel-bg);
+        color: var(--text-main);
+        font-size: 15px;
+        font-family: inherit;
+        transition: var(--transition);
+    }
+
+    .events-search:focus {
+        outline: none;
+        border-color: rgba(10, 128, 59, 0.45);
+        box-shadow: 0 0 0 3px rgba(10, 128, 59, 0.12);
+    }
+
+    .events-search::placeholder {
+        color: var(--text-muted);
+    }
+
+    .filter-toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        color: var(--text-main);
+        cursor: pointer;
+        user-select: none;
+        font-weight: 500;
+    }
+
+    .filter-toggle .sl-checkbox {
+        margin-top: 1px;
+    }
+
+    .event-speakers-block {
+        margin: 0 0 14px;
+        display: grid;
+        gap: 8px;
+    }
+
+    .event-speakers-block .stacked-avatars {
+        flex-wrap: wrap;
+    }
+
+    .event-speakers-names {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.45;
+        color: var(--text-muted);
+        font-weight: 500;
+    }
+
+    .event-speaker-link {
+        color: var(--sber-green);
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .event-speaker-link:hover {
+        text-decoration: underline;
+    }
+
+    .event-speaker-sep {
+        color: var(--text-muted);
+        font-weight: 500;
+    }
+
+    .events-empty {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-muted);
+        font-size: 15px;
+    }
+
+
+    #eventModalOverlay.modal-overlay {
+        align-items: flex-start;
+        padding: 24px 12px;
+        overflow-y: auto;
+    }
+
+    #eventModalOverlay .modal-content.event-detail-modal {
+        width: min(1120px, calc(100vw - 24px));
+        max-width: none;
+        max-height: none;
+        margin: auto;
+        padding: 28px 32px 32px;
+        box-sizing: border-box;
+        overflow: visible;
+    }
+
+    .event-detail-modal .event-modal-grid {
+        grid-template-columns: minmax(280px, 1fr) minmax(320px, 1fr);
+        align-items: start;
+    }
+
+    .event-modal-scroll-col {
+        min-height: 0;
+        max-height: min(72vh, 900px);
+        overflow-y: auto;
+        padding-right: 6px;
+        scrollbar-gutter: stable;
+    }
+
+    .event-desc-wrap {
+        margin-top: 4px;
+    }
+
+    .event-desc-body {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.55;
+        color: var(--text-muted);
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+    }
+
+    .event-desc-body.is-collapsed {
+        max-height: 7.2rem;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .event-desc-body.is-collapsed::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 2.25rem;
+        background: linear-gradient(to bottom, transparent, var(--panel-bg));
+        pointer-events: none;
+    }
+
+    .event-desc-toggle {
+        margin-top: 10px;
+        padding: 0;
+        border: none;
+        background: none;
+        color: var(--sber-green);
+        font-size: 14px;
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .event-desc-toggle:hover {
+        text-decoration: underline;
+    }
+
+    .event-desc-toggle.is-visible {
+        display: inline-flex;
+    }
+
+    .event-schedule-scroll {
+        max-height: min(38vh, 360px);
+        overflow-y: auto;
+        padding-right: 4px;
+        word-break: break-word;
+    }
+
     @media (max-width: 960px) {
         .events-grid,
         .event-modal-grid {
             grid-template-columns: 1fr;
+        }
+
+        #eventModalOverlay .modal-content.event-detail-modal {
+            width: calc(100vw - 16px);
+            padding: 22px 18px;
+        }
+
+        .event-modal-scroll-col {
+            max-height: none;
+            overflow: visible;
+            padding-right: 0;
+        }
+
+        .event-schedule-scroll {
+            max-height: 42vh;
         }
     }
 </style>
@@ -272,116 +529,572 @@
         <span class="badge-active" id="activeEventsBadge"><i class="fa-solid fa-calendar-days"></i> Загрузка...</span>
     </div>
 
+    <div class="events-toolbar animate-fade" style="margin-top:4px;">
+        <div class="events-search-wrap">
+            <label class="visually-hidden" for="eventsSearch">Поиск мероприятий</label>
+            <input type="search" class="events-search" id="eventsSearch" placeholder="Поиск по названию, месту, описанию, спикерам…" autocomplete="off">
+        </div>
+        <div class="filters-container">
+            <button type="button" class="filters-toggle" id="evFiltersToggle" aria-haspopup="dialog" aria-expanded="false">
+                <i class="fa-solid fa-filter"></i>
+                Фильтры
+            </button>
+            <div class="filters-panel" id="evFiltersPanel" role="dialog" aria-label="Фильтры мероприятий">
+                <div class="filters-panel-title">
+                    <span>Фильтры</span>
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Esc / клик вне — закрыть</span>
+                </div>
+                <div class="filters-grid">
+                    <div class="filter-field" style="grid-column: 1 / -1;">
+                        <label for="eventsSort" style="font-size:12px; font-weight:600; color:var(--text-muted);">Сортировка</label>
+                        <select class="select-compact" id="eventsSort" aria-label="Сортировка списка">
+                            <option value="date_asc" selected>Дата: сначала ближайшие</option>
+                            <option value="date_desc">Дата: сначала поздние</option>
+                            <option value="title_asc">Название А → Я</option>
+                            <option value="title_desc">Название Я → А</option>
+                        </select>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-toggle">
+                            <input type="checkbox" id="filterSoon" class="sl-checkbox">
+                            <span>В ближайшие 30 дней</span>
+                        </label>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-toggle">
+                            <input type="checkbox" id="filterHidePast" class="sl-checkbox">
+                            <span>Скрыть прошедшие</span>
+                        </label>
+                    </div>
+                    <div class="filter-field">
+                        <label class="filter-toggle">
+                            <input type="checkbox" id="filterSber" class="sl-checkbox">
+                            <span>Только Сбер</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% if user.is_authenticated and user.profile.role == 'speaker' %}
+        <button type="button" class="btn-action" id="btnProposeEvent" style="padding: 8px 14px; border-radius: 12px; background: var(--sber-green); color: #fff; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-plus"></i> Предложить мероприятие
+        </button>
+        {% endif %}
+        {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+        <button type="button" class="btn-action" id="btnAdminCreateEvent" style="padding: 8px 14px; border-radius: 12px; background: var(--sber-green); color: #fff; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-plus"></i> Создать мероприятие
+        </button>
+        {% endif %}
+    </div>
+
     <div class="events-grid" id="eventsContainer">
     <!-- Данные будут загружены динамически -->
 </div>
 </div>
 
 <script>
+(function() {
+'use strict';
 let eventsDataCache = {};
+let allEvents = [];
+const SOON_DAYS = 30;
+
+const RU_MONTHS_GEN = {
+    'января': 0, 'февраля': 1, 'марта': 2, 'апреля': 3, 'мая': 4, 'июня': 5,
+    'июля': 6, 'августа': 7, 'сентября': 8, 'октября': 9, 'ноября': 10, 'декабря': 11
+};
+
+const RU_MONTHS_NOM = {
+    'январь': 0, 'февраль': 1, 'март': 2, 'апрель': 3, 'май': 4, 'июнь': 5,
+    'июль': 6, 'август': 7, 'сентябрь': 8, 'октябрь': 9, 'ноябрь': 10, 'декабрь': 11
+};
+
+function monthIndexRu(word) {
+    const w = word.toLowerCase();
+    if (RU_MONTHS_GEN[w] !== undefined) return RU_MONTHS_GEN[w];
+    if (RU_MONTHS_NOM[w] !== undefined) return RU_MONTHS_NOM[w];
+    return undefined;
+}
+
+function pushDateCandidate(arr, y, mo0, d) {
+    if (y < 1990 || y > 2100 || mo0 < 0 || mo0 > 11 || d < 1 || d > 31) return;
+    const t = new Date(y, mo0, d).getTime();
+    if (!Number.isNaN(t)) arr.push(t);
+}
+
+function inferYearForMonthDayMo0(mo0, day) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const y = today.getFullYear();
+    let cand = new Date(y, mo0, day);
+    if (cand < today) {
+        cand = new Date(y + 1, mo0, day);
+    }
+    return cand.getFullYear();
+}
+
+function parseLooseDateString(raw) {
+    if (raw === null || raw === undefined) return null;
+    const s = String(raw).trim();
+    if (!s || s.toLowerCase() === 'none') return null;
+    const candidates = [];
+    let m;
+
+    const reDmY = /\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b/g;
+    while ((m = reDmY.exec(s)) !== null) {
+        const d = parseInt(m[1], 10);
+        const mo = parseInt(m[2], 10) - 1;
+        const y = parseInt(m[3], 10);
+        pushDateCandidate(candidates, y, mo, d);
+    }
+
+    const reIso = /\b(\d{4})-(\d{2})-(\d{2})\b/g;
+    while ((m = reIso.exec(s)) !== null) {
+        const y = parseInt(m[1], 10);
+        const mo = parseInt(m[2], 10) - 1;
+        const d = parseInt(m[3], 10);
+        pushDateCandidate(candidates, y, mo, d);
+    }
+
+    const reRangeRu = /\b(\d{1,2})\s*[–—-]\s*(\d{1,2})\s+([а-яё]+)\s+(\d{4})\b/giu;
+    while ((m = reRangeRu.exec(s)) !== null) {
+        const d1 = parseInt(m[1], 10);
+        const mon = monthIndexRu(m[3]);
+        const y = parseInt(m[4], 10);
+        if (mon !== undefined) pushDateCandidate(candidates, y, mon, d1);
+    }
+
+    const reRuDMY = /\b(\d{1,2})\s+([а-яё]+)\s+(\d{4})\b/giu;
+    while ((m = reRuDMY.exec(s)) !== null) {
+        const d = parseInt(m[1], 10);
+        const mon = monthIndexRu(m[2]);
+        const y = parseInt(m[3], 10);
+        if (mon !== undefined) pushDateCandidate(candidates, y, mon, d);
+    }
+
+    if (!candidates.length) {
+        const reDayMonNoYear = /\b(\d{1,2})\s+([а-яё]+)\b/giu;
+        while ((m = reDayMonNoYear.exec(s)) !== null) {
+            const after = s.slice(m.index + m[0].length);
+            if (/^\s*\d{4}\b/.test(after)) continue;
+            const d = parseInt(m[1], 10);
+            const mon = monthIndexRu(m[2]);
+            if (mon === undefined) continue;
+            const y = inferYearForMonthDayMo0(mon, d);
+            pushDateCandidate(candidates, y, mon, d);
+        }
+    }
+
+    if (!candidates.length) {
+        const reMyOnly = /\b([а-яё]+)\s+(\d{4})\b/giu;
+        while ((m = reMyOnly.exec(s)) !== null) {
+            const mon = monthIndexRu(m[1]);
+            const y = parseInt(m[2], 10);
+            if (mon !== undefined) pushDateCandidate(candidates, y, mon, 1);
+        }
+    }
+
+    if (!candidates.length) return null;
+    return new Date(Math.min(...candidates));
+}
+
+function parseEventDate(ev) {
+    if (ev.sort_date) {
+        const p = parseLocalDate(ev.sort_date);
+        if (p) return p;
+    }
+    let d = parseLooseDateString(ev.date);
+    if (d) return d;
+    d = parseLocalDate(ev.event_date);
+    if (d) return d;
+    d = parseLooseDateString(ev.title || '');
+    if (d) return d;
+    return parseLooseDateString((ev.description || '').slice(0, 800));
+}
+
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function parseLocalDate(iso) {
+    if (!iso) return null;
+    const head = String(iso).trim().slice(0, 10);
+    const parts = head.split('-');
+    if (parts.length < 3) return null;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return null;
+    return new Date(y, m, d);
+}
+
+function isEventPast(ev) {
+    if (ev.status === 'past') return true;
+    const dt = parseEventDate(ev);
+    if (!dt) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return dt < today;
+}
+
+function isSoon(ev) {
+    if (isEventPast(ev)) return false;
+    const dt = parseEventDate(ev);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const limit = new Date(today);
+    limit.setDate(limit.getDate() + SOON_DAYS);
+    if (!dt) {
+        return false;
+    }
+    return dt >= today && dt <= limit;
+}
+
+function matchesSearch(ev, q) {
+    if (!q) return true;
+    const s = q.toLowerCase();
+    const speakerBits = (ev.speakers || []).flatMap(sp => [sp.name, sp.sub]);
+    const hay = [
+        ev.title,
+        ev.description,
+        ev.location,
+        ev.date,
+        ...speakerBits
+    ].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(s);
+}
+
+function getFilteredEvents() {
+    const q = (document.getElementById('eventsSearch')?.value || '').trim();
+    const hidePast = document.getElementById('filterHidePast')?.checked;
+    const soonOnly = document.getElementById('filterSoon')?.checked;
+    const sberOnly = document.getElementById('filterSber')?.checked;
+    return allEvents.filter(ev => {
+        if (hidePast && isEventPast(ev)) return false;
+        if (soonOnly && !isSoon(ev)) return false;
+        if (!matchesSearch(ev, q)) return false;
+        if (sberOnly && !(ev.speakers && ev.speakers.some(sp => sp.sub && sp.sub.toLowerCase().includes('сбер')))) return false;
+        return true;
+    });
+}
+
+function sortEventsList(list) {
+    const mode = document.getElementById('eventsSort')?.value || 'date_asc';
+    const out = [...list];
+    const tInfinity = 4102444800000;
+    const timeKey = ev => {
+        if (ev.sort_date) {
+            const p = parseLocalDate(ev.sort_date);
+            if (p) return p.getTime();
+        }
+        const d = parseEventDate(ev);
+        if (d) return d.getTime();
+        return isEventPast(ev) ? 0 : tInfinity;
+    };
+    const pastKey = ev => (isEventPast(ev) ? 1 : 0);
+
+    if (mode === 'title_asc') {
+        out.sort((a, b) => String(a.title).localeCompare(String(b.title), 'ru'));
+        return out;
+    }
+    if (mode === 'title_desc') {
+        out.sort((a, b) => String(b.title).localeCompare(String(a.title), 'ru'));
+        return out;
+    }
+    if (mode === 'date_desc') {
+        out.sort((a, b) => {
+            const pb = pastKey(a) - pastKey(b);
+            if (pb) return pb;
+            const td = timeKey(b) - timeKey(a);
+            if (td) return td;
+            return String(a.title).localeCompare(String(b.title), 'ru');
+        });
+        return out;
+    }
+    out.sort((a, b) => {
+        const pb = pastKey(a) - pastKey(b);
+        if (pb) return pb;
+        const td = timeKey(a) - timeKey(b);
+        if (td) return td;
+        return String(a.title).localeCompare(String(b.title), 'ru');
+    });
+    return out;
+}
+
+function buildCardSpeakersHtml(ev) {
+    const speakers = ev.speakers || [];
+    if (!speakers.length) {
+        return '<p class="event-speakers-names" style="margin-bottom:0;">Спикеры не указаны</p>';
+    }
+    const maxA = 4;
+    const shown = speakers.slice(0, maxA);
+    const avatars = shown.map(sp => {
+        const alt = escapeHtml(sp.name);
+        if (sp.avatar) {
+            return `<img class="avatar" src="${escapeHtml(sp.avatar)}" alt="${alt}">`;
+        }
+        const letter = escapeHtml((sp.name || '?').trim().charAt(0) || '?');
+        return `<div class="avatar" style="background:var(--sber-green);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;" aria-hidden="true">${letter}</div>`;
+    }).join('');
+    const more = speakers.length > maxA
+        ? `<span class="speaker-count" style="margin-left:6px;">+${speakers.length - maxA}</span>`
+        : '';
+    const names = speakers.map((s, idx) => {
+        const sep = idx ? '<span class="event-speaker-sep"> · </span>' : '';
+        return `${sep}<a href="/speakers/#open-speaker-${s.id}" class="event-speaker-link">${escapeHtml(s.name)}</a>`;
+    }).join('');
+    return `
+        <div class="event-speakers-block">
+            <div class="stacked-avatars" style="display:flex;align-items:center;">${avatars}${more}</div>
+            <p class="event-speakers-names">${names}</p>
+        </div>
+    `;
+}
+
+function updateActiveBadge() {
+    const activeBadge = document.getElementById('activeEventsBadge');
+    if (!activeBadge) return;
+    const activeCount = allEvents.filter(ev => !isEventPast(ev)).length;
+    let noun = 'мероприятий';
+    if (activeCount % 10 === 1 && activeCount % 100 !== 11) {
+        noun = 'мероприятие';
+    } else if ([2, 3, 4].includes(activeCount % 10) && ![12, 13, 14].includes(activeCount % 100)) {
+        noun = 'мероприятия';
+    }
+    activeBadge.innerHTML = `<i class="fa-solid fa-calendar-days"></i> ${activeCount} предстоящих ${noun}`;
+}
+
+function renderEvents() {
+    const container = document.getElementById('eventsContainer');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    allEvents.forEach(ev => {
+        eventsDataCache[ev.id] = ev;
+    });
+
+    const filtered = sortEventsList(getFilteredEvents());
+
+    if (!filtered.length) {
+        container.innerHTML = '<p class="events-empty">Нет мероприятий по выбранным условиям. Измените поиск или снимите фильтры.</p>';
+        return;
+    }
+
+    filtered.forEach(ev => {
+
+        const past = isEventPast(ev);
+        const statusClass = past ? 'badge-inactive' : 'badge-active';
+        const statusText = past ? 'Прошедшие' : 'Предстоящее';
+
+        const card = document.createElement('article');
+        card.className = 'event-card-large';
+        card.dataset.eventId = ev.id;
+
+        let cardLink = '';
+        if (ev.link && ev.link !== 'None' && ev.link !== '') {
+            cardLink = `<a href="${escapeHtml(ev.link)}" target="_blank" rel="noopener noreferrer" class="event-card-external-link" style="color: var(--sber-green); font-weight: 600; text-decoration: none;">Перейти на сайт</a>`;
+        }
+
+        let desc = ev.description && ev.description !== 'None' ? ev.description : '';
+        if (desc.length > 120) desc = desc.substring(0, 120) + '…';
+
+        card.innerHTML = `
+            <div class="event-card-top">
+                <div class="event-date-box">
+                    <span class="event-date-main">${ev.date && ev.date !== 'None' ? escapeHtml(ev.date) : 'Дата не указана'}</span>
+                    <span class="event-date-sub">${ev.location && ev.location !== 'None' ? escapeHtml(ev.location) : 'Онлайн'}</span>
+                </div>
+                <span class="${statusClass}">${statusText}</span>
+            </div>
+            <h2 class="event-title-card" style="margin-top: 10px;">${escapeHtml(ev.title)}</h2>
+            <p class="event-description-card">${escapeHtml(desc)}</p>
+            ${buildCardSpeakersHtml(ev)}
+            <div class="event-card-bottom" style="margin-top:auto;">
+                ${cardLink}
+            </div>
+        `;
+
+        const ext = card.querySelector('.event-card-external-link');
+        if (ext) {
+            ext.addEventListener('click', e => e.stopPropagation());
+        }
+        card.querySelectorAll('.event-speaker-link').forEach(a => {
+            a.addEventListener('click', e => e.stopPropagation());
+        });
+
+        card.addEventListener('click', () => openEventModal(ev.id));
+        container.appendChild(card);
+    });
+}
 
 async function fetchEvents() {
     try {
         const response = await fetch('/api/events/');
         const events = await response.json();
-        
-        const container = document.getElementById('eventsContainer');
-        if (!container) return;
-        container.innerHTML = '';
-        
-        let activeCount = 0;
-
-        events.forEach(ev => {
-            eventsDataCache[ev.id] = ev;
-            
-            const statusClass = ev.status === 'past' ? 'badge-inactive' : 'badge-active';
-            const statusText = ev.status === 'past' ? 'Прошедшее' : 'Предстоящее';
-            
-            if (ev.status !== 'past') {
-                activeCount++;
-            }
-            
-            const card = document.createElement('article');
-            card.className = 'event-card-large';
-            card.dataset.eventId = ev.id;
-            
-            let cardLink = '';
-            if (ev.link && ev.link !== 'None' && ev.link !== '') {
-                cardLink = `<a href="${ev.link}" target="_blank" style="color: var(--sber-green); font-weight: 600; text-decoration: none;">Перейти на сайт</a>`;
-            }
-
-            let desc = ev.description && ev.description !== 'None' ? ev.description : '';
-            if (desc.length > 120) desc = desc.substring(0, 120) + '...';
-
-            card.innerHTML = `
-                <div class="event-card-top">
-                    <div class="event-date-box">
-                        <span class="event-date-main">${ev.date && ev.date !== 'None' ? ev.date : 'Дата не указана'}</span>
-                        <span class="event-date-sub">${ev.location && ev.location !== 'None' ? ev.location : 'Онлайн'}</span>
-                    </div>
-                    <span class="${statusClass}">${statusText}</span>
-                </div>
-                <h2 class="event-title-card" style="margin-top: 10px;">${ev.title}</h2>
-                <p class="event-description-card">${desc}</p>
-                <div class="event-card-bottom" style="margin-top:auto;">
-                    ${cardLink}
-                </div>
-            `;
-            
-            card.addEventListener('click', () => openEventModal(ev.id));
-            container.appendChild(card);
-        });
-
-        const activeBadge = document.getElementById('activeEventsBadge');
-        if (activeBadge) {
-            let noun = 'мероприятий';
-            if (activeCount % 10 === 1 && activeCount % 100 !== 11) {
-                noun = 'мероприятие';
-            } else if ([2, 3, 4].includes(activeCount % 10) && ![12, 13, 14].includes(activeCount % 100)) {
-                noun = 'мероприятия';
-            }
-            activeBadge.innerHTML = `<i class="fa-solid fa-calendar-days"></i> ${activeCount} предстоящих ${noun}`;
-        }
-    } catch(err) {
+        allEvents = Array.isArray(events) ? events : [];
+        window.allEvents = allEvents;
+        updateActiveBadge();
+        renderEvents();
+        tryOpenEventFromHash();
+    } catch (err) {
         console.error('Error fetching events:', err);
     }
 }
+window.fetchEvents = fetchEvents;
+
+function tryOpenEventFromHash() {
+    const m = (location.hash || '').match(/^#event-(\d+)$/);
+    if (!m) return;
+    const id = Number(m[1]);
+    if (!Number.isFinite(id) || !eventsDataCache[id]) return;
+    openEventModal(id);
+}
+
+if (window.__starliftEventsHashHandler) {
+    window.removeEventListener('hashchange', window.__starliftEventsHashHandler);
+}
+window.__starliftEventsHashHandler = function() {
+    if (document.getElementById('eventsContainer')) {
+        tryOpenEventFromHash();
+    }
+};
+window.addEventListener('hashchange', window.__starliftEventsHashHandler);
 
 function renderEventModal(eventId) {
     const ev = eventsDataCache[eventId];
     if (!ev) return;
 
-    const statusClass = ev.status === 'past' ? 'badge-inactive' : 'badge-active';
-    const statusText = ev.status === 'past' ? 'Завершено' : 'Запланировано';
+    const past = isEventPast(ev);
+    const statusClass = past ? 'badge-inactive' : 'badge-active';
+    const statusText = past ? 'Прошедшие' : 'Предстоящее';
 
     const badge = document.getElementById('eventStatusBadge');
     if (badge) {
         badge.className = statusClass;
         badge.textContent = statusText;
     }
-    
+
     document.getElementById('eventModalTitle').textContent = ev.title;
-    document.getElementById('eventModalDescription').textContent = ev.description && ev.description !== 'None' ? ev.description : 'Описание отсутствует';
-    
+    window.__currentEventId = ev.id;
+    window.__currentEventTitle = ev.title;
+
+    const descEl = document.getElementById('eventModalDescription');
+    const descToggle = document.getElementById('eventModalDescToggle');
+    const rawDesc = ev.description && ev.description !== 'None' ? String(ev.description) : '';
+    if (descEl) {
+        descEl.textContent = rawDesc || 'Описание отсутствует';
+        const needsToggle = rawDesc.length > 280 || (rawDesc.match(/\n/g) || []).length > 4;
+        descEl.classList.toggle('is-collapsed', needsToggle);
+        if (descToggle) {
+            if (needsToggle) {
+                descToggle.classList.add('is-visible');
+                descToggle.setAttribute('aria-expanded', 'false');
+                descToggle.textContent = 'Показать полностью';
+                descToggle.onclick = () => {
+                    descEl.classList.toggle('is-collapsed');
+                    const collapsed = descEl.classList.contains('is-collapsed');
+                    descToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                    descToggle.textContent = collapsed ? 'Показать полностью' : 'Свернуть';
+                };
+            } else {
+                descToggle.classList.remove('is-visible');
+                descToggle.removeAttribute('aria-expanded');
+                descToggle.textContent = '';
+                descToggle.onclick = null;
+            }
+        }
+    }
+
     const coverAvatar = document.getElementById('eventCoverAvatar');
     if (coverAvatar) coverAvatar.style.display = 'none';
-    
+
     document.getElementById('eventLocationLine').textContent = ev.location && ev.location !== 'None' ? ev.location : 'Онлайн/Офлайн';
     document.getElementById('eventCountLine').textContent = ev.date && ev.date !== 'None' ? ev.date : 'Дата уточняется';
-    
+
     let formatHtml = 'Информация недоступна';
-    if(ev.link && ev.link !== 'None') {
-        formatHtml = `<a href="${ev.link}" target="_blank">Перейти по ссылке</a>`;
+    if (ev.link && ev.link !== 'None') {
+        formatHtml = `<a href="${escapeHtml(ev.link)}" target="_blank" rel="noopener noreferrer">Перейти по ссылке</a>`;
     }
     document.getElementById('eventFormatLine').innerHTML = formatHtml;
 
-    document.getElementById('eventSpeakersList').innerHTML = '<p style="color:var(--text-muted);font-size:14px;">Информация по спикерам уточняется.</p>';
-    
-    let scheduleHtml = '<p style="color:var(--text-muted);font-size:14px;">Смотрите подробное расписание на официальном сайте мероприятия.</p>';
-    if (ev.schedule && ev.schedule !== 'None' && ev.schedule.trim() !== '') {
+    const spWrap = document.getElementById('eventSpeakersList');
+    const spList = ev.speakers || [];
+    if (spWrap) {
+        if (!spList.length) {
+            spWrap.innerHTML = '<p style="color:var(--text-muted);font-size:14px;">Спикеры для этого мероприятия не указаны.</p>';
+        } else {
+            spWrap.innerHTML = spList.map(sp => {
+                const sub = sp.sub ? escapeHtml(sp.sub) : '';
+                const alt = escapeHtml(sp.name || '');
+                const href = `/speakers/#open-speaker-${sp.id}`;
+                const img = sp.avatar
+                    ? `<img class="avatar" src="${escapeHtml(sp.avatar)}" alt="${alt}">`
+                    : `<div class="avatar" style="background:var(--sber-green);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;" aria-hidden="true">${escapeHtml((sp.name || '?').charAt(0))}</div>`;
+                const removeBtn = window.__isAdmin
+                    ? `<button type="button" class="ev-speaker-remove" data-speaker-id="${sp.id}" title="Убрать со мероприятия" style="margin-left:auto; background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3); border-radius:8px; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;"><i class="fa-solid fa-xmark"></i></button>`
+                    : '';
+                return `<div class="speaker-chip" style="display:flex; align-items:center; gap:10px;">${img}<div style="flex:1; min-width:0;"><strong><a href="${href}" class="event-speaker-link">${escapeHtml(sp.name)}</a></strong><span>${sub}</span></div>${removeBtn}</div>`;
+            }).join('');
+            spWrap.querySelectorAll('button.ev-speaker-remove').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    const speakerId = btn.dataset.speakerId;
+                    const evId = window.__currentEventId;
+                    if (!evId || !speakerId) return;
+                    if (!confirm('Убрать спикера со мероприятия?')) return;
+                    const csrf = document.querySelector('input[name="csrfmiddlewaretoken"]');
+                    try {
+                        const r = await fetch(`/events/admin/${evId}/remove-speaker/${speakerId}/`, {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': csrf ? csrf.value : '', 'X-Requested-With': 'XMLHttpRequest' },
+                            credentials: 'same-origin',
+                        });
+                        if (r.ok) {
+                            const evOverlay = document.getElementById('eventModalOverlay');
+                            if (evOverlay && window.closeAnyModal) window.closeAnyModal(evOverlay);
+                            if (typeof window.fetchEvents === 'function') window.fetchEvents();
+                        } else {
+                            alert('Не удалось убрать спикера');
+                        }
+                    } catch (err) { alert('Сеть недоступна'); }
+                });
+            });
+
+            spWrap.querySelectorAll('a.event-speaker-link').forEach(a => {
+                a.addEventListener('click', e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const m = (a.getAttribute('href') || '').match(/open-speaker-(\d+)/);
+                    if (!m) return;
+                    const speakerId = parseInt(m[1], 10);
+                    const evOverlay = document.getElementById('eventModalOverlay');
+                    if (evOverlay && window.closeAnyModal) window.closeAnyModal(evOverlay);
+                    // Используем полный переход с хешем — speakers.html ловит #open-speaker-N
+                    // через tryOpenSpeakerFromHash на встроенных серверных данных. Это надёжнее,
+                    // чем SPA-путь с __pendingOpenSpeakerId, где была гонка между rAF в base.html
+                    // и инициализацией speakers.html.
+                    window.location.href = `/speakers/#open-speaker-${speakerId}`;
+                });
+            });
+        }
+    }
+
+    const schedEl = document.getElementById('eventScheduleList');
+    let scheduleHtml = '<p style="color:var(--text-muted);font-size:14px;margin:0;">Смотрите подробное расписание на официальном сайте мероприятия.</p>';
+    if (ev.schedule && ev.schedule !== 'None' && String(ev.schedule).trim() !== '') {
         scheduleHtml = ev.schedule;
     }
-    document.getElementById('eventScheduleList').innerHTML = scheduleHtml;
+    if (schedEl) {
+        schedEl.innerHTML = scheduleHtml;
+        schedEl.classList.add('event-schedule-scroll');
+    }
 }
 
 function openEventModal(eventId) {
@@ -390,28 +1103,75 @@ function openEventModal(eventId) {
     if (overlay) overlay.style.display = 'flex';
 }
 
-function initEventsPage() {
-    fetchEvents();
+function bindEventsFilters() {
+    const toolbar = document.querySelector('.events-toolbar');
+    if (!toolbar || toolbar.dataset.eventsFiltersBound === '1') {
+        return;
+    }
+    toolbar.dataset.eventsFiltersBound = '1';
+    const search = document.getElementById('eventsSearch');
+    const soon = document.getElementById('filterSoon');
+    const hidePast = document.getElementById('filterHidePast');
+    const sortSel = document.getElementById('eventsSort');
+    const rerender = () => renderEvents();
+    if (search) search.addEventListener('input', rerender);
+    if (soon) soon.addEventListener('change', rerender);
+    if (hidePast) hidePast.addEventListener('change', rerender);
+    const sber = document.getElementById('filterSber');
+    if (sber) sber.addEventListener('change', rerender);
+    if (sortSel) sortSel.addEventListener('change', rerender);
+
+    // Filters panel toggle
+    const toggleBtn = document.getElementById('evFiltersToggle');
+    const panel = document.getElementById('evFiltersPanel');
+    if (toggleBtn && panel) {
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = panel.classList.toggle('show');
+            toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#evFiltersPanel') && !e.target.closest('#evFiltersToggle')) {
+                panel.classList.remove('show');
+                toggleBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && panel.classList.contains('show')) {
+                panel.classList.remove('show');
+                toggleBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
 }
 
-initEventsPage();
-document.addEventListener('spa-page-loaded', () => {
-    if (document.getElementById('eventModalOverlay')) {
-        initEventsPage();
-    }
-});
+// См. комментарий в speakers.html: ждём DOMContentLoaded, чтобы block modals
+// успел отрендериться до первого вызова openEventModal по хешу.
+function __startEventsPage() {
+    bindEventsFilters();
+    fetchEvents();
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', __startEventsPage, { once: true });
+} else {
+    __startEventsPage();
+}
+})();
 </script>
 {% endblock %}
 
 {% block modals %}
     <div class="modal-overlay" id="eventModalOverlay">
-        <div class="modal-content">
+        <div class="modal-content event-detail-modal">
             <i class="fa-solid fa-xmark modal-close" id="eventModalClose"></i>
             <div class="event-modal-grid">
-                <div class="event-modal-section">
+                <div class="event-modal-section event-modal-scroll-col">
                     <div class="badge-active" id="eventStatusBadge" style="display:inline-flex; margin-bottom:12px;"></div>
                     <h2 class="event-modal-title" id="eventModalTitle"></h2>
-                    <p class="events-subtitle" id="eventModalDescription"></p>
+                    <div class="event-desc-wrap">
+                        <p class="event-desc-body" id="eventModalDescription"></p>
+                        <button type="button" class="event-desc-toggle" id="eventModalDescToggle" aria-controls="eventModalDescription">Показать полностью</button>
+                    </div>
 
                     <div style="display:grid; gap:12px; margin-top:18px;">
                         <div class="speaker-chip">
@@ -431,9 +1191,25 @@ document.addEventListener('spa-page-loaded', () => {
                     </div>
                 </div>
 
-                <div class="event-modal-section">
+                <div class="event-modal-section event-modal-scroll-col">
                     <h3 class="section-title" style="margin-bottom: 14px; font-size: 18px;"><i class="fa-solid fa-microphone-lines"></i> Утвержденные спикеры</h3>
                     <div id="eventSpeakersList" style="display:grid; gap:10px;"></div>
+
+                    {% if user.is_authenticated and user.profile.role == 'speaker' %}
+                    <button type="button" id="btnRequestJoin" style="margin-top: 14px; padding: 10px 16px; border-radius: 12px; background: var(--sber-green); color: #fff; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-paper-plane"></i> Подать заявку на участие
+                    </button>
+                    {% endif %}
+                    {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+                    <div style="margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" id="btnAdminEditEvent" style="padding: 8px 14px; border-radius: 10px; background: var(--white); color: var(--text-main); border: 1px solid var(--border-color); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-pen"></i> Редактировать
+                        </button>
+                        <button type="button" id="btnAdminDeleteEvent" style="padding: 8px 14px; border-radius: 10px; background: rgba(217,62,78,0.1); color: #D93E4E; border: 1px solid rgba(217,62,78,0.3); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-solid fa-trash"></i> Удалить
+                        </button>
+                    </div>
+                    {% endif %}
 
                     <h3 class="section-title" style="margin: 18px 0 14px; font-size: 18px;"><i class="fa-solid fa-clock"></i> Расписание</h3>
                     <div class="schedule-list" id="eventScheduleList"></div>
@@ -441,4 +1217,280 @@ document.addEventListener('spa-page-loaded', () => {
             </div>
         </div>
     </div>
+
+    {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+    <div class="modal-overlay" id="adminEventModal">
+        <div class="modal-content" style="max-width: 820px; width: 100%; padding: 36px 40px;">
+            <i class="fa-solid fa-xmark modal-close" id="adminEventClose"></i>
+            <h2 id="adminEventModalTitle" class="ev-form-modal-title">Создать мероприятие</h2>
+            <form id="adminEventForm" class="ev-form">
+                {% csrf_token %}
+                <input type="hidden" name="event_id" id="adminEventId" value="">
+                <label>Название*
+                    <input type="text" name="title" required maxlength="200" placeholder="Название мероприятия...">
+                </label>
+                <div class="ev-form-grid">
+                    <label>Дата
+                        <input type="date" name="event_date">
+                    </label>
+                    <label>Место
+                        <input type="text" name="location" maxlength="200" placeholder="Москва, Сколково">
+                    </label>
+                    <label>Ссылка
+                        <input type="url" name="link" maxlength="500" placeholder="https://…">
+                    </label>
+                    <label>Тема/стек
+                        <input type="text" name="topic" maxlength="100" placeholder="Backend, ML, DevOps…">
+                    </label>
+                </div>
+                <label>Описание
+                    <textarea name="description" rows="3" placeholder="О чём мероприятие"></textarea>
+                </label>
+                <label>Расписание (HTML/текст)
+                    <textarea name="schedule" rows="2"></textarea>
+                </label>
+                <div id="adminEventMsg" class="ev-form-msg"></div>
+                <button type="submit" class="ev-form-submit">Сохранить</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        function getCsrf() { const c = document.querySelector('input[name="csrfmiddlewaretoken"]'); return c ? c.value : ''; }
+        function openModal(id) { const m = document.getElementById(id); if (m) m.style.display = 'flex'; }
+
+        function fillForm(ev) {
+            const f = document.getElementById('adminEventForm');
+            f.querySelector('[name=title]').value = ev ? (ev.title || '') : '';
+            f.querySelector('[name=event_date]').value = ev && ev.event_date ? ev.event_date : '';
+            f.querySelector('[name=location]').value = ev ? (ev.location || '') : '';
+            f.querySelector('[name=link]').value = ev ? (ev.link || '') : '';
+            f.querySelector('[name=topic]').value = ev ? (ev.topic || '') : '';
+            f.querySelector('[name=description]').value = ev ? (ev.description || '') : '';
+            f.querySelector('[name=schedule]').value = ev ? (ev.schedule || '') : '';
+            document.getElementById('adminEventId').value = ev ? ev.id : '';
+            document.getElementById('adminEventModalTitle').textContent = ev ? 'Редактировать мероприятие' : 'Создать мероприятие';
+            document.getElementById('adminEventMsg').textContent = '';
+        }
+
+        const createBtn = document.getElementById('btnAdminCreateEvent');
+        if (createBtn) createBtn.addEventListener('click', () => { fillForm(null); openModal('adminEventModal'); });
+
+        const editBtn = document.getElementById('btnAdminEditEvent');
+        if (editBtn) editBtn.addEventListener('click', () => {
+            const evId = window.__currentEventId;
+            if (!evId) return;
+            const ev = (window.allEvents || []).find(e => e.id === evId);
+            if (!ev) return;
+            const evOverlay = document.getElementById('eventModalOverlay');
+            if (evOverlay && window.closeAnyModal) window.closeAnyModal(evOverlay);
+            fillForm(ev);
+            openModal('adminEventModal');
+        });
+
+        const delBtn = document.getElementById('btnAdminDeleteEvent');
+        if (delBtn) delBtn.addEventListener('click', async () => {
+            const evId = window.__currentEventId;
+            if (!evId) return;
+            if (!confirm('Удалить это мероприятие? Действие необратимо.')) return;
+            const fd = new FormData();
+            try {
+                const r = await fetch(`/events/admin/${evId}/delete/`, {
+                    method: 'POST', body: fd,
+                    headers: { 'X-CSRFToken': getCsrf(), 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                if (r.ok) {
+                    const evOverlay = document.getElementById('eventModalOverlay');
+                    if (evOverlay && window.closeAnyModal) window.closeAnyModal(evOverlay);
+                    if (typeof window.fetchEvents === 'function') window.fetchEvents();
+                } else {
+                    alert('Не удалось удалить мероприятие');
+                }
+            } catch (e) { alert('Сеть недоступна'); }
+        });
+
+        const form = document.getElementById('adminEventForm');
+        if (form) form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById('adminEventMsg');
+            msg.style.color = 'var(--text-muted)'; msg.textContent = '';
+            const evId = document.getElementById('adminEventId').value;
+            const url = evId ? `/events/admin/${evId}/edit/` : '/events/admin/create/';
+            const fd = new FormData(form);
+            try {
+                const r = await fetch(url, {
+                    method: 'POST', body: fd,
+                    headers: { 'X-CSRFToken': getCsrf(), 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                const data = await r.json();
+                if (r.ok && data.ok) {
+                    msg.style.color = 'var(--sber-green)'; msg.textContent = 'Сохранено.';
+                    if (typeof window.fetchEvents === 'function') window.fetchEvents();
+                    setTimeout(() => window.closeAnyModal(document.getElementById('adminEventModal')), 800);
+                } else {
+                    msg.style.color = '#D93E4E'; msg.textContent = 'Ошибка: ' + (data.error || 'не удалось сохранить');
+                }
+            } catch (err) { msg.style.color = '#D93E4E'; msg.textContent = 'Сеть недоступна'; }
+        });
+    })();
+    </script>
+    {% endif %}
+
+    {% if user.is_authenticated and user.profile.role == 'speaker' %}
+    <div class="modal-overlay" id="proposeEventModal">
+        <div class="modal-content" style="max-width: 820px; width: 100%; padding: 36px 40px;">
+            <i class="fa-solid fa-xmark modal-close" id="proposeEventClose"></i>
+            <h2 class="ev-form-modal-title">Предложить мероприятие</h2>
+            <p class="ev-form-subtitle">Заявка отправится администратору на рассмотрение.</p>
+            <form id="proposeEventForm" class="ev-form">
+                {% csrf_token %}
+                <label>Название*
+                    <input type="text" name="proposed_title" required maxlength="200" placeholder="Название мероприятия">
+                </label>
+                <div class="ev-form-grid">
+                    <label>Дата
+                        <input type="date" name="proposed_event_date">
+                    </label>
+                    <label>Место
+                        <input type="text" name="proposed_location" maxlength="200">
+                    </label>
+                    <label>Ссылка
+                        <input type="url" name="proposed_link" maxlength="500" placeholder="https://…">
+                    </label>
+                    <label>Тема вашего доклада
+                        <input type="text" name="topic" maxlength="200">
+                    </label>
+                </div>
+                <label>Описание мероприятия
+                    <textarea name="proposed_description" rows="3"></textarea>
+                </label>
+                <label>Комментарий администратору
+                    <textarea name="comment" rows="2"></textarea>
+                </label>
+                <div id="proposeEventMsg" class="ev-form-msg"></div>
+                <button type="submit" class="ev-form-submit">Отправить заявку</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="joinEventModal">
+        <div class="modal-content" style="max-width: 640px; width: 100%; padding: 36px 40px;">
+            <i class="fa-solid fa-xmark modal-close" id="joinEventClose"></i>
+            <h2 class="ev-form-modal-title" style="margin-bottom: 8px;">Заявка на участие</h2>
+            <p id="joinEventName" class="ev-form-subtitle"></p>
+            <form id="joinEventForm" class="ev-form">
+                {% csrf_token %}
+                <input type="hidden" name="event_id" id="joinEventId">
+                <label>Тема вашего доклада*
+                    <input type="text" name="topic" required maxlength="200" placeholder="О чём вы будете рассказывать">
+                </label>
+                <label>Комментарий администратору
+                    <textarea name="comment" rows="3"></textarea>
+                </label>
+                <div id="joinEventMsg" class="ev-form-msg"></div>
+                <button type="submit" class="ev-form-submit">Отправить заявку</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        function getCsrf() {
+            const c = document.querySelector('input[name="csrfmiddlewaretoken"]');
+            return c ? c.value : '';
+        }
+        function openModal(id) { const m = document.getElementById(id); if (m) m.style.display = 'flex'; }
+
+        // Кнопка «Предложить мероприятие»
+        const proposeBtn = document.getElementById('btnProposeEvent');
+        if (proposeBtn) proposeBtn.addEventListener('click', () => openModal('proposeEventModal'));
+
+        const proposeForm = document.getElementById('proposeEventForm');
+        if (proposeForm) {
+            proposeForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const msg = document.getElementById('proposeEventMsg');
+                msg.textContent = '';
+                msg.style.color = 'var(--text-muted)';
+                const fd = new FormData(proposeForm);
+                try {
+                    const r = await fetch('/events/request-create/', {
+                        method: 'POST', body: fd,
+                        headers: { 'X-CSRFToken': getCsrf(), 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+                    const data = await r.json();
+                    if (r.ok && data.ok) {
+                        msg.style.color = 'var(--sber-green)';
+                        msg.textContent = 'Заявка отправлена администратору.';
+                        proposeForm.reset();
+                        setTimeout(() => window.closeAnyModal(document.getElementById('proposeEventModal')), 1200);
+                    } else {
+                        msg.style.color = '#D93E4E';
+                        msg.textContent = 'Ошибка: ' + (data.error || 'не удалось отправить');
+                    }
+                } catch (err) {
+                    msg.style.color = '#D93E4E';
+                    msg.textContent = 'Сеть недоступна';
+                }
+            });
+        }
+
+        // Кнопка «Подать заявку на участие» внутри модалки события
+        const joinBtn = document.getElementById('btnRequestJoin');
+        if (joinBtn) {
+            joinBtn.addEventListener('click', () => {
+                const evId = window.__currentEventId;
+                const evTitle = window.__currentEventTitle || '';
+                if (!evId) return;
+                document.getElementById('joinEventId').value = evId;
+                document.getElementById('joinEventName').textContent = 'Мероприятие: ' + evTitle;
+                document.getElementById('joinEventMsg').textContent = '';
+                openModal('joinEventModal');
+            });
+        }
+
+        const joinForm = document.getElementById('joinEventForm');
+        if (joinForm) {
+            joinForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const msg = document.getElementById('joinEventMsg');
+                msg.textContent = '';
+                msg.style.color = 'var(--text-muted)';
+                const evId = document.getElementById('joinEventId').value;
+                const fd = new FormData(joinForm);
+                try {
+                    const r = await fetch(`/events/${evId}/request-join/`, {
+                        method: 'POST', body: fd,
+                        headers: { 'X-CSRFToken': getCsrf(), 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+                    const data = await r.json();
+                    if (r.ok && data.ok) {
+                        msg.style.color = 'var(--sber-green)';
+                        msg.textContent = 'Заявка отправлена администратору.';
+                        joinForm.reset();
+                        setTimeout(() => window.closeAnyModal(document.getElementById('joinEventModal')), 1200);
+                    } else {
+                        msg.style.color = '#D93E4E';
+                        const errMap = {
+                            already_participant: 'Вы уже в списке спикеров этого мероприятия.',
+                            already_pending: 'Вы уже подали заявку на это мероприятие.',
+                            topic_required: 'Укажите тему доклада.',
+                            no_speaker_profile: 'У вашего аккаунта не привязан профиль спикера.',
+                        };
+                        msg.textContent = errMap[data.error] || ('Ошибка: ' + (data.error || 'не удалось отправить'));
+                    }
+                } catch (err) {
+                    msg.style.color = '#D93E4E';
+                    msg.textContent = 'Сеть недоступна';
+                }
+            });
+        }
+    })();
+    </script>
+    {% endif %}
 {% endblock %}

@@ -151,6 +151,154 @@
             overflow-x: auto;
         }
     }
+
+    .numeric-stepper {
+        position: relative;
+        width: 100%;
+    }
+
+    .nps-range-container .numeric-stepper .input-compact {
+        padding-right: 44px;
+        -moz-appearance: textfield;
+        appearance: textfield;
+    }
+
+    .nps-range-container .numeric-stepper .input-compact::-webkit-outer-spin-button,
+    .nps-range-container .numeric-stepper .input-compact::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .stepper-controls {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: inline-flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .stepper-btn {
+        width: 28px;
+        height: 16px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background: var(--glass-bg);
+        color: var(--text-muted);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: var(--transition);
+        padding: 0;
+        line-height: 1;
+    }
+
+    .stepper-btn i { font-size: 10px; }
+
+    .stepper-btn:hover {
+        border-color: var(--sber-green);
+        color: var(--sber-green);
+        background: var(--light-green);
+        transform: translateY(-1px);
+    }
+
+    .stepper-btn:active { transform: translateY(0); }
+
+    #speakerTable {
+        table-layout: fixed;
+        width: 100%;
+    }
+
+    #speakerTable th,
+    #speakerTable td {
+        vertical-align: middle;
+        padding: 12px 14px;
+        box-sizing: border-box;
+    }
+
+    #speakerTable th:nth-child(1),
+    #speakerTable td:nth-child(1) {
+        width: 22%;
+    }
+
+    #speakerTable th:nth-child(2),
+    #speakerTable td:nth-child(2) {
+        width: 22%;
+    }
+
+    #speakerTable th:nth-child(3),
+    #speakerTable td:nth-child(3) {
+        width: 22%;
+    }
+
+    #speakerTable th:nth-child(4),
+    #speakerTable td:nth-child(4) {
+        width: 22%;
+    }
+
+    #speakerTable th:nth-child(5),
+    #speakerTable td:nth-child(5) {
+        width: 12%;
+    }
+
+    .speaker-desc-preview {
+        margin: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 14px;
+        color: var(--text-main);
+        line-height: 1.4;
+    }
+
+    .sber-only-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 38px;
+        padding: 0 14px;
+        border-radius: 12px;
+        border: 2px solid var(--border-color);
+        background: var(--white);
+        color: var(--text-main);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--transition);
+        white-space: nowrap;
+        width: 100%;
+        justify-content: center;
+    }
+    .sber-only-btn:hover {
+        border-color: var(--sber-green);
+        color: var(--sber-green);
+        transform: translateY(-1px);
+    }
+    .sber-only-btn__dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--border-color);
+        transition: var(--transition);
+        flex-shrink: 0;
+    }
+    .sber-only-btn.active {
+        border-color: var(--sber-green);
+        background: var(--light-green);
+        color: var(--sber-green);
+    }
+    .sber-only-btn.active .sber-only-btn__dot {
+        background: var(--sber-green);
+        box-shadow: 0 0 0 3px rgba(10, 128, 59, 0.2);
+    }
+    [data-theme="dark"] .sber-only-btn {
+        background: var(--card-bg);
+    }
+    [data-theme="dark"] .sber-only-btn.active {
+        background: rgba(33, 160, 56, 0.12);
+    }
 </style>
 
 <div class="speakers-page">
@@ -160,7 +308,9 @@
             <p class="page-subtitle-xl">Управление базой экспертов, фильтрами и массовыми действиями</p>
         </div>
         <div class="speakers-meta">
+            {% if user.is_superuser or user.profile.role == 'admin' %}
             <span class="badge-inactive"><i class="fa-solid fa-shield-halved"></i> Доступ администратора</span>
+            {% endif %}
         </div>
     </div>
 
@@ -170,10 +320,10 @@
             <div class="speaker-toolbar">
                 <div class="search-box">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="searchInput" placeholder="Поиск по имени, стеку или городу">
+                    <input type="text" id="searchInput" placeholder="Поиск по имени или описанию">
                 </div>
 
-                {% if user.is_superuser %}
+                {% if user.is_superuser or user.profile.role == 'admin' %}
                 <a href="{% url 'speaker_add' %}" class="btn-action btn-contact" style="flex: none; display: inline-flex; padding: 10px 20px; white-space: nowrap; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-plus"></i> Добавить спикера
                 </a>
@@ -190,16 +340,14 @@
                         </div>
                         <div class="filters-grid">
                             <div class="filter-field">
-                                <label for="regionFilter">Регион</label>
-                                <select id="regionFilter" class="select-compact">
-                                    <option value="">Все</option>
-                                </select>
+                                <label for="companyFilter">Компания</label>
+                                <input type="text" id="companyFilter" class="input-compact" placeholder="Название компании" style="width:100%;">
                             </div>
-                            <div class="filter-field">
-                                <label for="stackFilter">Стек</label>
-                                <select id="stackFilter" class="select-compact">
-                                    <option value="">Все</option>
-                                </select>
+                            <div class="filter-field" style="align-self: flex-end;">
+                                <button type="button" id="sberOnlyBtn" class="sber-only-btn">
+                                    <span class="sber-only-btn__dot"></span>
+                                    Спикеры Сбера
+                                </button>
                             </div>
                             <div class="filter-field">
                                 <label for="statusFilter">Статус</label>
@@ -212,8 +360,28 @@
                             <div class="filter-field">
                                 <label>NPS</label>
                                 <div class="nps-range-container">
-                                    <input id="npsMin" class="input-compact" type="number" step="1" min="-100" max="100" inputmode="numeric" placeholder="Мин.">
-                                    <input id="npsMax" class="input-compact" type="number" step="1" min="-100" max="100" inputmode="numeric" placeholder="Макс.">
+                                    <div class="numeric-stepper">
+                                        <input id="npsMin" class="input-compact" type="number" step="0.1" min="0" max="10" inputmode="decimal" placeholder="Мин.">
+                                        <div class="stepper-controls">
+                                            <button type="button" class="stepper-btn" data-step-target="npsMin" data-step-dir="up" aria-label="Увеличить минимум NPS">
+                                                <i class="fa-solid fa-chevron-up"></i>
+                                            </button>
+                                            <button type="button" class="stepper-btn" data-step-target="npsMin" data-step-dir="down" aria-label="Уменьшить минимум NPS">
+                                                <i class="fa-solid fa-chevron-down"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="numeric-stepper">
+                                        <input id="npsMax" class="input-compact" type="number" step="0.1" min="0" max="10" inputmode="decimal" placeholder="Макс.">
+                                        <div class="stepper-controls">
+                                            <button type="button" class="stepper-btn" data-step-target="npsMax" data-step-dir="up" aria-label="Увеличить максимум NPS">
+                                                <i class="fa-solid fa-chevron-up"></i>
+                                            </button>
+                                            <button type="button" class="stepper-btn" data-step-target="npsMax" data-step-dir="down" aria-label="Уменьшить максимум NPS">
+                                                <i class="fa-solid fa-chevron-down"></i>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -235,13 +403,13 @@
                             </th>
                             <th class="sortable" data-col="1" onclick="sortTable(1)">
                                 <span class="th-inner">
-                                    <span>Стек</span>
+                                    <span>Компания</span>
                                     <span class="sort-indicator hidden" data-indicator-for="1"></span>
                                 </span>
                             </th>
                             <th class="sortable" data-col="2" onclick="sortTable(2)">
                                 <span class="th-inner">
-                                    <span>Регион</span>
+                                    <span>Описание</span>
                                     <span class="sort-indicator hidden" data-indicator-for="2"></span>
                                 </span>
                             </th>
@@ -257,7 +425,9 @@
                                     <span class="sort-indicator hidden" data-indicator-for="4"></span>
                                 </span>
                             </th>
+                            {% if user.is_superuser or user.profile.role == 'admin' %}
                             <th id="actionsHeader"></th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody id="tableBody"></tbody>
@@ -268,58 +438,83 @@
 </div>
 
 <script>
-    window.isSuperuser = {% if user.is_superuser %}true{% else %}false{% endif %};
-    var speakersData = window.speakersData || [];
-    window.speakersData = speakersData;
+    window.isAdmin = {% if user.is_superuser or user.profile.role == 'admin' %}true{% else %}false{% endif %};
+    /* Отдельный кеш: нельзя писать `var speakersData = window.speakersData` — в браузере это тот же слот, что и window.speakersData
+       после `var`, из‑за чего при SPA‑переходе список мог сбрасываться в []. */
+    var __serverSpeakersData = {{ speakers_json|safe }};
+    var speakersData = (window.__starliftSpeakersCache && Array.isArray(window.__starliftSpeakersCache))
+        ? window.__starliftSpeakersCache.slice()
+        : __serverSpeakersData;
+    if (!window.__starliftSpeakersCache) {
+        window.__starliftSpeakersCache = __serverSpeakersData;
+    }
     window.__speakersGlobalListenersBound = window.__speakersGlobalListenersBound || false;
+
+    /** Отдельный учёт по типу события (раньше один data-атрибут блокировал и change, и input). */
+    function slBindOnce(el, evt, handler) {
+        if (!el) return;
+        if (!window.__slSpeakersEvtBound) window.__slSpeakersEvtBound = new WeakMap();
+        let rec = window.__slSpeakersEvtBound.get(el);
+        if (!rec) {
+            rec = Object.create(null);
+            window.__slSpeakersEvtBound.set(el, rec);
+        }
+        if (rec[evt]) return;
+        rec[evt] = true;
+        el.addEventListener(evt, handler);
+    }
     
     // Sort & Filter state
     var sortState = { col: null, dir: 'asc' };
     
-    function populateFilters() {
-        const regionFilter = document.getElementById('regionFilter');
-        const stackFilter = document.getElementById('stackFilter');
-        if (!regionFilter || !stackFilter || !speakersData.length) return;
-
-        const regions = [...new Set(speakersData.map(s => s.city))].filter(Boolean).sort();
-        
-        const stacksSet = new Set();
-        speakersData.forEach(s => {
-            if (s.stack) {
-                const parts = s.stack.split(',').map(p => p.trim()).filter(Boolean);
-                parts.forEach(p => stacksSet.add(p));
-            }
-        });
-        const stacks = [...stacksSet].sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
-
-        regionFilter.innerHTML = '<option value="">Все</option>';
-        stackFilter.innerHTML = '<option value="">Все</option>';
-
-        regions.forEach(r => {
-            const opt = document.createElement('option');
-            opt.value = r; opt.textContent = r;
-            regionFilter.appendChild(opt);
-        });
-
-        stacks.forEach(st => {
-            const opt = document.createElement('option');
-            opt.value = st; opt.textContent = st;
-            stackFilter.appendChild(opt);
-        });
-    }
-
     function normalizeText(v) { return (v ?? '').toString().toLowerCase().trim(); }
     function parseNps(value) {
         if (value === '' || value == null) return null;
         const n = Number(value);
         return Number.isFinite(n) ? n : null;
     }
+
+    function stepNumericInput(input, direction) {
+        if (!input) return;
+        const step = Number(input.step || 1) || 1;
+        const min = input.min !== '' ? Number(input.min) : -Infinity;
+        const max = input.max !== '' ? Number(input.max) : Infinity;
+        const current = input.value === '' ? 0 : Number(input.value);
+        const nextRaw = current + (direction * step);
+        const next = Math.min(max, Math.max(min, nextRaw));
+        const decimals = (String(step).split('.')[1] || '').length;
+        input.value = next.toFixed(decimals);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     
-    function getAvatarUrl(img, size = 150) {
+    function getAvatarUrl(speaker, size = 150) {
+        if (speaker && speaker.avatar) {
+            return speaker.avatar;
+        }
+        const img = speaker ? speaker.img : '';
         if (img && (img.startsWith('/media/') || img.startsWith('http'))) {
             return img;
         }
         return `https://i.pravatar.cc/${size}?img=${img}`;
+    }
+
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function tryOpenSpeakerFromHash() {
+        const m = (location.hash || '').match(/^#open-speaker-(\d+)$/);
+        if (!m) return;
+        const id = Number(m[1]);
+        if (!Number.isFinite(id)) return;
+        if (!speakersData.find(s => s.id === id)) return;
+        showEvents(id);
     }
 
     function updateSortIndicators() {
@@ -346,8 +541,8 @@
             let av, bv;
             switch (col) {
                 case 0: av = a.name; bv = b.name; return collator.compare(av, bv) * dirFactor;
-                case 1: av = a.stack; bv = b.stack; return collator.compare(av, bv) * dirFactor;
-                case 2: av = a.city; bv = b.city; return collator.compare(av, bv) * dirFactor;
+                case 1: av = a.sub || ''; bv = b.sub || ''; return collator.compare(av, bv) * dirFactor;
+                case 2: av = a.stack; bv = b.stack; return collator.compare(av, bv) * dirFactor;
                 case 3: av = a.status; bv = b.status; return collator.compare(av, bv) * dirFactor;
                 case 4: av = Number(a.nps); bv = Number(b.nps); return (av - bv) * dirFactor;
                 default: return 0;
@@ -359,28 +554,28 @@
         if (!query) return true;
         return normalizeText(speaker.name).includes(query) ||
                normalizeText(speaker.stack).includes(query) ||
-               normalizeText(speaker.city).includes(query);
+               normalizeText(speaker.sub || '').includes(query);
     }
-    
+
     function applyFiltersAndRender() {
         const searchInput = document.getElementById('searchInput');
-        const regionFilter = document.getElementById('regionFilter');
-        const stackFilter = document.getElementById('stackFilter');
         const statusFilter = document.getElementById('statusFilter');
         const npsMin = document.getElementById('npsMin');
         const npsMax = document.getElementById('npsMax');
+        const companyFilter = document.getElementById('companyFilter');
 
         const query = searchInput ? normalizeText(searchInput.value) : '';
-        const regionQ = regionFilter ? normalizeText(regionFilter.value) : '';
-        const stackQ = stackFilter ? normalizeText(stackFilter.value) : '';
         const statusVal = statusFilter ? statusFilter.value : 'all';
         const minVal = npsMin ? parseNps(npsMin.value) : null;
         const maxVal = npsMax ? parseNps(npsMax.value) : null;
+        const companyQuery = companyFilter ? normalizeText(companyFilter.value) : '';
 
         const filtered = speakersData
             .filter(s => matchesSearch(s, query))
-            .filter(s => !regionQ || normalizeText(s.city).includes(regionQ))
-            .filter(s => !stackQ || normalizeText(s.stack).includes(stackQ))
+            .filter(s => {
+                if (!companyQuery) return true;
+                return normalizeText(s.sub || '').includes(companyQuery);
+            })
             .filter(s => {
                 if (statusVal === 'all') return true;
                 if (statusVal === 'active') return s.status === 'Авторизован';
@@ -400,32 +595,40 @@
         updateSortIndicators();
     }
 
+    const DESCRIPTION_PREVIEW_MAX = 72;
+
+    function previewDescriptionCell(stack) {
+        const t = (stack ?? '').toString().replace(/\s+/g, ' ').trim();
+        if (!t) {
+            return '<p class="speaker-desc-preview" style="color:var(--text-muted);">—</p>';
+        }
+        const clipped = t.length > DESCRIPTION_PREVIEW_MAX ? `${t.slice(0, DESCRIPTION_PREVIEW_MAX)}…` : t;
+        const titleAttr = escapeHtml(t).replace(/"/g, '&quot;');
+        return `<p class="speaker-desc-preview" title="${titleAttr}">${escapeHtml(clipped)}</p>`;
+    }
+
     function render(data) {
         const body = document.getElementById('tableBody');
         if (!body) return;
 
         const actionsHeader = document.getElementById('actionsHeader');
-        if (actionsHeader) {
-            if (window.isSuperuser) {
-                actionsHeader.innerText = 'Действия';
-            } else {
-                actionsHeader.innerText = '';
-            }
+        if (actionsHeader && window.isAdmin) {
+            actionsHeader.innerText = 'Действия';
         }
 
         body.innerHTML = data.map((s, i) => `
             <tr class="${i % 2 !== 0 ? 'alt-row' : ''}">
                 <td onclick="showEvents(${s.id})">
                     <div class="speaker-info">
-                        <img src="${getAvatarUrl(s.img, 150)}" class="avatar" style="object-fit: cover;">
+                        <img src="${getAvatarUrl(s, 150)}" class="avatar" style="object-fit: cover;">
                         <div><strong>${s.name}</strong></div>
                     </div>
                 </td>
-                <td onclick="showEvents(${s.id})">${s.stack}</td>
-                <td onclick="showEvents(${s.id})">${s.city}</td>
-                <td onclick="showEvents(${s.id})"><span class="${s.status === 'Активен' ? 'badge-active' : 'badge-inactive'}">${s.status}</span></td>
-                <td onclick="showEvents(${s.id})"><div class="nps-val">${s.nps}${s.nps > 0 ? '%' : ''}</div></td>
-                ${window.isSuperuser ? `
+                <td onclick="showEvents(${s.id})" style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${s.sub ? escapeHtml(s.sub) : '—'}</td>
+                <td onclick="showEvents(${s.id})">${previewDescriptionCell(s.stack)}</td>
+                <td onclick="showEvents(${s.id})"><span class="${s.status === 'Авторизован' ? 'badge-active' : 'badge-inactive'}">${s.status}</span></td>
+                <td onclick="showEvents(${s.id})"><div class="nps-val">${s.nps > 0 ? Number(s.nps).toFixed(1) : '—'}</div></td>
+                ${window.isAdmin ? `
                 <td class="actions-cell" onclick="event.stopPropagation()">
                     <a href="/speakers/edit/${s.id}/" class="btn-action" style="color: var(--text-main); text-decoration: none;" title="Редактировать"><i class="fa-solid fa-pen"></i></a>
                     <form method="POST" action="/speakers/delete/${s.id}/" style="display:inline;" onsubmit="return confirm('Вы уверены, что хотите удалить этого спикера?');">
@@ -433,7 +636,7 @@
                         <button type="submit" class="btn-action btn-danger" style="background: none; border: none; cursor: pointer; color: var(--text-main);" title="Удалить"><i class="fa-solid fa-trash"></i></button>
                     </form>
                 </td>
-                ` : '<td></td>'}
+                ` : ''}
             </tr>
         `).join('');
     }
@@ -454,15 +657,15 @@
         const speaker = speakersData.find(s => s.id === id);
         if (!speaker) return;
         
-        document.getElementById('modalAvatarImg').src = getAvatarUrl(speaker.img, 300);
+        document.getElementById('modalAvatarImg').src = getAvatarUrl(speaker, 300);
         document.getElementById('modalAvatarNameText').innerText = speaker.name;
         
         document.getElementById('modalStackVal').innerText = speaker.stack;
-        document.getElementById('modalCityVal').innerText = speaker.city;
-        document.getElementById('modalNpsVal').innerHTML = `<span style="color: var(--text-main); font-weight: 700;">${speaker.nps}</span>`;
+        document.getElementById('modalCityVal').innerText = speaker.sub || '—';
+        document.getElementById('modalNpsVal').innerHTML = `<span style="color: var(--text-main); font-weight: 700;">${speaker.nps > 0 ? Number(speaker.nps).toFixed(1) : '—'}</span>`;
         
         const statusContainer = document.getElementById('modalStatusVal');
-        statusContainer.innerHTML = `<span class="${speaker.status === 'Активен' ? 'badge-active' : 'badge-inactive'}">${speaker.status}</span>`;
+        statusContainer.innerHTML = `<span class="${speaker.status === 'Авторизован' ? 'badge-active' : 'badge-inactive'}">${speaker.status}</span>`;
 
         const list = document.getElementById('eventList');
         
@@ -471,12 +674,22 @@
         if (speaker.events && speaker.events.length > 0) {
             contentHtml += `<div style="margin-bottom: 16px;">
                 <h4 style="margin: 0 0 8px 0; font-size: 14px; color: var(--text-main);">Мероприятия</h4>
-                ${speaker.events.map(e => `
-                <div class="event-item" style="padding: 8px 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-size: 14px;">${e.t}</span>
-                    <span class="status-pill ${e.s}" style="font-size: 11px; padding: 4px 10px; border-radius: 12px; font-weight: 600; ${e.s === 'past' ? 'background: var(--status-past-bg); color: var(--status-past-color);' : 'background: var(--status-future-bg); color: var(--status-future-color);'}">${e.s === 'past' ? 'Прошло' : 'Будет'}</span>
-                </div>
-                `).join('')}
+                ${speaker.events.map(e => {
+                    const pillClass = e.s === 'past' ? 'past' : 'future';
+                    const pillLabel = e.s === 'past' ? 'Прошло' : 'Предстоящее';
+                    const metaParts = [];
+                    if (e.d) metaParts.push(e.d);
+                    if (e.loc) metaParts.push(e.loc);
+                    const meta = metaParts.map(t => escapeHtml(t)).join(' · ');
+                    return `
+                <div class="event-item" style="padding: 10px 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                    <div>
+                        <a href="/events/#event-${e.id}" style="font-size: 14px; font-weight: 700; color: var(--sber-green); text-decoration: none;">${escapeHtml(e.t)}</a>
+                        ${meta ? `<div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">${meta}</div>` : ''}
+                    </div>
+                    <span class="status-pill ${pillClass}" style="font-size: 11px; padding: 4px 10px; border-radius: 12px; font-weight: 600; flex-shrink: 0; ${e.s === 'past' ? 'background: var(--status-past-bg); color: var(--status-past-color);' : 'background: var(--status-future-bg); color: var(--status-future-color);'}">${pillLabel}</span>
+                </div>`;
+                }).join('')}
             </div>`;
         }
 
@@ -518,32 +731,66 @@
     }
 
     async function loadSpeakersData() {
+        if (window.__slSpeakersFetchPromise) {
+            return window.__slSpeakersFetchPromise;
+        }
+        window.__slSpeakersFetchPromise = (async () => {
         try {
-            const response = await fetch('/api/speakers/');
-            speakersData = await response.json();
-            window.speakersData = speakersData;
+            const response = await fetch('/api/speakers/', {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (!response.ok) {
+                throw new Error('speakers API HTTP ' + response.status);
+            }
+            const raw = await response.text();
+            let parsed;
+            try {
+                parsed = JSON.parse(raw);
+            } catch (e) {
+                console.error('speakers API: не JSON', raw.slice(0, 300));
+                throw e;
+            }
+            if (!Array.isArray(parsed)) {
+                throw new Error('speakers API: ожидался массив');
+            }
+            speakersData = parsed;
+            window.__starliftSpeakersCache = speakersData;
 
             if (window.selectedSpeakerIds && typeof window.selectedSpeakerIds.clear === 'function') {
                 window.selectedSpeakerIds.clear();
             }
 
-            if (typeof populateFilters === 'function') {
-                populateFilters();
-            }
             if (typeof applyFiltersAndRender === 'function') {
                 applyFiltersAndRender();
             }
+            tryOpenSpeakerFromHash();
+            if (window.__pendingOpenSpeakerId != null) {
+                const pid = window.__pendingOpenSpeakerId;
+                window.__pendingOpenSpeakerId = null;
+                if (speakersData.find(function(s) { return s.id === pid; })) showEvents(pid);
+            }
         } catch (error) {
             console.error('Ошибка при загрузке данных спикеров:', error);
+            if (!speakersData.length && window.__starliftSpeakersCache && window.__starliftSpeakersCache.length) {
+                speakersData = window.__starliftSpeakersCache.slice();
+                applyFiltersAndRender();
+            }
+        } finally {
+            window.__slSpeakersFetchPromise = null;
         }
+        })();
+        return window.__slSpeakersFetchPromise;
     }
+
+    window.loadStarliftSpeakersData = loadSpeakersData;
 
     function initSpeakersPage() {
         const actionsToggle = document.getElementById('tableActionsToggle');
         const actionsMenu = document.getElementById('tableActionsMenu');
 
         if (actionsToggle && actionsMenu) {
-            actionsToggle.addEventListener('click', (event) => {
+            slBindOnce(actionsToggle, 'click', (event) => {
                 event.stopPropagation();
                 actionsMenu.classList.toggle('show');
             });
@@ -556,13 +803,29 @@
                     document.getElementById('tableActionsMenu')?.classList.remove('show');
                 }
             });
-            
+
+            /* Фильтры «Спикеры»: только делегирование — после SPA узлы новые, прямой addEventListener на кнопку иногда не срабатывал */
             document.addEventListener('click', (e) => {
+                if (!document.querySelector('.speakers-page')) return;
+                const pageRoot = document.getElementById('page-content');
+                if (!pageRoot || !pageRoot.contains(e.target)) return;
+
+                const toggle = e.target.closest('#filtersToggle');
+                if (toggle) {
+                    e.stopPropagation();
+                    const filterPanel = document.getElementById('filtersPanel');
+                    if (filterPanel) {
+                        const isOpen = filterPanel.classList.toggle('show');
+                        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                    }
+                    return;
+                }
+
                 const filterPanel = document.getElementById('filtersPanel');
                 const toggleFiltersBtn = document.getElementById('filtersToggle');
-                if (filterPanel && !e.target.closest('.filters-container')) {
+                if (filterPanel && toggleFiltersBtn && !e.target.closest('.filters-container')) {
                     filterPanel.classList.remove('show');
-                    toggleFiltersBtn?.setAttribute('aria-expanded', 'false');
+                    toggleFiltersBtn.setAttribute('aria-expanded', 'false');
                 }
             });
 
@@ -578,26 +841,51 @@
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') closeModal();
             });
+
+            window.addEventListener('hashchange', () => {
+                if (document.querySelector('.speakers-page') && speakersData.length) {
+                    tryOpenSpeakerFromHash();
+                }
+            });
         }
 
-        // Attach event listeners for filters & search
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) searchInput.addEventListener('input', applyFiltersAndRender);
+        // Данные встроены сервером — рендерим немедленно
+        if (speakersData.length) {
+            applyFiltersAndRender();
+        }
 
-        ['regionFilter', 'stackFilter', 'statusFilter', 'npsMin', 'npsMax'].forEach(id => {
+        // Attach event listeners for filters & search (на новых узлах после каждой SPA‑вставки)
+        const searchInput = document.getElementById('searchInput');
+        slBindOnce(searchInput, 'input', applyFiltersAndRender);
+
+        ['statusFilter', 'npsMin', 'npsMax'].forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.addEventListener('change', applyFiltersAndRender);
+            if (el) slBindOnce(el, 'change', applyFiltersAndRender);
         });
-        ['npsMin', 'npsMax'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.addEventListener('input', applyFiltersAndRender);
-        });
+
+        const companyFilter = document.getElementById('companyFilter');
+        slBindOnce(companyFilter, 'input', applyFiltersAndRender);
+
+        const sberBtn = document.getElementById('sberOnlyBtn');
+        if (sberBtn) {
+            slBindOnce(sberBtn, 'click', () => {
+                if (!companyFilter) return;
+                const isSberActive = companyFilter.value.toLowerCase() === 'сбер';
+                companyFilter.value = isSberActive ? '' : 'Сбер';
+                sberBtn.classList.toggle('active', !isSberActive);
+                applyFiltersAndRender();
+            });
+            // Синхронизировать состояние кнопки при ручном вводе
+            slBindOnce(companyFilter, 'input', () => {
+                if (sberBtn) sberBtn.classList.toggle('active', normalizeText(companyFilter.value) === normalizeText('Сбер'));
+            });
+        }
 
         const npsMin = document.getElementById('npsMin');
         const npsMax = document.getElementById('npsMax');
         if (npsMin && npsMax) {
             [npsMin, npsMax].forEach(el => {
-                el.addEventListener('input', () => {
+                slBindOnce(el, 'input', () => {
                     let min = parseNps(npsMin.value);
                     let max = parseNps(npsMax.value);
                     if (min != null && max != null && min > max) {
@@ -606,40 +894,50 @@
                         } else {
                             npsMax.value = min;
                         }
-                        applyFiltersAndRender();
                     }
+                    applyFiltersAndRender();
                 });
             });
         }
 
-        const toggleFiltersBtn = document.getElementById('filtersToggle');
-        const filterPanel = document.getElementById('filtersPanel');
-
-        if (toggleFiltersBtn && filterPanel) {
-            toggleFiltersBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isOpen = filterPanel.classList.toggle('show');
-                toggleFiltersBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        document.querySelectorAll('[data-step-target][data-step-dir]').forEach(btn => {
+            slBindOnce(btn, 'click', () => {
+                const target = document.getElementById(btn.dataset.stepTarget);
+                const dir = btn.dataset.stepDir === 'down' ? -1 : 1;
+                stepNumericInput(target, dir);
             });
-
-            filterPanel.addEventListener('click', (e) => e.stopPropagation());
-        }
+        });
 
         const modalClose = document.getElementById('modalClose');
         if (modalClose) {
-            modalClose.addEventListener('click', closeModal);
+            slBindOnce(modalClose, 'click', closeModal);
         }
         const modalOverlay = document.getElementById('modalOverlay');
         if (modalOverlay) {
-            modalOverlay.addEventListener('click', (e) => {
+            slBindOnce(modalOverlay, 'click', (e) => {
                 if (e.target === modalOverlay) closeModal();
             });
         }
 
-        loadSpeakersData();
+        tryOpenSpeakerFromHash();
+
+        if (window.__pendingOpenSpeakerId && speakersData.length) {
+            const pid = window.__pendingOpenSpeakerId;
+            window.__pendingOpenSpeakerId = null;
+            if (speakersData.find(s => s.id === pid)) showEvents(pid);
+        }
     }
 
-    initSpeakersPage();
+    // Inline-скрипт сидит в block content, а модалка — в block modals (рендерится позже).
+    // На полной перезагрузке страницы DOM модалки ещё не существует в момент вызова —
+    // showEvents падал на getElementById(...).src, и спикер не открывался по хешу.
+    // Ждём DOMContentLoaded, чтобы модалка точно была в DOM. На SPA-инъекции
+    // readyState === 'complete', поэтому запускаемся сразу.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSpeakersPage, { once: true });
+    } else {
+        initSpeakersPage();
+    }
 </script>
 {% endblock %}
 
@@ -663,11 +961,11 @@
 
                     <div class="speaker-detail-grid">
                         <div class="speaker-detail-item">
-                            <span class="sd-label">Стек</span>
+                            <span class="sd-label">Описание</span>
                             <span class="sd-value" id="modalStackVal"></span>
                         </div>
                         <div class="speaker-detail-item">
-                            <span class="sd-label">Город</span>
+                            <span class="sd-label">Компания</span>
                             <span class="sd-value" id="modalCityVal"></span>
                         </div>
                         <div class="speaker-detail-item">

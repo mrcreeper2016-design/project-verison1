@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .console-shell { display: grid; gap: 20px; }
+    .console-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .console-title { margin: 0; font-size: clamp(26px, 3vw, 36px); font-weight: 800; letter-spacing: -0.03em; color: var(--text-main); }
+    .console-subtitle { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; line-height: 1.5; }
+    .console-nav { display: flex; gap: 8px; flex-wrap: wrap; padding: 6px; background: var(--white); border: 1px solid var(--border-color); border-radius: 14px; }
+    .console-nav a { padding: 8px 14px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 13px; color: var(--text-muted); transition: var(--transition); }
+    .console-nav a:hover { color: var(--text-main); background: var(--light-green); }
+    .console-nav a.active { background: var(--sber-green); color: #fff; }
+    .console-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+    .console-table th, .console-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+    .console-table th { font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; }
+    .console-table tbody tr:hover { background: var(--light-green); }
+    .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; border: 1px solid var(--border-color); }
+    .chip-green { background: var(--light-green); color: var(--sber-green); }
+    .chip-amber { background: rgba(224,165,0,0.15); color: #B87C00; border-color: rgba(224,165,0,0.3); }
+    .chip-red { background: rgba(217,62,78,0.1); color: #D93E4E; border-color: rgba(217,62,78,0.3); }
+    .chip-gray { background: var(--white); color: var(--text-muted); }
+    .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 14px; }
+    .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .filter-bar input, .filter-bar select { background: var(--white); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 12px; font-size: 13px; color: var(--text-main); }
+    .inline-form { display: inline; }
+</style>
+
+<div class="console-shell">
+    <div class="console-header animate-fade">
+        <div>
+            <h1 class="console-title">Администрирование</h1>
+            <p class="console-subtitle">Приглашения, пользователи, аудит-лог.</p>
+        </div>
+    </div>
+
+    <nav class="console-nav animate-fade" style="animation-delay:0.04s;">
+        <a href="{% url 'accounts:users' %}" class="{% if active == 'users' %}active{% endif %}"><i class="fa-solid fa-users"></i> Пользователи</a>
+        <a href="{% url 'accounts:invites' %}" class="{% if active == 'invites' %}active{% endif %}"><i class="fa-solid fa-envelope-circle-check"></i> Приглашения</a>
+        <a href="{% url 'accounts:event_requests' %}" class="{% if active == 'event_requests' %}active{% endif %}"><i class="fa-solid fa-inbox"></i> Заявки</a>
+        <a href="{% url 'accounts:audit' %}" class="{% if active == 'audit' %}active{% endif %}"><i class="fa-solid fa-clipboard-list"></i> Аудит</a>
+    </nav>
+
+    <div class="animate-fade" style="animation-delay:0.08s;">
+        {% block console_content %}{% endblock %}
+    </div>
+</div>
+{% endblock %}

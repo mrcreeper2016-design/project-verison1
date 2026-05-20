@@ -1,0 +1,10 @@
+{% extends 'accounts/auth_base.html' %}
+
+{% block title %}Ссылка недействительна — StarLift{% endblock %}
+
+{% block content %}
+<h1 class="auth-title"><i class="fa-solid fa-triangle-exclamation" style="color:#E0A500;"></i> Ссылка недействительна</h1>
+<p class="auth-subtitle">Приглашение недействительно, истёк срок, уже использовано или было отозвано. Обратитесь к администратору за новым приглашением.</p>
+
+<a href="{% url 'accounts:login' %}" class="btn-primary" style="text-decoration:none; display:inline-flex; justify-content:center; align-items:center; gap:8px;"><i class="fa-solid fa-arrow-left"></i> Ко входу</a>
+{% endblock %}
