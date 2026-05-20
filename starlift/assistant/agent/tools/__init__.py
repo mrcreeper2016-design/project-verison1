@@ -48,3 +48,13 @@ def assistant_tool(*, name: str, description: str, parameters: dict):
         TOOL_REGISTRY[name] = ToolEntry(name=name, schema=schema, func=func)
         return func
     return decorator
+
+
+def _load_builtin_tools() -> None:
+    # Imported for side-effects: each module registers its tools via @assistant_tool.
+    from . import speakers   # noqa: F401
+    from . import events     # noqa: F401
+    from . import analytics  # noqa: F401
+
+
+_load_builtin_tools()
