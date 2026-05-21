@@ -3,12 +3,18 @@ from django.urls import include, path, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve as static_serve
-from starlift import views
-from starlift.views_legal import PrivacyView, ConsentView, TermsView
+from starlift import views, views_me
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('accounts.urls')),
+    path('me/', views_me.dashboard_view, name='me_dashboard'),
+    path('me/feedback/', views_me.feedback_view, name='me_feedback'),
+    path('me/feedback/export.csv', views_me.feedback_csv_export, name='me_feedback_csv'),
+    path('me/events/', views_me.events_view, name='me_events'),
+    path('me/events/<int:event_id>/rate/', views_me.rate_event_view, name='me_event_rate'),
+    path('me/requests/', views_me.requests_view, name='me_requests'),
+    path('me/favorites/', views_me.favorites_view, name='me_favorites'),
     path('', views.index_view, name='home'),
     path('index/', views.index_view, name='index'),
     path('explore/', views.explore_view, name='explore'),
@@ -16,12 +22,15 @@ urlpatterns = [
     path('events/', views.events_view, name='events'),
     path('analytics/', views.analytics_view, name='analytics'),
     path('api/speakers/', views.speakers_api, name='speakers_api'),
+    path('api/speakers/<int:speaker_id>/like/', views.speaker_like_toggle, name='speaker_like_toggle'),
+    path('api/speakers/<int:speaker_id>/recommend/', views.speaker_recommend_toggle, name='speaker_recommend_toggle'),
     path('api/events/', views.events_api, name='events_api'),
     path('api/home/', views.home_api, name='home_api'),
     path('speakers/add/', views.speaker_add, name='speaker_add'),
     path('speakers/edit/<int:pk>/', views.speaker_edit, name='speaker_edit'),
     path('speakers/delete/<int:pk>/', views.speaker_delete, name='speaker_delete'),
     path('speaker/<int:speaker_id>/event/<int:event_id>/qr/', views.generate_qr_view, name='generate_qr'),
+    path('speaker/<int:speaker_id>/event/<int:event_id>/qr/poster.png', views.qr_poster_view, name='qr_poster'),
     path('qr-generator/', views.qr_generator_view, name='qr_generator'),
     path('rate/<int:event_id>/<int:speaker_id>/', views.submit_feedback_view, name='rate_speaker'),
     path('thanks/', views.thank_you_view, name='thank_you'),
@@ -34,9 +43,6 @@ urlpatterns = [
     path('events/admin/<int:event_id>/remove-speaker/<int:speaker_id>/', views.admin_event_remove_speaker, name='admin_event_remove_speaker'),
     path('api/admin/pending-requests/', views.admin_pending_requests_api, name='admin_pending_requests_api'),
     path('api/admin/quick-approve/<int:request_id>/', views.admin_quick_approve, name='admin_quick_approve'),
-    path('privacy/', PrivacyView.as_view(), name='privacy'),
-    path('consent/', ConsentView.as_view(), name='consent'),
-    path('terms/', TermsView.as_view(), name='terms'),
     path('assistant/', include('assistant.urls')),
     path('assistant/support/', include(('support.urls', 'support'), namespace='support')),
     path('support/', include(('support.urls_guest', 'support_guest'), namespace='support_guest')),

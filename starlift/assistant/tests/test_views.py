@@ -32,11 +32,6 @@ class ChatFlowTests(TestCase):
     def setUp(self):
         self.client.login(username="admin", password="pw")
 
-    def test_chat_home_creates_or_redirects(self):
-        resp = self.client.get(reverse("assistant:home"))
-        self.assertEqual(resp.status_code, 302)
-        self.assertIn("/assistant/c/", resp.url)
-
     def test_create_conversation_seeds_first_message(self):
         resp = self.client.post(
             reverse("assistant:conversations_create"),
@@ -49,14 +44,16 @@ class ChatFlowTests(TestCase):
             Message.objects.filter(conversation_id=conv_id, role="user", content="Привет").exists()
         )
 
-    def test_chat_detail_renders_thread(self):
+    def test_state_returns_messages(self):
         conv = Conversation.objects.create(user=self.user, title="Test")
         Message.objects.create(conversation=conv, role="user", content="Hi there")
         Message.objects.create(conversation=conv, role="assistant", content="Hello!")
-        resp = self.client.get(reverse("assistant:chat_detail", args=[conv.id]))
+        resp = self.client.get(reverse("assistant:state"))
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Hi there")
-        self.assertContains(resp, "Hello!")
+        data = resp.json()
+        bodies = [m["content"] for m in data["messages"]]
+        self.assertIn("Hi there", bodies)
+        self.assertIn("Hello!", bodies)
 
     def test_send_then_stream_records_assistant_reply(self):
         conv = Conversation.objects.create(user=self.user)
@@ -89,10 +86,14 @@ class ChatFlowTests(TestCase):
         )
         self.assertEqual(resp.status_code, 400)
 
-    def test_cannot_access_other_users_conversation(self):
+    def test_cannot_send_to_other_users_conversation(self):
         other = _admin_user("other")
         their_conv = Conversation.objects.create(user=other)
-        resp = self.client.get(reverse("assistant:chat_detail", args=[their_conv.id]))
+        resp = self.client.post(
+            reverse("assistant:chat_send", args=[their_conv.id]),
+            data=json.dumps({"content": "hi"}),
+            content_type="application/json",
+        )
         self.assertEqual(resp.status_code, 404)
 
 

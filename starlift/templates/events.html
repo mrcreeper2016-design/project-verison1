@@ -497,6 +497,130 @@
         word-break: break-word;
     }
 
+    /* Плашка «Оценка от спикеров» — выделяется выше остального фидбэка */
+    .speaker-ratings-plate {
+        margin: 14px 0 4px;
+        padding: 16px 18px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(255, 209, 102, 0.22), rgba(255, 231, 163, 0.12));
+        border: 1px solid rgba(180, 130, 0, 0.35);
+        box-shadow: 0 6px 18px rgba(255, 209, 102, 0.18);
+        display: none;
+    }
+    .speaker-ratings-plate.is-visible { display: block; }
+    [data-theme="dark"] .speaker-ratings-plate {
+        background: linear-gradient(135deg, rgba(255, 209, 102, 0.10), rgba(255, 209, 102, 0.04));
+        border-color: rgba(255, 209, 102, 0.35);
+    }
+
+    .srp-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+    .srp-icon {
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #FFD166, #FFB347);
+        color: #6B4F00;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        box-shadow: 0 4px 10px rgba(255, 180, 71, 0.35);
+    }
+    .srp-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .srp-avg {
+        font-size: 28px;
+        font-weight: 800;
+        color: var(--text-main);
+        line-height: 1;
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+    }
+    .srp-avg .srp-of-ten {
+        font-size: 14px;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+    .srp-count {
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+    .srp-toggle {
+        background: none;
+        border: none;
+        color: var(--sber-green);
+        font-weight: 700;
+        cursor: pointer;
+        padding: 4px 0;
+        margin-top: 8px;
+        font-size: 13px;
+        font-family: inherit;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .srp-toggle:hover { text-decoration: underline; }
+    .srp-items {
+        display: none;
+        margin-top: 12px;
+        gap: 10px;
+        flex-direction: column;
+    }
+    .srp-items.is-open { display: flex; }
+    .srp-item {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 10px;
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+    }
+    .srp-item .avatar {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+    }
+    .srp-item-body { flex: 1; min-width: 0; }
+    .srp-item-row {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        flex-wrap: wrap;
+    }
+    .srp-item-name { font-weight: 700; font-size: 13px; color: var(--text-main); }
+    .srp-item-score {
+        font-weight: 800;
+        font-size: 14px;
+        color: #B07A00;
+        background: rgba(255, 209, 102, 0.25);
+        padding: 1px 8px;
+        border-radius: 999px;
+    }
+    [data-theme="dark"] .srp-item-score { color: #FFD166; background: rgba(255, 209, 102, 0.12); }
+    .srp-item-comment {
+        margin: 4px 0 0;
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.4;
+        word-break: break-word;
+    }
+
     @media (max-width: 960px) {
         .events-grid,
         .event-modal-grid {
@@ -524,19 +648,92 @@
         .events-header { flex-direction: column; align-items: flex-start; gap: 12px; }
         .events-title { font-size: 22px !important; }
         .event-card { padding: 14px; }
+
+        /* Фуллскрин-модалка мероприятия: убираем внешние отступы у контейнера */
+        #eventModalOverlay.modal-overlay {
+            padding: 0 !important;
+            align-items: stretch;
+        }
         #eventModalOverlay .modal-content.event-detail-modal {
             width: 100vw !important;
             height: 100vh !important;
             max-height: 100vh !important;
             border-radius: 0 !important;
-            padding: 16px 14px !important;
+            padding: 56px 16px 20px !important;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+        /* Кнопка закрытия — фикс наверху, не «улетает» */
+        #eventModalOverlay .modal-close {
+            position: fixed;
+            top: 14px;
+            right: 14px;
+            z-index: 5;
+            background: var(--panel-bg);
+            border-radius: 999px;
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        /* Уплощаем «карточки внутри карточки» — они в фуллскрин-модалке только мешают */
+        .event-detail-modal .event-modal-grid {
+            gap: 22px;
+            margin-top: 0;
+        }
+        .event-detail-modal .event-modal-section {
+            padding: 0;
+            border: none;
+            background: transparent;
+            border-radius: 0;
+        }
+        .event-detail-modal .event-modal-section + .event-modal-section {
+            border-top: 1px solid var(--border-color);
+            padding-top: 18px;
+        }
+        .event-detail-modal .event-modal-section:active {
+            transform: none;
+        }
+
+        .event-detail-modal .event-modal-title {
+            font-size: 20px;
+            line-height: 1.25;
+            margin-bottom: 10px;
+        }
+        .event-detail-modal .section-title {
+            font-size: 16px;
+        }
+        .event-detail-modal .event-desc-body {
+            font-size: 14px;
+        }
+
+        /* Расписание: не отдельный скролл, естественный поток внутри модалки */
+        .event-detail-modal .event-schedule-scroll {
+            max-height: none !important;
+            overflow: visible !important;
+            padding-right: 0 !important;
+        }
+
+        /* Чипы спикеров — компактнее */
+        .event-detail-modal .speaker-chip {
+            padding: 8px 10px;
         }
     }
 
     @media (max-width: 480px) {
         .schedule-item {
-            grid-template-columns: 1fr !important;
-            gap: 4px !important;
+            grid-template-columns: 60px 1fr !important;
+            gap: 8px !important;
+            padding: 10px !important;
+        }
+        .schedule-time {
+            font-size: 11px;
+        }
+        .schedule-text {
+            font-size: 13px;
         }
         .stacked-avatars .avatar {
             width: 28px !important;
@@ -544,6 +741,17 @@
             margin-left: -6px;
         }
         .stacked-avatars .avatar:first-child { margin-left: 0; }
+
+        #eventModalOverlay .modal-content.event-detail-modal {
+            padding: 52px 12px 16px !important;
+        }
+        .event-detail-modal .event-modal-title { font-size: 19px; }
+        /* «Перейти на мероприятие» — sticky внизу для удобства большого пальца */
+        .event-detail-modal #eventGoLink {
+            position: sticky;
+            bottom: 8px;
+            z-index: 4;
+        }
     }
 </style>
 
@@ -737,6 +945,14 @@ function parseEventDate(ev) {
     d = parseLooseDateString(ev.title || '');
     if (d) return d;
     return parseLooseDateString((ev.description || '').slice(0, 800));
+}
+
+function pluralRu(n, forms) {
+    const mod10 = Math.abs(n) % 10;
+    const mod100 = Math.abs(n) % 100;
+    if (mod10 === 1 && mod100 !== 11) return forms[0];
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+    return forms[2];
 }
 
 function escapeHtml(str) {
@@ -1064,6 +1280,49 @@ function renderEventModal(eventId) {
         }
     }
 
+    // --- Плашка «Оценка от спикеров» ---
+    const ratingsPlate = document.getElementById('eventRatingsPlate');
+    const ratingsAvg = document.getElementById('eventRatingsAvg');
+    const ratingsCount = document.getElementById('eventRatingsCount');
+    const ratingsItems = document.getElementById('eventRatingsItems');
+    const ratingsToggle = document.getElementById('eventRatingsToggle');
+    const sr = ev.speaker_ratings || { avg: null, count: 0, items: [] };
+    if (ratingsPlate && sr.count > 0) {
+        ratingsPlate.classList.add('is-visible');
+        if (ratingsAvg) ratingsAvg.textContent = sr.avg != null ? String(sr.avg) : '—';
+        if (ratingsCount) ratingsCount.textContent = sr.count + ' ' + pluralRu(sr.count, ['оценка', 'оценки', 'оценок']);
+        if (ratingsItems) {
+            ratingsItems.innerHTML = (sr.items || []).map(it => {
+                const alt = escapeHtml(it.speaker_name || '');
+                const img = it.speaker_avatar
+                    ? `<img class="avatar" src="${escapeHtml(it.speaker_avatar)}" alt="${alt}">`
+                    : `<div class="avatar" style="background:var(--sber-green);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;" aria-hidden="true">${escapeHtml((it.speaker_name || '?').charAt(0))}</div>`;
+                const cmt = it.comment ? `<p class="srp-item-comment">${escapeHtml(it.comment)}</p>` : '';
+                return `<div class="srp-item">${img}<div class="srp-item-body">
+                    <div class="srp-item-row">
+                        <span class="srp-item-name">${escapeHtml(it.speaker_name)}</span>
+                        <span class="srp-item-score">${it.score}/10</span>
+                    </div>${cmt}
+                </div></div>`;
+            }).join('');
+            ratingsItems.classList.remove('is-open');
+        }
+        if (ratingsToggle) {
+            ratingsToggle.setAttribute('aria-expanded', 'false');
+            ratingsToggle.querySelector('span').textContent = 'Показать оценки';
+            ratingsToggle.querySelector('i').className = 'fa-solid fa-chevron-down';
+            ratingsToggle.onclick = () => {
+                const open = ratingsItems.classList.toggle('is-open');
+                ratingsToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                ratingsToggle.querySelector('span').textContent = open ? 'Скрыть оценки' : 'Показать оценки';
+                ratingsToggle.querySelector('i').className = open ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down';
+            };
+        }
+    } else if (ratingsPlate) {
+        ratingsPlate.classList.remove('is-visible');
+        if (ratingsItems) ratingsItems.innerHTML = '';
+    }
+
     const spWrap = document.getElementById('eventSpeakersList');
     const spList = ev.speakers || [];
     if (spWrap) {
@@ -1217,6 +1476,22 @@ if (document.readyState === 'loading') {
                     <div class="event-desc-wrap">
                         <p class="event-desc-body" id="eventModalDescription"></p>
                         <button type="button" class="event-desc-toggle" id="eventModalDescToggle" aria-controls="eventModalDescription">Показать полностью</button>
+                    </div>
+
+                    <div class="speaker-ratings-plate" id="eventRatingsPlate" aria-live="polite">
+                        <div class="srp-head">
+                            <div class="srp-icon"><i class="fa-solid fa-star"></i></div>
+                            <div style="display:flex; flex-direction:column; gap:2px;">
+                                <p class="srp-title">Оценка от спикеров</p>
+                                <div class="srp-avg"><span id="eventRatingsAvg">—</span><span class="srp-of-ten">/ 10</span></div>
+                            </div>
+                            <span class="srp-count" id="eventRatingsCount"></span>
+                        </div>
+                        <button type="button" class="srp-toggle" id="eventRatingsToggle" aria-expanded="false" aria-controls="eventRatingsItems">
+                            <i class="fa-solid fa-chevron-down"></i>
+                            <span>Показать оценки</span>
+                        </button>
+                        <div class="srp-items" id="eventRatingsItems"></div>
                     </div>
 
                     <div style="display:grid; gap:12px; margin-top:18px;">

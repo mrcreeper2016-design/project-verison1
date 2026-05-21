@@ -2,15 +2,17 @@ from django.urls import path
 
 from .views import tickets, stream, api
 
+# Support is drawer-only — no page-level entry point. These are only
+# backend endpoints called by the FAB drawer JS.
 urlpatterns = [
-    # Authenticated tab inside the assistant page
-    path("", tickets.support_home, name="home"),
-    path("t/<int:ticket_id>/", tickets.ticket_detail, name="ticket_detail"),
     path("t/<int:ticket_id>/send/", tickets.send_message, name="send_message"),
+    path("t/<int:ticket_id>/typing/", tickets.typing_endpoint, name="typing"),
     path("t/<int:ticket_id>/stream/", stream.user_stream, name="ticket_stream"),
     path("t/<int:ticket_id>/close/", tickets.close_ticket, name="close_ticket"),
-    path("new/", tickets.new_ticket, name="new_ticket"),
 
-    # API
+    # JSON API consumed by the drawer pane
     path("api/unread/", api.unread_api, name="api_unread"),
+    path("api/list/", api.list_api, name="api_list"),
+    path("api/t/<int:ticket_id>/", api.thread_api, name="api_thread"),
+    path("api/new/", api.new_api, name="api_new"),
 ]

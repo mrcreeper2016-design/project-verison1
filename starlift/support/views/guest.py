@@ -15,6 +15,7 @@ from ..models import SupportTicket, SupportMessage
 from ..services.magic_link import make_token, hash_token, verify_token
 from ..services.email import send_guest_link
 from ..services.rate_limit import RateLimitExceeded, hit_guest
+from ..services.typing import set_typing, clear_typing
 
 
 def _client_ip(request: HttpRequest) -> str:
@@ -99,13 +100,39 @@ def guest_new(request: HttpRequest):
 
 @never_cache
 def guest_thread(request: HttpRequest, token: str):
+    from ..services.avatars import avatar_url_for_user
+    import json as _json
+
     ticket = _find_ticket_by_token(token)
     if ticket is None:
         raise Http404
-    messages_list = list(ticket.messages.order_by("created_at", "id"))
+    messages_list = list(
+        ticket.messages.order_by("created_at", "id").select_related("sender_user")
+    )
+
+    def _sender_name(m):
+        if m.sender_user_id:
+            return m.sender_user.get_full_name() or m.sender_user.username
+        if m.sender_kind == SupportMessage.SENDER_GUEST:
+            return ticket.guest_name or ticket.guest_email or "Гость"
+        return ""
+
+    msgs_json = [
+        {
+            "id": m.id,
+            "sender_kind": m.sender_kind,
+            "sender_name": _sender_name(m),
+            "sender_avatar_url": avatar_url_for_user(m.sender_user) if m.sender_user_id else "",
+            "sender_id": m.sender_user_id or 0,
+            "body": m.body,
+            "created_at": m.created_at.isoformat(),
+        }
+        for m in messages_list
+    ]
     return render(request, "support/guest_thread.html", {
         "ticket": ticket,
         "messages_list": messages_list,
+        "messages_data": msgs_json,
         "token": token,
     })
 
@@ -139,6 +166,28 @@ def guest_send(request: HttpRequest, token: str) -> JsonResponse:
     msg = SupportMessage.objects.create(
         ticket=ticket, sender_kind=SupportMessage.SENDER_GUEST, body=content,
     )
+    clear_typing(ticket.id, "guest")
     audit.log(action="support_message_sent", request=request, target=ticket,
               metadata={"ticket_id": ticket.id, "guest": True, "message_id": msg.id})
     return JsonResponse({"message_id": msg.id})
+
+
+@never_cache
+@csrf_protect
+@require_http_methods(["POST"])
+def guest_typing(request: HttpRequest, token: str) -> JsonResponse:
+    ticket = _find_ticket_by_token(token)
+    if ticket is None:
+        return JsonResponse({"error": "not_found"}, status=404)
+    if ticket.status == SupportTicket.STATUS_CLOSED:
+        return JsonResponse({"ok": True})
+    import json as _json
+    try:
+        data = _json.loads(request.body or b"{}")
+    except _json.JSONDecodeError:
+        data = {}
+    if data.get("active"):
+        set_typing(ticket.id, "guest")
+    else:
+        clear_typing(ticket.id, "guest")
+    return JsonResponse({"ok": True})

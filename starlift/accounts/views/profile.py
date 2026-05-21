@@ -160,6 +160,7 @@ def profile_view(request: HttpRequest) -> HttpResponse:
         "linked_speaker": linked_speaker,
         "is_speaker_role": is_speaker_role,
         "speaker_card_linked": is_speaker_role and linked_speaker is not None,
+        "active": "settings",
     }
     return render(request, "accounts/profile.html", context)
 

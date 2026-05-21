@@ -106,16 +106,23 @@ class Speaker(models.Model):
         return self.card_avatar_url
 
     def calculate_nps(self, event_id=None):
-        qs = self.feedbacks.all()
-        if event_id:
-            qs = qs.filter(event_id=event_id)
+        """Средняя оценка по всем отзывам зрителей + собственным оценкам мероприятий.
 
-        from django.db.models import Avg
-        result = qs.aggregate(avg=Avg('score'))
-        avg = result['avg']
-        if avg is None:
+        Оценка спикера за событие (`SpeakerEventRating`) учитывается наравне с отзывом
+        зрителя — это его взгляд на собственное участие/выступление.
+        """
+        fb_qs = self.feedbacks.all()
+        sr_qs = self.event_ratings.all()
+        if event_id:
+            fb_qs = fb_qs.filter(event_id=event_id)
+            sr_qs = sr_qs.filter(event_id=event_id)
+
+        scores = list(fb_qs.values_list("score", flat=True)) + list(
+            sr_qs.values_list("score", flat=True)
+        )
+        if not scores:
             return 0
-        return round(avg, 1)
+        return round(sum(scores) / len(scores), 1)
 
     def __str__(self):
         return self.name
@@ -258,3 +265,81 @@ class EventRequest(models.Model):
 
     def __str__(self):
         return f"{self.get_kind_display()} от {self.speaker.name} ({self.status})"
+
+
+class SpeakerEventRating(models.Model):
+    """Спикер ставит оценку прошедшему мероприятию, в котором участвовал.
+
+    Не влияет на NPS спикеров (это отдельная метрика самого события глазами
+    выступавших). Одна оценка на пару (speaker, event); повторный сабмит
+    обновляет существующую запись.
+    """
+
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="speaker_ratings",
+        verbose_name="Мероприятие",
+    )
+    speaker = models.ForeignKey(
+        Speaker,
+        on_delete=models.CASCADE,
+        related_name="event_ratings",
+        verbose_name="Спикер",
+    )
+    score = models.IntegerField(
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+        verbose_name="Оценка (0–10)",
+    )
+    comment = models.TextField(blank=True, default="", verbose_name="Комментарий")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "starlift_speaker_event_rating"
+        unique_together = [("event", "speaker")]
+        indexes = [models.Index(fields=["event", "speaker"])]
+        verbose_name = "Оценка мероприятия от спикера"
+        verbose_name_plural = "Оценки мероприятий от спикеров"
+
+    def __str__(self):
+        return f"{self.speaker.name} → {self.event.title}: {self.score}/10"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        nps_value = self.speaker.calculate_nps()
+        if nps_value is not None:
+            self.speaker.nps = nps_value
+            self.speaker.save(update_fields=["nps"])
+
+    def delete(self, *args, **kwargs):
+        speaker = self.speaker
+        super().delete(*args, **kwargs)
+        nps_value = speaker.calculate_nps()
+        if nps_value is not None:
+            speaker.nps = nps_value
+            speaker.save(update_fields=["nps"])
+
+
+class SpeakerLike(models.Model):
+    """Per-user heart/favorite on a Speaker. Toggled from the speaker modal."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="speaker_likes",
+    )
+    speaker = models.ForeignKey(
+        Speaker,
+        on_delete=models.CASCADE,
+        related_name="likes",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "starlift_speaker_like"
+        unique_together = [("user", "speaker")]
+        indexes = [models.Index(fields=["user", "speaker"])]
+
+    def __str__(self):
+        return f"{self.user_id} ♥ {self.speaker_id}"

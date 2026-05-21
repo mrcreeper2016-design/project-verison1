@@ -65,22 +65,28 @@ class QrAccessTests(TestCase):
         self.sp_me.user = self.user_sp
         self.sp_me.save(update_fields=["user"])
 
-    def test_speaker_qr_page_hides_speaker_picker(self):
+    def test_speaker_qr_page_locks_speaker_to_self(self):
         self.client.login(username="spqr", password="Secret!234")
         r = self.client.get(reverse("qr_generator"))
         self.assertEqual(r.status_code, 200)
-        self.assertNotContains(r, 'id="speakerSelect"')
-        self.assertContains(r, "Выберите мероприятие")
-        self.assertContains(r, "My Talk")
-        self.assertNotContains(r, "Foreign Event")
+        body = r.content.decode()
+        # Speaker name is rendered as the readonly input value.
+        self.assertIn('value="MeSpeaker"', body)
+        self.assertIn('readonly', body)
+        # Their own events appear; foreign events do not.
+        self.assertIn("My Talk", body)
+        self.assertNotIn("Foreign Event", body)
 
     def test_admin_qr_page_lists_all_speakers(self):
         _login_admin(self.client)
         r = self.client.get(reverse("qr_generator"))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'id="speakerSelect"')
-        self.assertContains(r, "MeSpeaker")
-        self.assertContains(r, "OtherSpeaker")
+        body = r.content.decode()
+        self.assertIn("MeSpeaker", body)
+        self.assertIn("OtherSpeaker", body)
+        # The combobox input is present and not readonly for admins.
+        self.assertIn('id="speakerInput"', body)
+        self.assertNotIn('id="speakerSelect"', body)
 
     def test_speaker_can_generate_qr_only_own_event(self):
         self.client.login(username="spqr", password="Secret!234")
@@ -102,14 +108,55 @@ class QrAccessTests(TestCase):
         url = reverse("generate_qr", kwargs={"speaker_id": self.sp_other.id, "event_id": self.ev_foreign.id})
         self.assertEqual(self.client.get(url).status_code, 200)
 
-    def test_unlinked_speaker_sees_warning_and_disabled_controls(self):
+    def test_unlinked_speaker_sees_warning_and_no_form(self):
         self.sp_me.user = None
         self.sp_me.save(update_fields=["user"])
         self.client.login(username="spqr", password="Secret!234")
         r = self.client.get(reverse("qr_generator"))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "привязанная карточка")
-        self.assertIn("disabled", r.content.decode().lower())
+        body = r.content.decode()
+        self.assertIn("привязанная карточка", body)
+        # No generate button when there's no data to work with.
+        self.assertNotIn('id="generateBtn"', body)
+
+    def test_admin_cannot_generate_qr_for_non_participating_pair(self):
+        """Defence-in-depth: even if admin crafts the URL by hand, the server refuses."""
+        _login_admin(self.client)
+        # sp_me is on ev_ok only; sp_other on ev_foreign only.
+        url = reverse(
+            "generate_qr",
+            kwargs={"speaker_id": self.sp_me.id, "event_id": self.ev_foreign.id},
+        )
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_qr_poster_returns_png_for_valid_pair(self):
+        _login_admin(self.client)
+        url = reverse(
+            "qr_poster",
+            kwargs={"speaker_id": self.sp_me.id, "event_id": self.ev_ok.id},
+        )
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "image/png")
+        self.assertIn("attachment", resp["Content-Disposition"])
+        # PNG magic bytes
+        self.assertTrue(resp.content.startswith(b"\x89PNG\r\n\x1a\n"))
+
+    def test_qr_poster_forbidden_for_invalid_pair(self):
+        _login_admin(self.client)
+        url = reverse(
+            "qr_poster",
+            kwargs={"speaker_id": self.sp_me.id, "event_id": self.ev_foreign.id},
+        )
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_qr_poster_forbidden_for_other_speaker(self):
+        self.client.login(username="spqr", password="Secret!234")
+        url = reverse(
+            "qr_poster",
+            kwargs={"speaker_id": self.sp_other.id, "event_id": self.ev_foreign.id},
+        )
+        self.assertEqual(self.client.get(url).status_code, 403)
 
 
 def _login_member(client):
@@ -516,3 +563,113 @@ class SyncHighloadCommandTests(TestCase):
         mock_sync.return_value = ImportCounters()
         call_command("sync_highload", "--max-cycles=2", "--interval-minutes=1")
         self.assertEqual(mock_sync.call_count, 2)
+
+
+class SpeakerLikeTests(TestCase):
+    def setUp(self):
+        from accounts.models import UserProfile
+        User = get_user_model()
+
+        self.user = User.objects.create_user(
+            username="liker", email="liker@x.io", password="Secret!234"
+        )
+        self.user.profile.role = UserProfile.ROLE_SPEAKER
+        self.user.profile.email_verified = True
+        self.user.profile.save(update_fields=["role", "email_verified"])
+
+        self.speaker = _make_speaker("Hearted")
+
+    def test_like_toggle_creates_then_removes(self):
+        self.client.login(username="liker", password="Secret!234")
+        url = f"/api/speakers/{self.speaker.id}/like/"
+
+        # First POST → liked
+        r1 = self.client.post(url)
+        self.assertEqual(r1.status_code, 200)
+        d1 = r1.json()
+        self.assertTrue(d1["liked"])
+        self.assertEqual(d1["like_count"], 1)
+
+        # Second POST → unliked
+        r2 = self.client.post(url)
+        self.assertEqual(r2.status_code, 200)
+        d2 = r2.json()
+        self.assertFalse(d2["liked"])
+        self.assertEqual(d2["like_count"], 0)
+
+    def test_like_get_not_allowed(self):
+        self.client.login(username="liker", password="Secret!234")
+        r = self.client.get(f"/api/speakers/{self.speaker.id}/like/")
+        self.assertEqual(r.status_code, 405)
+
+    def test_like_requires_login(self):
+        r = self.client.post(f"/api/speakers/{self.speaker.id}/like/")
+        # @member_required redirects anon to login (302).
+        self.assertIn(r.status_code, (302, 403))
+
+    def test_speakers_api_includes_liked_flag_after_like(self):
+        self.client.login(username="liker", password="Secret!234")
+        self.client.post(f"/api/speakers/{self.speaker.id}/like/")
+        r = self.client.get("/api/speakers/")
+        self.assertEqual(r.status_code, 200)
+        items = r.json()
+        mine = next((s for s in items if s["id"] == self.speaker.id), None)
+        self.assertIsNotNone(mine)
+        self.assertTrue(mine["liked"])
+        self.assertEqual(mine["like_count"], 1)
+
+    def test_speakers_api_zero_likes_by_default(self):
+        self.client.login(username="liker", password="Secret!234")
+        r = self.client.get("/api/speakers/")
+        self.assertEqual(r.status_code, 200)
+        items = r.json()
+        mine = next((s for s in items if s["id"] == self.speaker.id), None)
+        self.assertIsNotNone(mine)
+        self.assertFalse(mine["liked"])
+        self.assertEqual(mine["like_count"], 0)
+
+
+class SpeakerRecommendTests(TestCase):
+    def setUp(self):
+        self.admin = _login_admin(self.client)
+        self.speaker = _make_speaker("RecMe")
+        self.assertFalse(self.speaker.recommended)
+
+    def test_recommend_toggle_flips_flag(self):
+        url = f"/api/speakers/{self.speaker.id}/recommend/"
+        r1 = self.client.post(url)
+        self.assertEqual(r1.status_code, 200)
+        self.assertTrue(r1.json()["recommended"])
+        self.speaker.refresh_from_db()
+        self.assertTrue(self.speaker.recommended)
+
+        r2 = self.client.post(url)
+        self.assertEqual(r2.status_code, 200)
+        self.assertFalse(r2.json()["recommended"])
+        self.speaker.refresh_from_db()
+        self.assertFalse(self.speaker.recommended)
+
+    def test_recommend_get_not_allowed(self):
+        r = self.client.get(f"/api/speakers/{self.speaker.id}/recommend/")
+        self.assertEqual(r.status_code, 405)
+
+    def test_recommend_forbidden_for_non_admin(self):
+        from accounts.models import UserProfile
+        User = get_user_model()
+        speaker_user = User.objects.create_user(
+            username="notadmin", email="na@x.io", password="Secret!234"
+        )
+        speaker_user.profile.role = UserProfile.ROLE_SPEAKER
+        speaker_user.profile.save(update_fields=["role"])
+        self.client.logout()
+        self.client.login(username="notadmin", password="Secret!234")
+        r = self.client.post(f"/api/speakers/{self.speaker.id}/recommend/")
+        self.assertEqual(r.status_code, 403)
+
+    def test_speakers_api_includes_recommended(self):
+        self.speaker.recommended = True
+        self.speaker.save(update_fields=["recommended"])
+        r = self.client.get("/api/speakers/")
+        item = next((s for s in r.json() if s["id"] == self.speaker.id), None)
+        self.assertIsNotNone(item)
+        self.assertTrue(item["recommended"])

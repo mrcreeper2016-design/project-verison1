@@ -1,0 +1,19 @@
+{# Общий просмотрщик правовых документов. Включается на страницах с ссылками .legal-link[data-legal=…]. #}
+<div class="legal-modal-backdrop" id="legalModal" role="dialog" aria-modal="true" aria-labelledby="legalModalTitle">
+    <div class="legal-modal" role="document">
+        <header class="legal-modal__header">
+            <h2 class="legal-modal__title" id="legalModalTitle" data-legal-title>Документ</h2>
+            <button type="button" class="legal-modal__close" data-legal-close aria-label="Закрыть">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </header>
+        <div class="legal-modal__body">
+            <div class="legal-modal__doc" data-legal-doc="consent">{% include 'legal/_consent_body.html' %}</div>
+            <div class="legal-modal__doc" data-legal-doc="privacy" hidden>{% include 'legal/_privacy_body.html' %}</div>
+            <div class="legal-modal__doc" data-legal-doc="terms" hidden>{% include 'legal/_terms_body.html' %}</div>
+        </div>
+        <footer class="legal-modal__footer">
+            <button type="button" class="legal-modal__btn" data-legal-close>Закрыть</button>
+        </footer>
+    </div>
+</div>

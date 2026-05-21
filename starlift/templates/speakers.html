@@ -685,7 +685,6 @@
         
         if (speaker.events && speaker.events.length > 0) {
             contentHtml += `<div style="margin-bottom: 16px;">
-                <h4 style="margin: 0 0 8px 0; font-size: 14px; color: var(--text-main);">Мероприятия</h4>
                 ${speaker.events.map(e => {
                     const pillClass = e.s === 'past' ? 'past' : 'future';
                     const pillLabel = e.s === 'past' ? 'Прошло' : 'Предстоящее';
@@ -707,18 +706,39 @@
 
         if (speaker.feedbacks && speaker.feedbacks.length > 0) {
             contentHtml += `<div>
-                <h4 style="margin: 0 0 8px 0; font-size: 14px; color: var(--text-main);">Отзывы</h4>
+                <h4 style="margin: 0 0 8px 0; font-size: 14px; color: var(--text-main); display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    Отзывы
+                    <span style="display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; color:var(--text-muted);">
+                        <span style="width:10px; height:10px; border-radius:50%; background:var(--sber-green); display:inline-block;"></span> зрители
+                        <span style="width:10px; height:10px; border-radius:50%; background:linear-gradient(135deg,#FFD166,#FFB347); margin-left:6px; display:inline-block;"></span> общая оценка мероприятия
+                    </span>
+                </h4>
                 <div style="max-height: 200px; overflow-y: auto; padding-right: 8px;">
-                    ${speaker.feedbacks.map(f => `
-                    <div style="padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 8px; background: var(--glass-bg);">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                            <strong style="color: var(--sber-green); font-size: 13px;"><i class="fa-solid fa-star"></i> ${f.score}/10</strong>
+                    ${speaker.feedbacks.map(f => {
+                        const isSelf = f.kind === 'self_event';
+                        const cardBg = isSelf
+                            ? 'background: linear-gradient(135deg, rgba(255,209,102,0.22), rgba(255,231,163,0.08));'
+                            : 'background: var(--glass-bg);';
+                        const cardBorder = isSelf
+                            ? 'border: 1px solid rgba(180,130,0,0.4);'
+                            : 'border: 1px solid var(--border-color);';
+                        const scoreColor = isSelf ? '#B07A00' : 'var(--sber-green)';
+                        const chip = isSelf
+                            ? `<span style="display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; background:rgba(255,209,102,0.3); color:#B07A00; border:1px solid rgba(180,130,0,0.35); white-space:nowrap;"><i class="fa-solid fa-star"></i> общая оценка мероприятия</span>`
+                            : '';
+                        return `
+                    <div style="${cardBg} ${cardBorder} padding: 10px; border-radius: 8px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px; align-items: center; gap:8px;">
+                            <strong style="color: ${scoreColor}; font-size: 13px;"><i class="fa-solid fa-star"></i> ${f.score}/10</strong>
                             <span style="color: var(--text-muted); font-size: 11px;">${f.date}</span>
                         </div>
-                        <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">${f.event_title}</div>
-                        <p style="margin: 0; font-size: 13px; color: var(--text-main);">${f.comment ? f.comment : '<em style="color: var(--text-muted);">Без комментария</em>'}</p>
-                    </div>
-                    `).join('')}
+                        <div style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            ${escapeHtml(f.event_title || '')}
+                            ${chip}
+                        </div>
+                        <p style="margin: 0; font-size: 13px; color: var(--text-main);">${f.comment ? escapeHtml(f.comment) : '<em style="color: var(--text-muted);">Без комментария</em>'}</p>
+                    </div>`;
+                    }).join('')}
                 </div>
             </div>`;
         } else {
@@ -726,7 +746,76 @@
         }
         
         list.innerHTML = contentHtml || '<p style="color: var(--text-muted); font-size: 14px;">Нет данных</p>';
-        
+
+        // Heart / like state
+        const heartBtn = document.getElementById('modalHeartBtn');
+        const heartCount = document.getElementById('modalHeartCount');
+        function applyLikeState(liked, count) {
+            if (!heartBtn) return;
+            const icon = heartBtn.querySelector('i');
+            heartBtn.classList.toggle('is-liked', !!liked);
+            if (icon) icon.className = liked ? 'fa-solid fa-heart' : 'fa-regular fa-heart';
+            if (heartCount) {
+                heartCount.textContent = count > 0 ? String(count) : '';
+                heartCount.dataset.zero = count > 0 ? '0' : '1';
+            }
+        }
+        applyLikeState(speaker.liked, speaker.like_count || 0);
+        if (heartBtn) {
+            heartBtn.onclick = async () => {
+                heartBtn.disabled = true;
+                try {
+                    const csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [, ''])[1];
+                    const r = await fetch(`/api/speakers/${speaker.id}/like/`, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+                    if (r.ok) {
+                        const d = await r.json();
+                        applyLikeState(d.liked, d.like_count);
+                        speaker.liked = d.liked;
+                        speaker.like_count = d.like_count;
+                    }
+                } finally { heartBtn.disabled = false; }
+            };
+        }
+
+        // Wire admin edit/delete buttons to the current speaker.
+        const editBtn = document.getElementById('modalEditBtn');
+        if (editBtn) editBtn.setAttribute('href', `/speakers/edit/${speaker.id}/`);
+        const delForm = document.getElementById('modalDeleteForm');
+        if (delForm) delForm.setAttribute('action', `/speakers/delete/${speaker.id}/`);
+
+        // Recommend toggle (admin)
+        const recBtn = document.getElementById('modalRecommendBtn');
+        function applyRecommendState(active) {
+            if (!recBtn) return;
+            recBtn.classList.toggle('is-active', !!active);
+            const icon = recBtn.querySelector('i');
+            if (icon) icon.className = active ? 'fa-solid fa-star' : 'fa-regular fa-star';
+            recBtn.setAttribute('data-tip', active ? 'Снять рекомендацию' : 'Рекомендую к выдвижению');
+        }
+        if (recBtn) {
+            applyRecommendState(speaker.recommended);
+            recBtn.onclick = async () => {
+                recBtn.disabled = true;
+                try {
+                    const csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [, ''])[1];
+                    const r = await fetch(`/api/speakers/${speaker.id}/recommend/`, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+                    if (r.ok) {
+                        const d = await r.json();
+                        applyRecommendState(d.recommended);
+                        speaker.recommended = d.recommended;
+                    }
+                } finally { recBtn.disabled = false; }
+            };
+        }
+
         const overlay = document.getElementById('modalOverlay');
         if (overlay) overlay.style.display = 'flex';
     }
@@ -962,11 +1051,40 @@
                     <div class="modal-avatar-wrapper">
                         <img id="modalAvatarImg" src="" alt="Speaker Avatar">
                         <div class="modal-avatar-name" id="modalAvatarNameText"></div>
+                        {% if user.is_authenticated %}
+                        <button type="button" class="modal-heart-btn" id="modalHeartBtn"
+                                aria-label="Добавить в избранное">
+                            <i class="fa-regular fa-heart"></i>
+                            <span class="modal-heart-count" id="modalHeartCount" data-zero="1"></span>
+                        </button>
+                        {% endif %}
                     </div>
-                    <div class="modal-actions">
-                        <button class="btn-action btn-like" title="Лайк"><i class="fa-regular fa-heart"></i></button>
-                        <button class="btn-action btn-contact"><i class="fa-regular fa-paper-plane"></i> Связаться</button>
+                    {% if user.is_superuser or user.profile.role == 'admin' %}
+                    <div class="modal-admin-actions">
+                        <button type="button" id="modalRecommendBtn"
+                                class="modal-admin-btn modal-admin-btn--recommend"
+                                data-tip="Рекомендую к выдвижению"
+                                aria-label="Рекомендую к выдвижению">
+                            <i class="fa-regular fa-star"></i>
+                        </button>
+                        <a id="modalEditBtn" href="#"
+                           class="modal-admin-btn modal-admin-btn--edit"
+                           data-tip="Редактировать"
+                           aria-label="Редактировать">
+                            <i class="fa-solid fa-pen"></i>
+                        </a>
+                        <form id="modalDeleteForm" method="POST" action=""
+                              onsubmit="return confirm('Удалить этого спикера?');">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="modal-admin-btn modal-admin-btn--delete"
+                                    data-tip="Удалить"
+                                    aria-label="Удалить">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
                     </div>
+                    {% endif %}
                 </div>
                 <div class="modal-right">
                     <h2 style="margin-top: 0; color: var(--text-main); margin-bottom: 20px; font-size: 24px;">Профиль спикера</h2>

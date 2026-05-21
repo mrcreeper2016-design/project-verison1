@@ -80,7 +80,7 @@
                     {% if not inv.revoked_at and not inv.used_at and inv.expires_at > now %}
                     <form method="post" action="{% url 'accounts:invite_revoke' inv.pk %}" class="inline-form" onsubmit="return confirm('Отозвать приглашение для {{ inv.email }}?');">
                         {% csrf_token %}
-                        <button type="submit" class="btn-action" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3); padding:6px 10px; font-size:12px;"><i class="fa-solid fa-ban"></i> Отозвать</button>
+                        <button type="submit" class="btn-action btn-danger"><i class="fa-solid fa-ban"></i> Отозвать</button>
                     </form>
                     {% endif %}
                 </td>

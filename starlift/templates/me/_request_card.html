@@ -1,0 +1,37 @@
+{# Single EventRequest card. Expects `r` (EventRequest) and `status` ('pending'/'approved'/'rejected'). #}
+<div class="req-card {{ status }}">
+    <div class="req-head">
+        <h4 class="req-title">
+            {% if r.kind == 'create' %}
+            <i class="fa-solid fa-plus-circle" style="color:var(--sber-green);"></i>
+            {{ r.proposed_title|default:'Новое мероприятие' }}
+            {% else %}
+            <i class="fa-solid fa-user-plus" style="color:var(--sber-green);"></i>
+            {{ r.event.title|default:'Мероприятие удалено' }}
+            {% endif %}
+        </h4>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <span class="chip chip-gray">{{ r.get_kind_display }}</span>
+            <span class="chip {% if r.status == 'pending' %}chip-amber{% elif r.status == 'approved' %}chip-green{% else %}chip-red{% endif %}">{{ r.get_status_display }}</span>
+        </div>
+    </div>
+
+    <div class="req-meta">Подана: {{ r.created_at|date:'d.m.Y H:i' }}{% if r.reviewed_at %} · Рассмотрена: {{ r.reviewed_at|date:'d.m.Y H:i' }}{% endif %}</div>
+
+    <div class="req-body">
+        <dl>
+            {% if r.topic %}<dt>Тема:</dt><dd>{{ r.topic }}</dd>{% endif %}
+            {% if r.kind == 'create' %}
+                {% if r.proposed_description %}<dt>Описание:</dt><dd>{{ r.proposed_description }}</dd>{% endif %}
+                {% if r.proposed_event_date %}<dt>Дата:</dt><dd>{{ r.proposed_event_date|date:'d.m.Y' }}</dd>{% endif %}
+                {% if r.proposed_location %}<dt>Место:</dt><dd>{{ r.proposed_location }}</dd>{% endif %}
+                {% if r.proposed_link %}<dt>Ссылка:</dt><dd><a href="{{ r.proposed_link }}" target="_blank" rel="noopener">{{ r.proposed_link }}</a></dd>{% endif %}
+            {% endif %}
+            {% if r.comment %}<dt>Комментарий:</dt><dd>{{ r.comment }}</dd>{% endif %}
+        </dl>
+    </div>
+
+    {% if r.status == 'rejected' and r.rejection_reason %}
+    <div class="req-rejection"><strong>Причина отказа:</strong> {{ r.rejection_reason }}</div>
+    {% endif %}
+</div>

@@ -9,11 +9,13 @@
         <h1><i class="fa-solid fa-life-ring" style="color:var(--sber-green);"></i> Связаться с поддержкой</h1>
         <p class="support-guest-lead">Заполните форму — пришлём ссылку на чат с поддержкой по указанному email.</p>
 
-        <form method="post" class="support-new-form">
+        <form method="post" class="support-guest-form">
             {% csrf_token %}
-            {% if errors.rate %}<div class="chat-error"><i class="fa-solid fa-circle-exclamation"></i> {{ errors.rate }}</div>{% endif %}
+            {% if errors.rate %}<div class="su-new-form-error">{{ errors.rate }}</div>{% endif %}
 
-            <label>Ваше имя<input type="text" name="name" value="{{ name|default:'' }}" maxlength="120"></label>
+            <label>Ваше имя
+                <input type="text" name="name" value="{{ name|default:'' }}" maxlength="120">
+            </label>
             <label>Email
                 <input type="email" name="email" value="{{ email|default:'' }}" required>
                 {% if errors.email %}<span class="support-field-error">{{ errors.email }}</span>{% endif %}
@@ -27,9 +29,9 @@
                 {% if errors.body %}<span class="support-field-error">{{ errors.body }}</span>{% endif %}
             </label>
 
-            <input type="text" name="website" style="position:absolute;left:-9999px;" tabindex="-1" autocomplete="off">
+            <input type="text" name="website" class="su-honeypot" tabindex="-1" autocomplete="off">
 
-            <button class="chat-new-btn" type="submit" style="width:auto;padding:12px 24px;">
+            <button class="su-submit-btn" type="submit" style="align-self:flex-start;">
                 <i class="fa-solid fa-paper-plane"></i> Отправить обращение
             </button>
         </form>

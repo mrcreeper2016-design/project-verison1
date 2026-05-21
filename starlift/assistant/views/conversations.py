@@ -4,18 +4,13 @@ The assistant lives as a floating widget (FAB drawer) on every page, so we
 keep exactly one active conversation per user. ``state`` returns it (creating
 on demand) with its current messages. ``clear`` wipes the conversation so the
 next ``state`` call returns a fresh one.
-
-``chat_home`` and ``chat_detail`` remain as full-page fallbacks (used when
-``/assistant/`` is opened directly) but they target the same single
-conversation, not a list.
 """
 from __future__ import annotations
 
 import json
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse, JsonResponse
-from django.shortcuts import redirect
+from django.http import HttpRequest, JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
@@ -43,16 +38,6 @@ def _message_to_dict(m: Message) -> dict:
         "tool_name": m.tool_name or "",
         "created_at": m.created_at.isoformat(),
     }
-
-
-@login_required
-@member_required
-@never_cache
-@require_http_methods(["GET"])
-def chat_home(request: HttpRequest) -> HttpResponse:
-    """Open the user's single conversation in the full chat page."""
-    conv = _get_or_create_single(request.user)
-    return redirect("assistant:chat_detail", conversation_id=conv.id)
 
 
 @login_required

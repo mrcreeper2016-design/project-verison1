@@ -4,199 +4,392 @@
 
 {% block content %}
 <style>
-    .qr-gen-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 60vh;
+    .qr-shell {
+        max-width: 640px;
+        margin: 0 auto;
+        display: grid;
+        gap: 20px;
     }
-
-    .qr-form-card {
-        background: var(--glass-bg);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid var(--glass-border);
-        border-radius: 20px;
-        padding: clamp(20px, 5vw, 40px);
-        max-width: 500px;
-        width: 100%;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    .qr-card {
+        padding: clamp(20px, 4vw, 36px);
     }
-
-    .qr-form-title {
-        font-size: 24px;
-        font-weight: 700;
-        margin-bottom: 30px;
-        text-align: center;
-        line-height: 1.2;
+    .qr-title {
+        margin: 0 0 6px;
+        font-size: clamp(22px, 3vw, 28px);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: var(--text-main);
     }
-
-    .form-group {
-        margin-bottom: 20px;
-    }
-
-    .form-label {
+    .qr-lede {
+        margin: 0 0 24px;
+        color: var(--text-muted);
         font-size: 14px;
-        font-weight: 600;
-        margin-bottom: 8px;
-        display: block;
-        color: var(--text-main);
+        line-height: 1.5;
     }
 
-    .form-select {
-        width: 100%;
-        padding: 14px 20px;
+    .qr-msg {
+        padding: 12px 14px;
         border-radius: 12px;
-        border: 2px solid var(--border-color);
-        background-color: var(--bg-color);
-        color: var(--text-main);
-        font-size: 16px;
-        appearance: none;
-        outline: none;
-        transition: var(--transition);
-        cursor: pointer;
+        font-size: 13px;
+        line-height: 1.45;
+        margin-bottom: 14px;
+        border: 1px solid;
     }
+    .qr-msg.error { background: rgba(217,62,78,0.08); color: #D93E4E; border-color: rgba(217,62,78,0.3); }
+    .qr-msg.warning { background: rgba(224,165,0,0.12); color: #B87C00; border-color: rgba(224,165,0,0.35); }
 
-    .form-select:focus {
+    .qr-field { display: grid; gap: 6px; margin-bottom: 16px; }
+    .qr-field label {
+        font-size: 12px; font-weight: 700; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .qr-combo {
+        position: relative;
+        display: flex;
+        align-items: center;
+        background: var(--white);
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        transition: var(--transition);
+    }
+    .qr-combo:focus-within {
         border-color: var(--sber-green);
         box-shadow: 0 0 0 4px var(--light-green);
     }
-
-    .btn-generate {
-        width: 100%;
-        padding: 16px;
-        border-radius: 12px;
-        background-color: var(--sber-green);
-        color: #fff;
-        font-size: 16px;
-        font-weight: 600;
+    .qr-combo input {
+        flex: 1;
+        background: transparent;
         border: none;
+        outline: none;
+        padding: 14px 16px;
+        font-size: 15px;
+        color: var(--text-main);
+        font-family: inherit;
+        min-width: 0;
+    }
+    .qr-combo input::placeholder { color: var(--text-muted); }
+    .qr-combo .qr-clear {
+        flex: 0 0 auto;
+        background: none;
+        border: none;
+        padding: 0 14px;
+        height: 100%;
+        font-size: 16px;
+        color: var(--text-muted);
         cursor: pointer;
-        transition: var(--transition);
-        margin-top: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .15s, color .15s;
     }
-
-    .btn-generate:hover {
-        background-color: var(--sber-green-hover);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 15px rgba(10, 128, 59, 0.3);
+    .qr-combo input:not(:placeholder-shown) + .qr-clear {
+        opacity: 1;
+        pointer-events: auto;
     }
-
-    .btn-generate:active {
-        transform: translateY(0);
-    }
-
-    .btn-generate:disabled {
-        opacity: 0.55;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-    }
-
-    .btn-generate:disabled:hover {
-        background-color: var(--sber-green);
-        transform: none;
-        box-shadow: none;
-    }
+    .qr-combo .qr-clear:hover { color: var(--sber-green); }
 
     .qr-hint {
-        font-size: 14px;
+        font-size: 12px;
         color: var(--text-muted);
-        margin: -12px 0 8px;
-        line-height: 1.45;
-        text-align: center;
+        line-height: 1.4;
+        margin: 2px 2px 0;
+        min-height: 16px;
     }
+    .qr-hint.error { color: #D93E4E; }
+    .qr-hint.ok { color: var(--sber-green); }
 
-    .qr-alert {
-        padding: 12px 14px;
+    .qr-suggest {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0; right: 0;
+        max-height: 260px;
+        overflow-y: auto;
+        background: #fff;
+        border: 1px solid var(--border-color);
         border-radius: 12px;
-        font-size: 14px;
-        line-height: 1.45;
-        background: rgba(224, 165, 0, 0.12);
-        color: #B87C00;
-        border: 1px solid rgba(224, 165, 0, 0.35);
-        margin-bottom: 16px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+        z-index: 20;
+        display: none;
     }
+    [data-theme="dark"] .qr-suggest { background: #1a221d; }
+    .qr-suggest.show { display: block; }
+    .qr-suggest-item {
+        padding: 10px 14px;
+        font-size: 14px;
+        color: var(--text-main);
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        transition: background .15s;
+    }
+    .qr-suggest-item + .qr-suggest-item { border-top: 1px solid var(--border-color); }
+    .qr-suggest-item:hover,
+    .qr-suggest-item.active { background: var(--light-green); color: var(--sber-green); }
+    .qr-suggest-item .meta { font-size: 11px; color: var(--text-muted); }
+    .qr-suggest-empty { padding: 14px; font-size: 13px; color: var(--text-muted); text-align: center; }
+
+    .qr-summary {
+        margin: 18px 0 16px;
+        padding: 14px;
+        border-radius: 12px;
+        background: var(--light-green);
+        border: 1px solid rgba(10,128,59,0.25);
+        font-size: 13px;
+        color: var(--text-main);
+        line-height: 1.5;
+        display: none;
+    }
+    .qr-summary.show { display: block; }
+    .qr-summary strong { color: var(--sber-green); }
 </style>
 
-<div class="qr-gen-container">
-    <div class="qr-form-card animate-fade" id="qrGenRoot"
-         data-self-only="{% if qr_self_only %}1{% else %}0{% endif %}"
-         data-speaker-id="{% if qr_speaker_id %}{{ qr_speaker_id }}{% endif %}">
-        <h2 class="qr-form-title">Создать QR-код для оценки</h2>
+<div class="qr-shell">
+    <div class="content-block qr-card animate-fade">
+        <h2 class="qr-title">QR-код для сбора отзывов</h2>
+        <p class="qr-lede">Выберите спикера и мероприятие — поля подсказывают друг другу, и QR создаётся только для пар, где спикер действительно участвует в событии.</p>
 
-        {% if qr_self_only %}
-            {% if linked_speaker %}
-            <p class="qr-hint">QR-код ведёт на оценку вашего выступления. Выберите мероприятие из списка, где вы указаны как спикер.</p>
-            {% else %}
-            <div class="qr-alert">
-                Чтобы создавать QR-коды, нужна привязанная карточка спикера. Обратитесь к администратору.
+        {% if messages %}
+            {% for m in messages %}
+            <div class="qr-msg {% if m.tags == 'error' %}error{% else %}warning{% endif %}">{{ m }}</div>
+            {% endfor %}
+        {% endif %}
+
+        {% if not is_admin and not linked_speaker %}
+        <div class="qr-msg warning">
+            Чтобы создавать QR-коды, нужна привязанная карточка спикера. Обратитесь к администратору.
+        </div>
+        {% elif not has_data %}
+        <div class="qr-msg warning">
+            {% if is_admin %}В базе пока нет связок «спикер ↔ мероприятие». Сначала добавьте спикера в какое-нибудь событие.{% else %}У вас пока нет мероприятий. Подайте заявку или дождитесь, пока администратор добавит вас к событию.{% endif %}
+        </div>
+        {% else %}
+
+        <div id="qrRoot"
+             data-speakers="{{ speakers_json|escape }}"
+             data-events="{{ events_json|escape }}"
+             data-is-admin="{% if is_admin %}1{% else %}0{% endif %}"
+             data-fixed-speaker-id="{% if not is_admin and linked_speaker %}{{ linked_speaker.id }}{% endif %}"
+             data-fixed-speaker-name="{% if not is_admin and linked_speaker %}{{ linked_speaker.name }}{% endif %}">
+
+            <div class="qr-field">
+                <label for="speakerInput">Спикер</label>
+                <div class="qr-combo">
+                    <input type="text" id="speakerInput" placeholder="Начните вводить имя…" autocomplete="off"
+                           {% if not is_admin %}readonly value="{{ linked_speaker.name }}"{% endif %}>
+                    {% if is_admin %}
+                    <button type="button" class="qr-clear" id="speakerClear" aria-label="Очистить" title="Очистить"><i class="fa-solid fa-xmark"></i></button>
+                    {% endif %}
+                    <div class="qr-suggest" id="speakerSuggest" role="listbox"></div>
+                </div>
+                <div class="qr-hint" id="speakerHint"></div>
             </div>
-            {% endif %}
-        {% endif %}
 
-        {% if not qr_self_only %}
-        <div class="form-group">
-            <label class="form-label" for="speakerSelect">Выберите спикера</label>
-            <select class="form-select" id="speakerSelect">
-                <option value="" disabled selected>-- Выберите спикера --</option>
-                {% for speaker in speakers %}
-                    <option value="{{ speaker.id }}">{{ speaker.name }}</option>
-                {% endfor %}
-            </select>
+            <div class="qr-field">
+                <label for="eventInput">Мероприятие</label>
+                <div class="qr-combo">
+                    <input type="text" id="eventInput" placeholder="Начните вводить название мероприятия…" autocomplete="off">
+                    <button type="button" class="qr-clear" id="eventClear" aria-label="Очистить" title="Очистить"><i class="fa-solid fa-xmark"></i></button>
+                    <div class="qr-suggest" id="eventSuggest" role="listbox"></div>
+                </div>
+                <div class="qr-hint" id="eventHint"></div>
+            </div>
+
+            <div class="qr-summary" id="qrSummary"></div>
+
+            <button type="button" class="btn-action btn-contact" id="generateBtn" style="width:100%; height:50px; font-size:15px;" disabled>
+                <i class="fa-solid fa-qrcode"></i> Сгенерировать QR-код
+            </button>
         </div>
         {% endif %}
-
-        <div class="form-group">
-            <label class="form-label" for="eventSelect">Выберите мероприятие</label>
-            <select class="form-select" id="eventSelect" {% if qr_self_only and not linked_speaker %}disabled{% endif %}>
-                <option value="" disabled selected>-- Выберите мероприятие --</option>
-                {% for event in events %}
-                    <option value="{{ event.id }}">{{ event.title }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        {% if qr_self_only and linked_speaker and not events %}
-        <p class="qr-hint" style="margin-top:4px;">У вас пока нет мероприятий в базе. После того как администратор добавит вас к событию, оно появится здесь.</p>
-        {% endif %}
-
-        <button type="button" class="btn-generate" id="generateBtn" {% if qr_self_only and not qr_speaker_id or qr_self_only and linked_speaker and not events %}disabled{% endif %}>
-            <i class="fa-solid fa-qrcode"></i> Сгенерировать
-        </button>
     </div>
 </div>
 
+{% if has_data %}
 <script>
-    (function() {
-        const root = document.getElementById('qrGenRoot');
-        const generateBtn = document.getElementById('generateBtn');
-        const speakerSelect = document.getElementById('speakerSelect');
-        const eventSelect = document.getElementById('eventSelect');
-        const selfOnly = root && root.dataset.selfOnly === '1';
-        const fixedSpeakerId = (root && root.dataset.speakerId) ? String(root.dataset.speakerId).trim() : '';
+(function() {
+    const root = document.getElementById('qrRoot');
+    if (!root) return;
 
-        if (generateBtn) {
-            generateBtn.addEventListener('click', function() {
-                const speakerId = selfOnly ? fixedSpeakerId : (speakerSelect && speakerSelect.value);
-                const eventId = eventSelect && eventSelect.value;
+    const SPEAKERS = JSON.parse(root.dataset.speakers || '[]');
+    const EVENTS = JSON.parse(root.dataset.events || '[]');
+    const isAdmin = root.dataset.isAdmin === '1';
+    const fixedSpeakerId = root.dataset.fixedSpeakerId ? parseInt(root.dataset.fixedSpeakerId, 10) : null;
 
-                if (!speakerId || !eventId) {
-                    alert(selfOnly
-                        ? 'Пожалуйста, выберите мероприятие.'
-                        : 'Пожалуйста, выберите спикера и мероприятие.');
-                    return;
-                }
+    const speakerInput  = document.getElementById('speakerInput');
+    const eventInput    = document.getElementById('eventInput');
+    const speakerSug    = document.getElementById('speakerSuggest');
+    const eventSug      = document.getElementById('eventSuggest');
+    const speakerHint   = document.getElementById('speakerHint');
+    const eventHint     = document.getElementById('eventHint');
+    const speakerClear  = document.getElementById('speakerClear');
+    const eventClear    = document.getElementById('eventClear');
+    const summary       = document.getElementById('qrSummary');
+    const generateBtn   = document.getElementById('generateBtn');
 
-                const qrUrl = `/speaker/${speakerId}/event/${eventId}/qr/`;
-                window.location.href = qrUrl;
-            });
+    let selectedSpeaker = fixedSpeakerId
+        ? SPEAKERS.find(s => s.id === fixedSpeakerId) || null
+        : null;
+    let selectedEvent = null;
+
+    function eventsForSpeaker(speaker) {
+        return speaker ? speaker.events : EVENTS;
+    }
+    function speakersForEvent(ev) {
+        return ev ? ev.speakers : SPEAKERS;
+    }
+
+    function renderSuggest(container, items, formatter, onPick) {
+        container.innerHTML = '';
+        if (!items.length) {
+            const empty = document.createElement('div');
+            empty.className = 'qr-suggest-empty';
+            empty.textContent = 'Ничего не найдено';
+            container.appendChild(empty);
+            container.classList.add('show');
+            return;
         }
-    })();
+        items.slice(0, 50).forEach(item => {
+            const el = document.createElement('div');
+            el.className = 'qr-suggest-item';
+            el.setAttribute('role', 'option');
+            el.innerHTML = formatter(item);
+            el.addEventListener('mousedown', e => { e.preventDefault(); onPick(item); });
+            container.appendChild(el);
+        });
+        container.classList.add('show');
+    }
+
+    function hideSuggest(container) { container.classList.remove('show'); }
+
+    function filterByQuery(items, query, keys) {
+        const q = (query || '').trim().toLowerCase();
+        if (!q) return items.slice();
+        return items.filter(it => keys.some(k => (it[k] || '').toLowerCase().includes(q)));
+    }
+
+    function updateValidity() {
+        const validPair = selectedSpeaker && selectedEvent
+            && selectedSpeaker.events.some(e => e.id === selectedEvent.id);
+
+        if (validPair) {
+            generateBtn.disabled = false;
+            summary.classList.add('show');
+            summary.innerHTML = `<i class="fa-solid fa-check-circle" style="color:var(--sber-green);"></i> Готово: <strong>${escapeHtml(selectedSpeaker.name)}</strong> · <strong>${escapeHtml(selectedEvent.title)}</strong>`;
+        } else {
+            generateBtn.disabled = true;
+            if (selectedSpeaker && selectedEvent) {
+                summary.classList.remove('show');
+                eventHint.textContent = `Этого мероприятия нет в списке участий «${selectedSpeaker.name}».`;
+                eventHint.className = 'qr-hint error';
+            } else {
+                summary.classList.remove('show');
+            }
+        }
+    }
+
+    function escapeHtml(s) {
+        return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    }
+
+    // --- Speaker combobox ---
+    function openSpeakerSuggest() {
+        if (!isAdmin) return;
+        const items = filterByQuery(speakersForEvent(selectedEvent), speakerInput.value, ['name', 'sub']);
+        renderSuggest(speakerSug, items, sp =>
+            `<span>${escapeHtml(sp.name)}</span><span class="meta">${escapeHtml(sp.sub || '')}</span>`,
+            pickSpeaker);
+    }
+
+    function pickSpeaker(sp) {
+        selectedSpeaker = sp;
+        speakerInput.value = sp.name;
+        speakerHint.textContent = sp.sub || '';
+        speakerHint.className = 'qr-hint';
+        hideSuggest(speakerSug);
+
+        // If currently selected event is incompatible — clear it.
+        if (selectedEvent && !sp.events.some(e => e.id === selectedEvent.id)) {
+            selectedEvent = null;
+            eventInput.value = '';
+            eventHint.textContent = '';
+            eventHint.className = 'qr-hint';
+        }
+        updateValidity();
+    }
+
+    if (isAdmin) {
+        speakerInput.addEventListener('focus', openSpeakerSuggest);
+        speakerInput.addEventListener('input', () => {
+            selectedSpeaker = null;
+            speakerHint.textContent = '';
+            speakerHint.className = 'qr-hint';
+            updateValidity();
+            openSpeakerSuggest();
+        });
+        speakerInput.addEventListener('blur', () => setTimeout(() => hideSuggest(speakerSug), 120));
+        speakerClear.addEventListener('click', () => {
+            speakerInput.value = '';
+            selectedSpeaker = null;
+            speakerHint.textContent = '';
+            speakerHint.className = 'qr-hint';
+            updateValidity();
+            speakerInput.focus();
+        });
+    }
+
+    // --- Event combobox ---
+    function openEventSuggest() {
+        const items = filterByQuery(eventsForSpeaker(selectedSpeaker), eventInput.value, ['title']);
+        renderSuggest(eventSug, items, ev =>
+            `<span>${escapeHtml(ev.title)}</span>`,
+            pickEvent);
+    }
+
+    function pickEvent(ev) {
+        selectedEvent = ev;
+        eventInput.value = ev.title;
+        eventHint.textContent = '';
+        eventHint.className = 'qr-hint';
+        hideSuggest(eventSug);
+
+        if (isAdmin && selectedSpeaker && !ev.speakers.some(s => s.id === selectedSpeaker.id)) {
+            // shouldn't happen due to filter, but defensive
+            selectedSpeaker = null;
+            speakerInput.value = '';
+        }
+        if (isAdmin && !selectedSpeaker && ev.speakers.length === 1) {
+            pickSpeaker(SPEAKERS.find(s => s.id === ev.speakers[0].id));
+        }
+        updateValidity();
+    }
+
+    eventInput.addEventListener('focus', openEventSuggest);
+    eventInput.addEventListener('input', () => {
+        selectedEvent = null;
+        eventHint.textContent = '';
+        eventHint.className = 'qr-hint';
+        updateValidity();
+        openEventSuggest();
+    });
+    eventInput.addEventListener('blur', () => setTimeout(() => hideSuggest(eventSug), 120));
+    eventClear.addEventListener('click', () => {
+        eventInput.value = '';
+        selectedEvent = null;
+        eventHint.textContent = '';
+        eventHint.className = 'qr-hint';
+        updateValidity();
+        eventInput.focus();
+    });
+
+    // --- Submit ---
+    generateBtn.addEventListener('click', () => {
+        if (!selectedSpeaker || !selectedEvent) return;
+        window.location.href = `/speaker/${selectedSpeaker.id}/event/${selectedEvent.id}/qr/`;
+    });
+
+    // Initial: for non-admin, speaker is pre-selected; nudge user to pick event.
+    updateValidity();
+})();
 </script>
+{% endif %}
 {% endblock %}

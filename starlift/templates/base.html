@@ -185,17 +185,27 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
-        .animate-fade { 
-            animation: fadeInUp 0.3s ease both; 
+        .animate-fade {
+            animation: fadeInUp 0.3s ease both;
         }
 
-        /* Page Transitions */
+        /* Page Transitions — short, opacity-led crossfade so SPA-nav feels instant. */
+        @keyframes pageEnter {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pageLeave {
+            from { opacity: 1; transform: translateY(0); }
+            to   { opacity: 0; transform: translateY(-6px); }
+        }
+        #page-content {
+            will-change: opacity, transform;
+        }
         .page-transition-enter {
-            animation: fadeInUp 0.4s ease forwards;
+            animation: pageEnter 0.26s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
         }
-
         .page-transition-leave {
-            animation: fadeOutDown 0.3s ease forwards;
+            animation: pageLeave 0.18s cubic-bezier(0.4, 0, 1, 1) forwards;
         }
 
         aside {
@@ -282,6 +292,85 @@
         .nav-item.active { background-color: var(--sber-green); color: #fff; }
         .nav-item:not(.active):hover { background-color: var(--nav-hover); transform: translateX(5px); }
 
+        /* --- Раскрывающаяся группа «Личный кабинет» --- */
+        .nav-group { display: flex; flex-direction: column; }
+        .nav-group-toggle {
+            background: transparent;
+            border: none;
+            width: 100%;
+            text-align: left;
+            font: inherit;
+            cursor: pointer;
+            color: var(--text-main);
+        }
+        .nav-group-toggle.has-active {
+            color: var(--sber-green);
+        }
+        .nav-group-chevron {
+            margin-left: auto;
+            font-size: 11px;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0.6;
+        }
+        .nav-group.open .nav-group-chevron {
+            transform: rotate(180deg);
+            opacity: 1;
+        }
+        .nav-submenu {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .nav-group.open .nav-submenu {
+            grid-template-rows: 1fr;
+        }
+        .nav-submenu-inner {
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 6px 0 4px 0;
+            margin: 2px 0 4px 18px;
+            border-left: 1.5px solid var(--border-color);
+        }
+        .nav-subitem {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px 9px 14px;
+            margin-left: 4px;
+            border-radius: 10px;
+            font-size: 13.5px;
+            font-weight: 500;
+            color: var(--text-main);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        .nav-subitem i {
+            width: 16px;
+            font-size: 13px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+        .nav-subitem.active {
+            background-color: var(--sber-green);
+            color: #fff;
+        }
+        .nav-subitem.active i { color: #fff; }
+        .nav-subitem:not(.active):hover {
+            background-color: var(--nav-hover);
+            color: var(--sber-green);
+            text-decoration: none;
+            transform: translateX(4px);
+        }
+        .nav-subitem:not(.active):hover i { color: var(--sber-green); }
+
+        /* В свёрнутом сайдбаре скрываем стрелку и подменю.
+           Клик по иконке аккаунта в свёрнутом виде ведёт на профиль (fallback). */
+        aside.collapsed .nav-group-chevron { display: none; }
+        aside.collapsed .nav-submenu { display: none; }
+
         main { flex-grow: 1; padding: 30px 40px; overflow-y: auto; background: transparent !important; position: relative; }
 
         .main-header {
@@ -299,10 +388,8 @@
         }
 
         .theme-toggle {
-            background: rgba(255, 255, 255, 0.25);
-            -webkit-backdrop-filter: blur(18px) saturate(140%);
-            backdrop-filter: blur(18px) saturate(140%);
-            border: 1px solid rgba(255, 255, 255, 0.45);
+            background: #ffffff;
+            border: 1px solid var(--border-color);
             box-shadow: 0 4px 16px rgba(10, 128, 59, 0.10);
             font-size: 20px;
             color: var(--sber-green); cursor: pointer;
@@ -312,8 +399,8 @@
         }
 
         [data-theme="dark"] .theme-toggle {
-            background: rgba(20, 29, 25, 0.25);
-            border: 1px solid rgba(255, 255, 255, 0.10);
+            background: #1a221d;
+            border: 1px solid var(--border-color);
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
         }
 
@@ -340,15 +427,17 @@
         .notif-dropdown {
             position: absolute; top: 110%; right: 0;
             width: 360px; max-height: 480px; overflow-y: auto;
-            background: linear-gradient(135deg, var(--white) 0%, rgba(255,255,255,0) 100%);
-            border: 1px solid var(--glass-border);
-            backdrop-filter: blur(16px) saturate(150%);
-            -webkit-backdrop-filter: blur(16px) saturate(150%);
+            background: #ffffff;
+            border: 1px solid var(--border-color);
             border-radius: 16px;
-            box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.15), 0 10px 25px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.18);
             z-index: 1500; padding: 8px;
             opacity: 0; visibility: hidden; transform: translateY(-10px);
             transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s, border-color 0.3s;
+        }
+        [data-theme="dark"] .notif-dropdown {
+            background: #1a221d;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
         }
         .notif-dropdown.show {
             opacity: 1; visibility: visible; transform: translateY(0);
@@ -377,17 +466,15 @@
         .admin-profile {
             display: flex; align-items: center; gap: 12px; cursor: pointer;
             padding: 6px 16px 6px 20px; border-radius: 50px;
-            background: rgba(255, 255, 255, 0.25);
-            -webkit-backdrop-filter: blur(18px) saturate(140%);
-            backdrop-filter: blur(18px) saturate(140%);
-            border: 1px solid rgba(255, 255, 255, 0.45);
+            background: #ffffff;
+            border: 1px solid var(--border-color);
             box-shadow: 0 4px 16px rgba(10, 128, 59, 0.10);
             transition: var(--transition);
         }
 
         [data-theme="dark"] .admin-profile {
-            background: rgba(20, 29, 25, 0.25);
-            border: 1px solid rgba(255, 255, 255, 0.10);
+            background: #1a221d;
+            border: 1px solid var(--border-color);
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
         }
 
@@ -401,16 +488,18 @@
 
         .dropdown-menu {
             position: absolute; top: 110%; right: 0; width: 180px;
-            background: linear-gradient(135deg, var(--white) 0%, rgba(255,255,255,0) 100%);
-            border: 1px solid var(--glass-border);
-            backdrop-filter: blur(16px) saturate(150%);
-            -webkit-backdrop-filter: blur(16px) saturate(150%);
-            border-radius: 16px; box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.15), 0 10px 25px rgba(0,0,0,0.1);
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.18);
             display: flex; flex-direction: column; overflow: hidden; z-index: 1000;
             opacity: 0; visibility: hidden; transform: translateY(-10px);
             transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s, border-color 0.3s;
         }
-        .dropdown-menu.show { 
+        [data-theme="dark"] .dropdown-menu {
+            background: #1a221d;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .dropdown-menu.show {
             opacity: 1; visibility: visible; transform: translateY(0);
         }
         .dropdown-item {
@@ -869,24 +958,99 @@
             backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
             color: #fff; text-align: center; font-size: 18px; font-weight: 700; box-sizing: border-box;
         }
-        .modal-actions {
-            display: flex; gap: 10px;
+        /* Heart overlay on speaker modal avatar */
+        .modal-heart-btn {
+            position: absolute;
+            top: 12px; right: 12px;
+            min-width: 44px; height: 44px;
+            padding: 0 12px;
+            border-radius: 999px;
+            border: none;
+            background: rgba(0,0,0,0.45);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            color: #fff;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-size: 16px;
+            transition: transform .15s ease, background-color .15s ease;
+            z-index: 5;
         }
-        .btn-action {
-            padding: 12px; border: none; border-radius: 12px; font-size: 14px; font-weight: 600;
-            cursor: pointer; display: inline-flex; justify-content: center; align-items: center; gap: 8px;
+        .modal-heart-btn:hover { transform: scale(1.06); background: rgba(0,0,0,0.6); }
+        .modal-heart-btn:disabled { opacity: 0.7; cursor: wait; }
+        .modal-heart-btn.is-liked { color: #ff4e6a; background: rgba(255,255,255,0.92); }
+        [data-theme="dark"] .modal-heart-btn.is-liked { background: rgba(40,40,46,0.92); }
+        .modal-heart-btn.is-liked i { animation: heart-pop .35s ease; }
+        .modal-heart-count { font-size: 12px; font-weight: 700; }
+        .modal-heart-count[data-zero="1"] { display: none; }
+        @keyframes heart-pop {
+            0%   { transform: scale(0.6); }
+            50%  { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+
+        /* Admin action row under speaker avatar — compact icon buttons */
+        .modal-admin-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-admin-actions form { margin: 0; display: inline-flex; }
+        .modal-admin-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: var(--white);
+            color: var(--text-main);
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
             transition: var(--transition);
+            position: relative;
         }
-        .btn-like {
-            background: var(--light-green); color: #EB5757; flex: 0 0 50px; border: 1px solid var(--border-color);
+        .modal-admin-btn:hover {
+            border-color: var(--sber-green);
+            color: var(--sber-green);
+            transform: translateY(-1px);
         }
-        .btn-like:hover { transform: scale(1.05); background: #ffe3e3; border-color: #ffb3b3; }
-        .btn-contact {
-            background: var(--sber-green); color: #fff; flex: 1;
+        .modal-admin-btn--delete { color: #D93E4E; }
+        .modal-admin-btn--delete:hover {
+            border-color: #D93E4E;
+            color: #D93E4E;
+            background: rgba(217, 62, 78, 0.06);
         }
-        .btn-contact:hover {
-            background: var(--sber-green-hover); color: #fff; text-decoration: none;
-            transform: scale(1.02); box-shadow: 0 4px 10px rgba(10, 128, 59, 0.3);
+        .modal-admin-btn--recommend.is-active {
+            background: var(--light-green);
+            border-color: var(--sber-green);
+            color: var(--sber-green);
+        }
+        .modal-admin-btn--recommend.is-active i { animation: heart-pop .35s ease; }
+        .modal-admin-btn[disabled] { opacity: 0.6; cursor: wait; }
+        /* Tooltip on hover */
+        .modal-admin-btn[data-tip]:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 29, 25, 0.92);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 5px 9px;
+            border-radius: 7px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 10;
         }
         .modal-right {
             flex: 1; display: flex; flex-direction: column;
@@ -1044,6 +1208,8 @@
             aside:not(.collapsed) .nav-item { justify-content: center; }
             aside:not(.collapsed) .sidebar-bottom-logo { display: none; }
             aside:not(.collapsed) .sidebar-toggle-btn { display: none; }
+            aside:not(.collapsed) .nav-group-chevron { display: none; }
+            aside:not(.collapsed) .nav-submenu { display: none; }
             main { padding: 24px 24px; }
         }
 
@@ -1065,16 +1231,22 @@
                 width: 100%;
                 box-sizing: border-box;
             }
-            .main-header { position: static; }
-
             .burger-btn { display: inline-flex; }
             .main-header {
                 justify-content: flex-start;
-                gap: 12px;
+                gap: 10px;
+                position: sticky;
                 top: 0;
-                padding-top: 14px;
-                margin-bottom: 18px;
-                padding-bottom: 10px;
+                left: 0;
+                right: 0;
+                margin: -16px -14px 14px -14px;
+                padding: 10px 14px;
+                background: var(--bg-color);
+                border-bottom: 1px solid var(--border-color);
+                z-index: 150;
+            }
+            [data-theme="dark"] .main-header {
+                background: #0E1512;
             }
 
             aside {
@@ -1097,6 +1269,8 @@
             aside .nav-item { justify-content: flex-start !important; }
             aside .sidebar-bottom-logo { display: block !important; }
             aside .sidebar-toggle-btn { display: none !important; }
+            aside .nav-group-chevron { display: inline-block !important; }
+            aside .nav-submenu { display: grid !important; }
 
             /* Modals → full-screen */
             .modal-content {
@@ -1134,7 +1308,7 @@
 
         @media (max-width: 480px) {
             main { padding: 12px 10px; }
-            .main-header { gap: 8px; padding-top: 10px; margin-bottom: 14px; }
+            .main-header { gap: 8px; margin: -12px -10px 12px -10px; padding: 8px 10px; }
             .table-title { font-size: 18px; }
             .content-block { padding: 16px; }
             .search-box { height: 44px; padding: 0 14px; }
@@ -1153,6 +1327,86 @@
             }
             .particles-container { display: none; }
         }
+
+        /* Global button system — .btn-action and variants.
+           Used across console, profile, speaker/event pages. Inline style=""
+           on call-sites still wins (specificity-wise), so this only fills in
+           the missing visual defaults that left buttons looking native. */
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1;
+            font-family: inherit;
+            background: var(--white);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            text-decoration: none;
+            transition: var(--transition);
+            white-space: nowrap;
+            box-sizing: border-box;
+        }
+        .btn-action:hover {
+            transform: translateY(-1px);
+            border-color: var(--sber-green);
+            color: var(--sber-green);
+            box-shadow: 0 4px 12px rgba(10,128,59,0.10);
+            text-decoration: none;
+        }
+        .btn-action:focus-visible {
+            outline: none;
+            border-color: var(--sber-green);
+            box-shadow: 0 0 0 3px var(--light-green);
+        }
+        .btn-action:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-action.btn-contact {
+            background: var(--sber-green);
+            color: #fff;
+            border-color: var(--sber-green);
+        }
+        .btn-action.btn-contact:hover {
+            background: var(--sber-green-hover);
+            border-color: var(--sber-green-hover);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(10,128,59,0.25);
+        }
+        .btn-action.btn-danger {
+            background: rgba(217,62,78,0.1);
+            color: #D93E4E;
+            border-color: rgba(217,62,78,0.3);
+        }
+        .btn-action.btn-danger:hover {
+            background: #D93E4E;
+            color: #fff;
+            border-color: #D93E4E;
+            box-shadow: 0 4px 14px rgba(217,62,78,0.25);
+        }
+        .btn-action.btn-icon { width: 40px; padding: 0; }
+
+        /* Global chip pills — used in console, /me/ pages and elsewhere. */
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid var(--border-color);
+            background: var(--white);
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        .chip-green { background: var(--light-green); color: var(--sber-green); border-color: rgba(10,128,59,0.3); }
+        .chip-amber { background: rgba(224,165,0,0.15); color: #B87C00; border-color: rgba(224,165,0,0.3); }
+        .chip-red   { background: rgba(217,62,78,0.1); color: #D93E4E; border-color: rgba(217,62,78,0.3); }
+        .chip-gray  { background: var(--white); color: var(--text-muted); }
     </style>
 </head>
 <body>
@@ -1185,10 +1439,30 @@
                         {% if user.profile.role == 'admin' or user.is_superuser %}
                         <a href="{% url 'accounts:console_home' %}" class="nav-item"><i class="fa-solid fa-sliders"></i> <span>Админ-консоль</span></a>
                         {% endif %}
+
+                    <div class="nav-group" id="navAccount">
+                        <button type="button" class="nav-item nav-group-toggle" aria-expanded="false" aria-controls="navAccountSub">
+                            <i class="fa-solid fa-circle-user"></i>
+                            <span>Личный кабинет</span>
+                            <i class="fa-solid fa-chevron-down nav-group-chevron"></i>
+                        </button>
+                        <div class="nav-submenu" id="navAccountSub">
+                            <div class="nav-submenu-inner">
+                                {% if user.profile.role == 'speaker' %}
+                                <a href="{% url 'me_dashboard' %}" class="nav-subitem"><i class="fa-solid fa-chart-line"></i> <span>Моя статистика</span></a>
+                                <a href="{% url 'me_events' %}" class="nav-subitem"><i class="fa-regular fa-calendar"></i> <span>Мои мероприятия</span></a>
+                                <a href="{% url 'me_feedback' %}" class="nav-subitem"><i class="fa-solid fa-comments"></i> <span>Мои отзывы</span></a>
+                                <a href="{% url 'me_requests' %}" class="nav-subitem"><i class="fa-solid fa-paper-plane"></i> <span>Мои заявки</span></a>
+                                {% endif %}
+                                <a href="{% url 'me_favorites' %}" class="nav-subitem"><i class="fa-solid fa-heart"></i> <span>Избранные</span></a>
+                                <a href="{% url 'accounts:profile' %}" class="nav-subitem"><i class="fa-solid fa-gear"></i> <span>Настройки</span></a>
+                            </div>
+                        </div>
+                    </div>
                     {% else %}
                     <a href="{% url 'explore' %}" class="nav-item"><i class="fa-solid fa-compass"></i> <span>Обзор</span></a>
+                    <a href="{% url 'accounts:profile' %}" class="nav-item"><i class="fa-solid fa-gear"></i> <span>Настройки</span></a>
                     {% endif %}
-                <a href="{% url 'accounts:profile' %}" class="nav-item"><i class="fa-solid fa-gear"></i> <span>Настройки</span></a>
                 {% else %}
                 <a href="{% url 'explore' %}" class="nav-item"><i class="fa-solid fa-compass"></i> <span>Обзор</span></a>
                 <a href="{% url 'accounts:login' %}" class="nav-item"><i class="fa-solid fa-right-to-bracket"></i> <span>Вход</span></a>
@@ -1592,22 +1866,128 @@
         // --- SPA Navigation ---
         document.addEventListener('DOMContentLoaded', () => {
             const pageContent = document.getElementById('page-content');
-            
-            // Обработка кликов по ссылкам в навигации
+
+            // Toggle «Личный кабинет» (раскрывающаяся группа)
+            document.body.addEventListener('click', (e) => {
+                const toggle = e.target.closest('.nav-group-toggle');
+                if (!toggle) return;
+                e.preventDefault();
+                const group = toggle.closest('.nav-group');
+                if (!group) return;
+                // В свёрнутом сайдбаре подменю спрятано — клик расширяет сайдбар.
+                if (sidebar.classList.contains('collapsed')) {
+                    sidebar.classList.remove('collapsed');
+                }
+                const willOpen = !group.classList.contains('open');
+                group.classList.toggle('open', willOpen);
+                toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            });
+
+            // Обработка кликов по ссылкам в навигации (обычные + sub-итемы + табы /me/)
             document.body.addEventListener('click', async (e) => {
-                const link = e.target.closest('a.nav-item');
-                
+                const link = e.target.closest('a.nav-item, a.nav-subitem, .me-nav a');
+
                 if (link && link.href && link.href.startsWith(window.location.origin)) {
+                    // Не перехватываем явный download / open-in-new / модификаторы.
+                    if (e.defaultPrevented) return;
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                    if (link.target && link.target !== '' && link.target !== '_self') return;
+
                     e.preventDefault();
                     const url = link.href;
 
                     if (url === window.location.href) return;
 
-                    await navigateTo(url);
+                    // Партиал-свап вкладок «Личного кабинета»: меняем только
+                    // содержимое, заголовок «Личный кабинет» и таб-бар не дёргаем.
+                    if (link.closest('.me-nav') && document.getElementById('me-tab-content')) {
+                        link.closest('.me-nav').querySelectorAll('a').forEach(a => {
+                            a.classList.toggle('active', a === link);
+                        });
+                        const ok = await meTabSwap(url);
+                        if (ok) {
+                            updateNavActive(url);
+                            return;
+                        }
+                    }
+
                     window.history.pushState({}, '', url);
                     updateNavActive(url);
+                    await navigateTo(url);
                 }
             });
+
+            async function meTabSwap(url) {
+                const currentTab = document.getElementById('me-tab-content');
+                if (!currentTab) return false;
+
+                currentTab.style.transition = 'opacity 0.16s ease, transform 0.16s ease';
+                currentTab.style.opacity = '0';
+                currentTab.style.transform = 'translateY(6px)';
+
+                try {
+                    const minLeave = new Promise(r => setTimeout(r, 160));
+                    const fetchPromise = fetch(url, { redirect: 'follow', credentials: 'same-origin' });
+                    const [, response] = await Promise.all([minLeave, fetchPromise]);
+
+                    const landed = new URL(response.url, window.location.origin);
+                    if (response.redirected || landed.pathname.startsWith('/auth/')) {
+                        window.location.href = response.url;
+                        return true;
+                    }
+                    if (!response.ok) throw new Error('Network response was not ok');
+
+                    const htmlString = await response.text();
+                    const doc = new DOMParser().parseFromString(htmlString, 'text/html');
+                    const newTab = doc.getElementById('me-tab-content');
+                    if (!newTab) {
+                        // Целевая страница не /me/_base — откатываемся к полному SPA.
+                        currentTab.style.opacity = '';
+                        currentTab.style.transform = '';
+                        return false;
+                    }
+
+                    document.title = doc.title;
+
+                    // Подменяем подзаголовок и блок справа от заголовка (роль-бейдж и т.п.)
+                    const newSub = doc.getElementById('me-subtitle');
+                    const curSub = document.getElementById('me-subtitle');
+                    if (newSub && curSub) curSub.innerHTML = newSub.innerHTML;
+
+                    const newExtra = doc.getElementById('me-header-extra');
+                    const curExtra = document.getElementById('me-header-extra');
+                    if (newExtra && curExtra) curExtra.innerHTML = newExtra.innerHTML;
+
+                    // Подменяем модалки (если у целевой страницы они есть)
+                    const newModals = doc.getElementById('page-modals');
+                    if (newModals) {
+                        const currentModals = document.getElementById('page-modals');
+                        if (currentModals) {
+                            currentModals.innerHTML = newModals.innerHTML;
+                            executeInlineScripts(currentModals);
+                        }
+                    }
+
+                    // Меняем сам tab-content.
+                    newTab.style.opacity = '0';
+                    newTab.style.transform = 'translateY(6px)';
+                    newTab.style.transition = 'opacity 0.24s ease, transform 0.24s ease';
+                    currentTab.replaceWith(newTab);
+                    executeInlineScripts(newTab);
+                    requestAnimationFrame(() => {
+                        newTab.style.opacity = '';
+                        newTab.style.transform = '';
+                    });
+                    document.dispatchEvent(new Event('spa-page-loaded'));
+
+                    window.history.pushState({}, '', url);
+                    return true;
+                } catch (err) {
+                    currentTab.style.opacity = '';
+                    currentTab.style.transform = '';
+                    return false;
+                }
+            }
 
             // Обработка кнопок "Вперед/Назад" в браузере
             window.addEventListener('popstate', async () => {
@@ -1616,16 +1996,14 @@
             });
 
             async function navigateTo(url) {
-                // 1. Анимация затухания старого контента
+                // 1. Запускаем анимацию затухания и fetch параллельно — крос-фейд.
                 pageContent.classList.remove('page-transition-enter');
                 pageContent.classList.add('page-transition-leave');
 
                 try {
-                    // Ждем завершения анимации исчезновения
-                    await new Promise(resolve => setTimeout(resolve, 300)); 
-
-                    // 2. Загрузка новой страницы
-                    const response = await fetch(url, { redirect: 'follow', credentials: 'same-origin' });
+                    const minLeave = new Promise(resolve => setTimeout(resolve, 180));
+                    const fetchPromise = fetch(url, { redirect: 'follow', credentials: 'same-origin' });
+                    const [, response] = await Promise.all([minLeave, fetchPromise]);
                     // Если сервер завернул на логин (302 → /auth/login/), делаем полный reload
                     // так как SPA-вставка HTML логина в текущий layout ломает верстку и CSRF.
                     const landed = new URL(response.url, window.location.origin);
@@ -1702,17 +2080,32 @@
             };
 
             function updateNavActive(url) {
-                const path = new URL(url).pathname;
-                const navItems = document.querySelectorAll('.nav-item');
-                navItems.forEach(item => {
+                const path = new URL(url, window.location.origin).pathname;
+                const items = document.querySelectorAll('a.nav-item, a.nav-subitem');
+                let activeGroup = null;
+                items.forEach(item => {
                     const itemPath = new URL(item.href).pathname;
-                    if (path === itemPath) {
-                        item.classList.add('active');
-                    } else {
-                        item.classList.remove('active');
+                    const isActive = path === itemPath;
+                    item.classList.toggle('active', isActive);
+                    if (isActive) {
+                        const grp = item.closest('.nav-group');
+                        if (grp) activeGroup = grp;
+                    }
+                });
+                // Подсветка/раскрытие «Личного кабинета» если активен любой sub-итем
+                document.querySelectorAll('.nav-group').forEach(grp => {
+                    const has = grp === activeGroup;
+                    const toggle = grp.querySelector('.nav-group-toggle');
+                    if (toggle) toggle.classList.toggle('has-active', has);
+                    if (has && !grp.classList.contains('open')) {
+                        grp.classList.add('open');
+                        if (toggle) toggle.setAttribute('aria-expanded', 'true');
                     }
                 });
             }
+
+            // Подсветка/раскрытие на первичной загрузке.
+            updateNavActive(window.location.href);
 
             // Вставляет скрипты заново для их реального выполнения браузером
             function executeInlineScripts(container) {
@@ -1739,20 +2132,27 @@
     {% load static %}
     <link rel="stylesheet" href="{% static 'assistant/chat.css' %}">
     <link rel="stylesheet" href="{% static 'assistant/fab.css' %}">
+    <link rel="stylesheet" href="{% static 'support/support.css' %}">
 
     <button type="button" class="assistant-fab" id="assistant-fab" aria-label="Открыть чат с ассистентом">
         <i class="fa-solid fa-robot"></i>
         <span class="assistant-fab-dot"></span>
+        <span class="support-fab-badge" id="supportFabBadge" style="display:none;">0</span>
     </button>
 
     <aside class="assistant-drawer" id="assistant-drawer" aria-hidden="true">
         <header class="assistant-drawer-header">
-            <div class="assistant-drawer-title">
-                <div class="chat-header-avatar"><i class="fa-solid fa-robot"></i></div>
-                <h2 class="assistant-drawer-name">Агент STARLIFT</h2>
+            <div class="drawer-tabs" role="tablist">
+                <button type="button" class="drawer-tab active" data-pane="ai" role="tab">
+                    <i class="fa-solid fa-robot"></i> Ассистент
+                </button>
+                <button type="button" class="drawer-tab" data-pane="support" role="tab">
+                    <i class="fa-solid fa-life-ring"></i> Поддержка
+                    <span class="drawer-tab-badge" id="drawerSupportBadge" style="display:none;">0</span>
+                </button>
             </div>
             <div class="assistant-drawer-actions">
-                <button type="button" class="assistant-drawer-action" data-chat-clear title="Очистить">
+                <button type="button" class="assistant-drawer-action" data-chat-clear title="Очистить (только ассистент)" data-pane-only="ai">
                     <i class="fa-solid fa-rotate-left"></i>
                 </button>
                 <button type="button" class="assistant-drawer-action" id="assistant-close" title="Закрыть">
@@ -1761,23 +2161,131 @@
             </div>
         </header>
 
-        <div class="assistant-chat-root"
-             data-csrf="{{ csrf_token }}"
-             data-user-avatar="{{ header_avatar_url }}"
-             data-user-initial="{{ user.first_name|default:user.username|slice:':1'|upper }}"
-             data-hydrate="lazy">
-            <div data-chat-thread class="chat-thread assistant-drawer-thread"></div>
-            <div class="chat-composer assistant-drawer-composer">
-                <div class="chat-composer-row">
-                    <textarea data-chat-input class="chat-input" rows="1"
-                              placeholder="Напишите ваш вопрос…" autocomplete="off"></textarea>
-                    <button data-chat-send class="chat-send" type="button" aria-label="Отправить">
-                        <i class="fa-solid fa-paper-plane"></i>
-                    </button>
+        <div class="drawer-panes">
+            <div class="drawer-pane active" data-pane="ai">
+                <div class="assistant-chat-root"
+                     data-csrf="{{ csrf_token }}"
+                     data-user-avatar="{{ header_avatar_url }}"
+                     data-user-initial="{{ user.first_name|default:user.username|slice:':1'|upper }}"
+                     data-hydrate="lazy">
+                    <div data-chat-thread class="chat-thread assistant-drawer-thread"></div>
+                    <div class="chat-composer assistant-drawer-composer">
+                        <div class="chat-composer-row">
+                            <textarea data-chat-input class="chat-input" rows="1"
+                                      placeholder="Напишите ваш вопрос…" autocomplete="off"></textarea>
+                            <button data-chat-send class="chat-send" type="button" aria-label="Отправить">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        <div class="chat-composer-hint">
+                            <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
+                            <span data-chat-status></span>
+                        </div>
+                    </div>
                 </div>
-                <div class="chat-composer-hint">
-                    <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
-                    <span data-chat-status></span>
+            </div>
+
+            <div class="drawer-pane support-ui" data-pane="support"
+                 data-csrf="{{ csrf_token }}"
+                 data-user-initial="{{ user.first_name|default:user.username|slice:':1'|upper }}"
+                 data-user-avatar="{{ header_avatar_url }}"
+                 data-viewer-kind="{% if user.is_superuser or user.profile.role == 'admin' %}admin{% else %}user{% endif %}"
+                 data-is-admin="{% if user.is_superuser or user.profile.role == 'admin' %}1{% else %}0{% endif %}"
+                 hidden>
+
+                <!-- List view -->
+                <div class="support-view" data-view="list">
+                    <div class="su-list-header">
+                        <span class="su-list-title">Мои обращения</span>
+                        <button type="button" class="su-new-btn" data-action="new-ticket">
+                            <i class="fa-solid fa-plus"></i> Новое
+                        </button>
+                    </div>
+                    <div class="su-list" data-support-list>
+                        <div class="su-list-empty">
+                            <div class="su-list-empty-icon"><i class="fa-solid fa-circle-notch fa-spin"></i></div>
+                            Загрузка…
+                        </div>
+                    </div>
+                </div>
+
+                <!-- New ticket view -->
+                <div class="support-view" data-view="new" hidden>
+                    <div class="su-thread-header">
+                        <button type="button" class="su-back" data-action="back-to-list" aria-label="Назад">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <div class="su-thread-title-wrap">
+                            <div class="su-thread-title">Новое обращение</div>
+                            <div class="su-thread-sub">Поддержка ответит здесь же</div>
+                        </div>
+                    </div>
+                    <div class="su-new-form">
+                        <div class="su-new-form-field">
+                            <label for="su-new-subject">Тема</label>
+                            <input id="su-new-subject" type="text" data-new-subject maxlength="200" placeholder="Например: не открывается профиль">
+                        </div>
+                        <div class="su-new-form-field su-new-form-field--grow">
+                            <label for="su-new-body">Сообщение</label>
+                            <textarea id="su-new-body" data-new-body rows="5" maxlength="5000" placeholder="Опишите вопрос как можно подробнее…"></textarea>
+                            <div class="su-new-form-counter" data-new-counter>0 / 5000</div>
+                        </div>
+                        <div class="su-new-form-error" data-new-error hidden></div>
+                        <button type="button" class="su-submit-btn" data-action="submit-new">
+                            <i class="fa-solid fa-paper-plane"></i> Отправить
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Thread view -->
+                <div class="support-view" data-view="thread" hidden>
+                    <div class="su-thread-header">
+                        <button type="button" class="su-back" data-action="back-to-list" aria-label="Назад">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <div class="su-thread-title-wrap">
+                            <div class="su-thread-title" data-thread-subject>—</div>
+                            <div class="su-thread-sub" data-thread-sub></div>
+                        </div>
+                        <div class="su-thread-menu-wrap" data-thread-menu-wrap hidden>
+                            <button type="button" class="su-thread-menu-btn" data-action="toggle-menu" aria-label="Меню">
+                                <i class="fa-solid fa-ellipsis-vertical"></i>
+                            </button>
+                            <div class="su-thread-menu" data-thread-menu hidden>
+                                <button type="button" class="is-danger" data-action="close-ticket">
+                                    <i class="fa-solid fa-circle-xmark"></i> Закрыть тикет
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="su-conn-bar" data-su-conn hidden>
+                        <i class="fa-solid fa-circle-notch"></i> Переподключение…
+                    </div>
+
+                    <div class="su-thread" data-thread-list></div>
+
+                    <div class="su-typing" data-su-typing hidden>
+                        <span class="su-typing-dots"><span></span><span></span><span></span></span>
+                        <span class="su-typing-label">Печатает…</span>
+                    </div>
+
+                    <div class="su-composer" data-su-composer>
+                        <div class="su-composer-row">
+                            <textarea class="su-input" data-thread-input rows="1"
+                                      placeholder="Сообщение поддержке…" autocomplete="off" maxlength="5000"></textarea>
+                            <button class="su-send" type="button" data-thread-send aria-label="Отправить">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        <div class="su-composer-hint">
+                            <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
+                            <span data-thread-status></span>
+                        </div>
+                    </div>
+                    <div class="su-closed-banner" data-su-closed-banner hidden>
+                        <i class="fa-solid fa-lock"></i> Тикет закрыт. Чтобы продолжить общение, создайте новое обращение.
+                    </div>
                 </div>
             </div>
         </div>
@@ -1785,6 +2293,8 @@
 
     <script src="{% static 'assistant/widget.js' %}"></script>
     <script src="{% static 'assistant/fab.js' %}" defer></script>
+    <script src="{% static 'support/render.js' %}" defer></script>
+    <script src="{% static 'support/drawer.js' %}" defer></script>
     {% endif %}
 </body>
 </html>

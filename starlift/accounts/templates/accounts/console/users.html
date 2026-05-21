@@ -14,7 +14,7 @@
     {% endif %}
 
     <form method="get" class="filter-bar">
-        <input type="text" name="q" value="{{ q }}" placeholder="Поиск по username / email / имени" style="min-width:260px;">
+        <input type="text" name="q" value="{{ q }}" placeholder="Поиск по username / email / имени" style="min-width:260px; flex:1;">
         <select name="role">
             <option value="">Все роли</option>
             <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Админ</option>
@@ -26,7 +26,7 @@
             <option value="active" {% if active_filter == 'active' %}selected{% endif %}>Активные</option>
             <option value="inactive" {% if active_filter == 'inactive' %}selected{% endif %}>Отключённые</option>
         </select>
-        <button type="submit" class="btn-action btn-contact" style="padding:8px 14px; font-size:13px;"><i class="fa-solid fa-magnifying-glass"></i> Найти</button>
+        <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-magnifying-glass"></i> Найти</button>
     </form>
 
     {% if page.object_list %}
@@ -68,40 +68,30 @@
                 <td style="color:var(--text-muted);">{{ u.date_joined|date:"d.m.Y" }}</td>
                 <td>
                     <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                        {% if u.profile.role == 'guest' %}
-                        <form method="post" action="{% url 'accounts:user_detail' u.pk %}" onsubmit="return confirm('Подтвердить {{ u.username }} как спикера?');" style="margin:0;">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="change_role">
-                            <input type="hidden" name="role" value="speaker">
-                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                            <button type="submit" class="btn-action btn-contact" style="padding:6px 10px; font-size:12px;" title="Подтвердить как спикера">
-                                <i class="fa-solid fa-user-check"></i> Сделать спикером
-                            </button>
-                        </form>
-                        <form method="post" action="{% url 'accounts:user_detail' u.pk %}" onsubmit="return confirm('Удалить гостевого пользователя {{ u.username }}? Это действие нельзя отменить.');" style="margin:0;">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="delete_guest">
-                            <button type="submit" class="btn-action" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3); padding:6px 10px; font-size:12px;">
-                                <i class="fa-solid fa-trash"></i> Удалить
-                            </button>
-                        </form>
-                        {% else %}
                         {% if u.profile.role == 'speaker' and u.pk not in linked_speaker_user_ids %}
-                        <a href="{% url 'accounts:user_detail' u.pk %}#speaker-link" class="btn-action" style="padding:6px 10px; font-size:12px; text-decoration:none; background:var(--white); color:var(--text-main); border:1px solid var(--border-color);" title="Перейти к привязке">
-                            <i class="fa-solid fa-link"></i> Привязать спикера
+                        <a href="{% url 'accounts:user_detail' u.pk %}#speaker-link" class="btn-action" title="Перейти к привязке" style="height:34px; padding:0 10px; font-size:12px;">
+                            <i class="fa-solid fa-link"></i> Привязать
                         </a>
                         {% endif %}
-                        <form method="post" action="{% url 'accounts:user_detail' u.pk %}" style="margin:0; display:flex; gap:4px; align-items:center;">
+                        <form method="post" action="{% url 'accounts:user_detail' u.pk %}" class="role-change-form" title="Сменить роль">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="change_role">
                             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                            <select name="role" class="select-compact" style="padding:4px 8px; font-size:12px;">
+                            <select name="role" aria-label="Роль пользователя">
                                 <option value="guest" {% if u.profile.role == 'guest' %}selected{% endif %}>Гость</option>
                                 <option value="speaker" {% if u.profile.role == 'speaker' %}selected{% endif %}>Спикер</option>
                                 <option value="admin" {% if u.profile.role == 'admin' %}selected{% endif %}>Админ</option>
                             </select>
-                            <button type="submit" class="btn-action btn-contact" style="padding:6px 10px; font-size:12px;" title="Сменить роль">
-                                <i class="fa-solid fa-user-shield"></i>
+                            <button type="submit" title="Применить роль" aria-label="Применить роль">
+                                <i class="fa-solid fa-check"></i>
+                            </button>
+                        </form>
+                        {% if u.profile.role == 'guest' %}
+                        <form method="post" action="{% url 'accounts:user_detail' u.pk %}" onsubmit="return confirm('Удалить гостевого пользователя {{ u.username }}? Это действие нельзя отменить.');" style="margin:0;">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_guest">
+                            <button type="submit" class="btn-action btn-danger btn-icon" style="height:34px; width:34px;" title="Удалить гостя">
+                                <i class="fa-solid fa-trash"></i>
                             </button>
                         </form>
                         {% endif %}

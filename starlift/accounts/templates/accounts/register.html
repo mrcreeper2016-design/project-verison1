@@ -1,42 +1,7 @@
 {% extends 'accounts/auth_base.html' %}
+{% load static %}
 
 {% block title %}Регистрация — StarLift{% endblock %}
-
-{% block extra_css %}
-.legal-link { color: var(--sber-green); font-weight: 600; text-decoration: underline; }
-.legal-link:hover { color: var(--sber-green-hover); }
-.legal-modal-backdrop {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
-    display: none; align-items: center; justify-content: center;
-    z-index: 1000; padding: 24px;
-}
-.legal-modal-backdrop.is-open { display: flex; animation: fadeIn 0.2s ease; }
-.legal-modal {
-    background: var(--bg-color);
-    border: 1px solid var(--border-color);
-    border-radius: 16px;
-    max-width: 720px; width: 100%; max-height: 86vh;
-    display: flex; flex-direction: column;
-    box-shadow: 0 24px 60px rgba(0,0,0,0.25);
-}
-.legal-modal-body {
-    padding: 24px 28px; overflow-y: auto;
-    color: var(--text-main); font-size: 14px; line-height: 1.6;
-}
-.legal-modal-body h2 { margin-top: 0; font-size: 22px; }
-.legal-modal-body h3 { font-size: 16px; margin-top: 18px; }
-.legal-modal-body em { color: var(--text-muted); font-style: normal; font-size: 12px; }
-.legal-modal-footer {
-    padding: 14px 28px; border-top: 1px solid var(--border-color);
-    display: flex; justify-content: flex-end;
-}
-.legal-modal-close {
-    background: var(--sber-green); color: #fff; border: none;
-    border-radius: 10px; padding: 10px 18px; font-weight: 700; cursor: pointer;
-    font-size: 14px; transition: var(--transition);
-}
-.legal-modal-close:hover { background: var(--sber-green-hover); }
-{% endblock %}
 
 {% block content %}
 <h1 class="auth-title">Создание аккаунта</h1>
@@ -121,46 +86,11 @@
 <div class="auth-footer-note">
     После отправки формы на указанный email придёт ссылка для активации. До перехода по ней войти в систему нельзя.
 </div>
-
-<div class="legal-modal-backdrop" id="legalModal" role="dialog" aria-modal="true">
-    <div class="legal-modal">
-        <div class="legal-modal-body" id="legalModalBody">
-            <div data-legal-doc="consent">{% include 'legal/_consent_body.html' %}</div>
-            <div data-legal-doc="privacy" hidden>{% include 'legal/_privacy_body.html' %}</div>
-            <div data-legal-doc="terms" hidden>{% include 'legal/_terms_body.html' %}</div>
-        </div>
-        <div class="legal-modal-footer">
-            <button type="button" class="legal-modal-close" id="legalModalClose">Закрыть</button>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
-<script>
-(function() {
-    const modal = document.getElementById('legalModal');
-    if (!modal) return;
-    const closeBtn = document.getElementById('legalModalClose');
-    const docs = modal.querySelectorAll('[data-legal-doc]');
-    function open(which) {
-        docs.forEach(d => d.hidden = (d.dataset.legalDoc !== which));
-        modal.classList.add('is-open');
-        document.body.style.overflow = 'hidden';
-    }
-    function close() {
-        modal.classList.remove('is-open');
-        document.body.style.overflow = '';
-    }
-    document.querySelectorAll('a.legal-link').forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            open(link.dataset.legal);
-        });
-    });
-    closeBtn.addEventListener('click', close);
-    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-})();
-</script>
+<link rel="stylesheet" href="{% static 'accounts/legal-modal.css' %}">
+{# Модалка живёт вне .auth-card, иначе backdrop-filter карточки делает её containing block для position:fixed. #}
+{% include 'legal/_modal.html' %}
+<script src="{% static 'accounts/legal-modal.js' %}" defer></script>
 {% endblock %}

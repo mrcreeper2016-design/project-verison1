@@ -46,23 +46,15 @@
                 <i class="fa-solid fa-user-clock" style="color:var(--sber-green); font-size:18px;"></i>
                 <div style="flex:1; font-size:13px;">
                     <div style="font-weight:700; color:var(--sber-green);">Ожидает подтверждения</div>
-                    <div style="color:var(--text-main);">Пользователь зарегистрировался самостоятельно. Выдайте роль спикера, чтобы открыть доступ к дашборду.</div>
+                    <div style="color:var(--text-main);">Пользователь зарегистрировался самостоятельно. Выберите роль ниже, чтобы открыть ему доступ.</div>
                 </div>
-                <form method="post" onsubmit="return confirm('Подтвердить пользователя и выдать роль спикера?');" style="margin:0;">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="change_role">
-                    <input type="hidden" name="role" value="speaker">
-                    <button type="submit" class="btn-action btn-contact" style="padding:8px 14px; font-size:13px;">
-                        <i class="fa-solid fa-user-check"></i> Подтвердить как спикера
-                    </button>
-                </form>
             </div>
             {% endif %}
 
             <form method="post" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="unlock">
-                <button type="submit" class="btn-action" style="background:var(--white); color:var(--text-main); border:1px solid var(--border-color); padding:8px 14px; font-size:13px;" {% if not is_locked %}disabled title="Нет активной блокировки"{% endif %}>
+                <button type="submit" class="btn-action" {% if not is_locked %}disabled title="Нет активной блокировки"{% endif %}>
                     <i class="fa-solid fa-lock-open"></i> Снять lockout
                 </button>
             </form>
@@ -75,16 +67,16 @@
                     <option value="speaker" {% if profile.role == 'speaker' %}selected{% endif %}>Спикер</option>
                     <option value="admin" {% if profile.role == 'admin' %}selected{% endif %}>Админ</option>
                 </select>
-                <button type="submit" class="btn-action btn-contact" style="padding:8px 14px; font-size:13px;"><i class="fa-solid fa-user-shield"></i> Сменить роль</button>
+                <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-user-shield"></i> Сменить роль</button>
             </form>
 
             <form method="post" onsubmit="return confirm('{% if target.is_active %}Отключить{% else %}Включить{% endif %} аккаунт {{ target.username }}?');">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle_active">
                 {% if target.is_active %}
-                <button type="submit" class="btn-action" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3); padding:8px 14px; font-size:13px;"><i class="fa-solid fa-user-slash"></i> Отключить аккаунт</button>
+                <button type="submit" class="btn-action btn-danger"><i class="fa-solid fa-user-slash"></i> Отключить аккаунт</button>
                 {% else %}
-                <button type="submit" class="btn-action btn-contact" style="padding:8px 14px; font-size:13px;"><i class="fa-solid fa-user-check"></i> Включить аккаунт</button>
+                <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-user-check"></i> Включить аккаунт</button>
                 {% endif %}
             </form>
 
@@ -92,7 +84,7 @@
             <form method="post" onsubmit="return confirm('Удалить гостевого пользователя {{ target.username }}? Это действие нельзя отменить.');">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="delete_guest">
-                <button type="submit" class="btn-action" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3); padding:8px 14px; font-size:13px;">
+                <button type="submit" class="btn-action btn-danger">
                     <i class="fa-solid fa-trash"></i> Удалить гостя
                 </button>
             </form>
@@ -111,7 +103,7 @@
                     {% csrf_token %}
                     <input type="hidden" name="action" value="link_speaker">
                     <input type="hidden" name="speaker_id" value="">
-                    <button type="submit" class="btn-action" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3); padding:6px 10px; font-size:12px;"><i class="fa-solid fa-link-slash"></i> Разорвать</button>
+                    <button type="submit" class="btn-action btn-danger"><i class="fa-solid fa-link-slash"></i> Разорвать</button>
                 </form>
             </div>
             {% else %}
@@ -127,7 +119,7 @@
                     <option value="{{ s.pk }}">{{ s.name }} ({{ s.city }})</option>
                     {% endfor %}
                 </select>
-                <button type="submit" class="btn-action btn-contact" style="padding:8px 14px; font-size:13px;"><i class="fa-solid fa-link"></i> Связать</button>
+                <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-link"></i> Связать</button>
             </form>
         </div>
     </div>

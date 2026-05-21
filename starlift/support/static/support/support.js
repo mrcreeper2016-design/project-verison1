@@ -1,150 +1,233 @@
-/* Support chat client: SSE stream + composer for user/admin/guest. */
-(function(){
-    var root = document.getElementById('support-root');
-    if (!root) return;
+/* Support page client (full /assistant/support/ + guest /support/t/<token>/).
+   Hydrates from a JSON <script type="application/json"> bootstrap then
+   streams updates via SSE. Uses window.SupportUI for rendering. */
+(function () {
+    'use strict';
 
-    var ticketId = root.dataset.ticketId || '';
-    var token = root.dataset.token || '';
+    var root = document.querySelector('.support-ui[data-status]');
+    if (!root || !window.SupportUI) return;
+
+    var SU = window.SupportUI;
     var isGuest = root.dataset.isGuest === '1';
     var isAdmin = root.dataset.isAdmin === '1';
+    var viewerKind = root.dataset.viewerKind || (isGuest ? 'guest' : (isAdmin ? 'admin' : 'user'));
+    var ticketId = root.dataset.ticketId || '';
+    var token = root.dataset.token || '';
     var status = root.dataset.status || 'open';
     var csrf = root.dataset.csrf || '';
+    var userInitial = root.dataset.userInitial || '?';
+    var userAvatar = root.dataset.userAvatar || '';
 
-    var thread = document.getElementById('chat-thread');
-    var input = document.getElementById('chat-input');
-    var sendBtn = document.getElementById('chat-send-btn');
-    var statusEl = document.getElementById('chat-status');
-    var closeBtn = document.getElementById('support-close-btn');
+    SU.init(root, {viewerKind: viewerKind, mineAvatarUrl: userAvatar, mineInitial: userInitial});
 
-    function escapeHtml(s){
-        return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-    function renderMessage(m){
-        if (!thread) return;
-        if (m.sender_kind === 'system') {
-            var d = document.createElement('div');
-            d.className = 'support-system';
-            d.textContent = m.body;
-            thread.appendChild(d);
-            scrollBottom();
-            return;
-        }
-        var isMine = (isAdmin && m.sender_kind === 'admin') ||
-                     (!isAdmin && !isGuest && m.sender_kind === 'user') ||
-                     (isGuest && m.sender_kind === 'guest');
-        var bubbleSide = isMine ? 'user' : 'assistant';
-        var avatarHtml;
-        if (m.sender_kind === 'admin') avatarHtml = '<i class="fa-solid fa-headset"></i>';
-        else if (m.sender_kind === 'guest') avatarHtml = '<i class="fa-solid fa-user"></i>';
-        else avatarHtml = escapeHtml((m.sender_name||'?').slice(0,1).toUpperCase());
-
-        var div = document.createElement('div');
-        div.className = 'chat-msg ' + bubbleSide;
-        div.innerHTML = '<div class="chat-avatar">'+avatarHtml+'</div>' +
-                        '<div class="chat-bubble">'+escapeHtml(m.body).replace(/\n/g,'<br>')+'</div>';
-        thread.appendChild(div);
-        scrollBottom();
-    }
-    function scrollBottom(){
-        if (thread) thread.scrollTop = thread.scrollHeight;
-    }
-
-    // ---- SSE
-    var sseUrl = isGuest
-        ? '/support/t/' + encodeURIComponent(token) + '/stream/'
-        : '/assistant/support/t/' + ticketId + '/stream/';
+    var threadList = root.querySelector('[data-thread-list]');
+    var threadInput = root.querySelector('[data-thread-input]');
+    var threadSendBtn = root.querySelector('[data-thread-send]');
+    var threadStatus = root.querySelector('[data-thread-status]');
+    var menuEl = root.querySelector('[data-thread-menu]');
 
     var seenIds = new Set();
-    Array.prototype.slice.call(document.querySelectorAll('#chat-thread [data-msg-id]'))
-        .forEach(function(el){ seenIds.add(parseInt(el.dataset.msgId,10)); });
+    var currentSSE = null;
+    var typingTimer = null;
+    var typingActive = false;
+    var typingResetTimer = null;
+    var typingClearTimer = null;
+    var lastTypingKind = null;
 
-    function startSSE(){
+    function scrollBottom() {
+        requestAnimationFrame(function () { threadList.scrollTop = threadList.scrollHeight; });
+    }
+
+    // ── Hydrate from bootstrap JSON
+    var bootstrap = document.getElementById('page-bootstrap-messages');
+    if (bootstrap) {
+        try {
+            var data = JSON.parse(bootstrap.textContent || '[]');
+            data.forEach(function (m) {
+                seenIds.add(m.id);
+                if (m.sender_kind === 'system') SU.renderSystem(threadList, m);
+                else SU.renderMessage(threadList, m, {viewerKind: viewerKind, mineAvatarUrl: userAvatar, mineInitial: userInitial});
+            });
+            scrollBottom();
+        } catch (e) { /* ignore */ }
+    }
+
+    // ── URLs
+    var streamUrl = isGuest
+        ? '/support/t/' + encodeURIComponent(token) + '/stream/'
+        : '/assistant/support/t/' + ticketId + '/stream/';
+    var sendUrl = isGuest
+        ? '/support/t/' + encodeURIComponent(token) + '/send/'
+        : '/assistant/support/t/' + ticketId + '/send/';
+    var typingUrl = isGuest
+        ? '/support/t/' + encodeURIComponent(token) + '/typing/'
+        : '/assistant/support/t/' + ticketId + '/typing/';
+    var closeUrl = isAdmin && !isGuest
+        ? '/assistant/support/t/' + ticketId + '/close/'
+        : null;
+
+    // ── SSE
+    function startSSE() {
         if (status === 'closed') return;
-        var es;
-        try { es = new EventSource(sseUrl); } catch (e) { return; }
-        es.addEventListener('message', function(ev){
+        closeSSE();
+        try { currentSSE = new EventSource(streamUrl); }
+        catch (e) { return; }
+
+        currentSSE.addEventListener('open', function () { SU.setConnection(root, 'ok'); });
+        currentSSE.addEventListener('message', function (ev) {
             try {
                 var m = JSON.parse(ev.data);
                 if (seenIds.has(m.id)) return;
                 seenIds.add(m.id);
-                renderMessage(m);
-            } catch (e) {}
+                SU.setConnection(root, 'ok');
+                if (m.sender_kind === 'system') SU.renderSystem(threadList, m);
+                else SU.renderMessage(threadList, m, {animate: true, viewerKind: viewerKind, mineAvatarUrl: userAvatar, mineInitial: userInitial});
+                scrollBottom();
+            } catch (e) { /* ignore */ }
         });
-        es.addEventListener('status', function(ev){
+        currentSSE.addEventListener('typing', function (ev) {
+            try {
+                var d = JSON.parse(ev.data);
+                handleTypingEvent(d);
+            } catch (e) { /* ignore */ }
+        });
+        currentSSE.addEventListener('status', function (ev) {
             try {
                 var d = JSON.parse(ev.data);
                 if (d.status === 'closed') {
                     status = 'closed';
-                    if (statusEl) statusEl.textContent = 'Тикет закрыт. Перезагрузите страницу.';
-                    if (input) input.disabled = true;
-                    if (sendBtn) sendBtn.disabled = true;
+                    SU.applyClosed(root, true);
+                    if (threadStatus) threadStatus.textContent = '';
                 }
-            } catch (e) {}
-            es.close();
+            } catch (e) { /* ignore */ }
+            closeSSE();
         });
-        es.onerror = function(){
-            es.close();
-            setTimeout(startSSE, 2000);
+        currentSSE.onerror = function () {
+            closeSSE();
+            SU.setConnection(root, 'reconnecting');
+            setTimeout(function () { if (status !== 'closed') startSSE(); }, 2000);
         };
     }
-    startSSE();
-    scrollBottom();
-
-    // ---- Send
-    function setBusy(b){
-        if (sendBtn) sendBtn.disabled = b;
-        if (input) input.disabled = b;
+    function closeSSE() {
+        if (currentSSE) { try { currentSSE.close(); } catch (e) {} currentSSE = null; }
     }
-    function send(){
-        if (!input) return;
-        var content = (input.value || '').trim();
+    startSSE();
+
+    // ── Typing in
+    function handleTypingEvent(d) {
+        if (!d || !d.kind) return;
+        if (d.active) {
+            lastTypingKind = d.kind;
+            var label = d.kind === 'admin' ? 'Поддержка печатает…'
+                       : d.kind === 'guest' ? 'Гость печатает…'
+                       : 'Печатает…';
+            SU.setTyping(root, label);
+            if (typingClearTimer) clearTimeout(typingClearTimer);
+            typingClearTimer = setTimeout(function () { SU.setTyping(root, null); }, 6000);
+        } else {
+            if (d.kind === lastTypingKind) {
+                lastTypingKind = null;
+                SU.setTyping(root, null);
+            }
+        }
+    }
+
+    // ── Typing out
+    function postTyping(active) {
+        fetch(typingUrl, {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+            body: JSON.stringify({ active: !!active }),
+        }).catch(function () {});
+    }
+    function onInputTyping() {
+        var hasText = (threadInput.value || '').trim().length > 0;
+        if (!hasText) { stopTyping(); return; }
+        if (!typingActive) { typingActive = true; postTyping(true); }
+        if (typingTimer) clearTimeout(typingTimer);
+        typingTimer = setTimeout(function () {
+            if (typingActive && (threadInput.value || '').trim()) {
+                postTyping(true);
+                onInputTyping();
+            }
+        }, 2000);
+        if (typingResetTimer) clearTimeout(typingResetTimer);
+        typingResetTimer = setTimeout(stopTyping, 3000);
+    }
+    function stopTyping() {
+        if (typingTimer) { clearTimeout(typingTimer); typingTimer = null; }
+        if (typingResetTimer) { clearTimeout(typingResetTimer); typingResetTimer = null; }
+        if (typingActive) {
+            typingActive = false;
+            postTyping(false);
+        }
+    }
+
+    // ── Send
+    function setBusy(b) {
+        if (threadSendBtn) threadSendBtn.disabled = b;
+        if (threadInput) threadInput.disabled = b;
+    }
+    function send() {
+        if (!threadInput) return;
+        var content = (threadInput.value || '').trim();
         if (!content) return;
         setBusy(true);
-        if (statusEl) statusEl.textContent = 'Отправка…';
-        var url = isGuest
-            ? '/support/t/' + encodeURIComponent(token) + '/send/'
-            : '/assistant/support/t/' + ticketId + '/send/';
-        fetch(url, {
-            method: 'POST',
-            credentials: 'same-origin',
+        if (threadStatus) threadStatus.textContent = 'Отправка…';
+        fetch(sendUrl, {
+            method: 'POST', credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-            body: JSON.stringify({ content: content })
-        }).then(function(r){
-            if (!r.ok) {
-                return r.json().then(function(d){ throw d; }).catch(function(){ throw {error: 'http_' + r.status}; });
-            }
+            body: JSON.stringify({ content: content }),
+        }).then(function (r) {
+            if (!r.ok) return r.json().then(function (d) { throw d; }).catch(function () { throw {error: 'http_' + r.status}; });
             return r.json();
-        }).then(function(){
-            input.value = '';
-            input.style.height = '';
-            if (statusEl) statusEl.textContent = '';
-        }).catch(function(err){
-            if (statusEl) statusEl.textContent = (err && err.error) ? ('Ошибка: ' + err.error) : 'Ошибка отправки';
-        }).finally(function(){ setBusy(false); input && input.focus(); });
+        }).then(function () {
+            threadInput.value = '';
+            threadInput.style.height = '';
+            if (threadStatus) threadStatus.textContent = '';
+            stopTyping();
+        }).catch(function (err) {
+            if (threadStatus) threadStatus.textContent = (err && err.error) ? ('Ошибка: ' + err.error) : 'Ошибка отправки';
+        }).finally(function () {
+            setBusy(false);
+            threadInput.focus();
+        });
     }
 
-    if (sendBtn) sendBtn.addEventListener('click', send);
-    if (input) {
-        input.addEventListener('keydown', function(e){
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
+    if (threadSendBtn) threadSendBtn.addEventListener('click', send);
+    if (threadInput) {
+        threadInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+        });
+        threadInput.addEventListener('input', function () {
+            threadInput.style.height = 'auto';
+            threadInput.style.height = Math.min(140, threadInput.scrollHeight) + 'px';
+            onInputTyping();
+        });
+    }
+
+    // ── Three-dot menu (admin only, non-guest)
+    var menuToggle = root.querySelector('[data-action="toggle-menu"]');
+    if (menuToggle && menuEl) {
+        menuToggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            menuEl.hidden = !menuEl.hidden;
+        });
+        document.addEventListener('click', function (e) {
+            if (menuEl.hidden) return;
+            if (!menuEl.contains(e.target) && !e.target.closest('[data-action="toggle-menu"]')) {
+                menuEl.hidden = true;
             }
         });
-        input.addEventListener('input', function(){
-            input.style.height = 'auto';
-            input.style.height = Math.min(160, input.scrollHeight) + 'px';
-        });
     }
-
-    if (closeBtn) {
-        closeBtn.addEventListener('click', function(){
-            if (!confirm('Закрыть тикет? Пользователь не сможет писать.')) return;
-            fetch('/assistant/support/t/' + ticketId + '/close/', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
-            }).then(function(){ location.reload(); });
+    var closeBtn = root.querySelector('[data-action="close-ticket"]');
+    if (closeBtn && closeUrl) {
+        closeBtn.addEventListener('click', function () {
+            if (!confirm('Закрыть тикет?')) return;
+            fetch(closeUrl, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'X-CSRFToken': csrf },
+            }).then(function () { location.reload(); });
         });
     }
 })();

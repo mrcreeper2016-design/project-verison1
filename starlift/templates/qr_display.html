@@ -113,6 +113,40 @@
             <br>
             <span class="event-badge">{{ event.title }}</span>
         </div>
+
+        <div class="qr-actions">
+            <a href="{% url 'qr_poster' speaker_id=speaker.id event_id=event.id %}" class="btn-action btn-contact" download>
+                <i class="fa-solid fa-download"></i> Скачать постер PNG
+            </a>
+            <button type="button" class="btn-action" id="qrPrintBtn">
+                <i class="fa-solid fa-print"></i> Распечатать
+            </button>
+            <a href="{% url 'qr_generator' %}" class="btn-action">
+                <i class="fa-solid fa-arrow-left"></i> Другой QR
+            </a>
+        </div>
     </div>
 </div>
+
+<style>
+    .qr-actions {
+        margin-top: 24px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    @media print {
+        aside, .main-header, .qr-actions { display: none !important; }
+        body, main { background: #fff !important; }
+        .qr-card { box-shadow: none !important; border: none !important; }
+    }
+</style>
+
+<script>
+    (function() {
+        const btn = document.getElementById('qrPrintBtn');
+        if (btn) btn.addEventListener('click', () => window.print());
+    })();
+</script>
 {% endblock %}

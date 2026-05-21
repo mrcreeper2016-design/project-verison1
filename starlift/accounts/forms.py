@@ -32,17 +32,32 @@ def _field_attrs(extra: str = "", placeholder: str = "") -> dict:
     return attrs
 
 
+def _email_field_attrs(placeholder: str = "", autocomplete: str = "email") -> dict:
+    # Mobile keyboards (особенно iOS) по умолчанию обрабатывают input как предложение:
+    # автокапитализация и «умная» пунктуация после точки вставляют пробел.
+    # Эти атрибуты выключают авто-исправления и переводят клавиатуру в email-режим.
+    attrs = _field_attrs(placeholder=placeholder)
+    attrs.update({
+        "autocomplete": autocomplete,
+        "autocapitalize": "none",
+        "autocorrect": "off",
+        "spellcheck": "false",
+        "inputmode": "email",
+    })
+    return attrs
+
+
 _CONSENT_PDN_LABEL = mark_safe(
     'Я даю согласие на обработку моих персональных данных в соответствии с '
-    '<a href="/consent/" class="legal-link" data-legal="consent" target="_blank" rel="noopener">'
-    'Согласием на обработку ПДн</a> и ФЗ-152.'
+    '<button type="button" class="legal-link" data-legal="consent">'
+    'Согласием на обработку ПДн</button> и ФЗ-152.'
 )
 _ACCEPT_POLICY_LABEL = mark_safe(
     'Я ознакомлен и принимаю '
-    '<a href="/privacy/" class="legal-link" data-legal="privacy" target="_blank" rel="noopener">'
-    'Политику конфиденциальности</a> и '
-    '<a href="/terms/" class="legal-link" data-legal="terms" target="_blank" rel="noopener">'
-    'Пользовательское соглашение</a>.'
+    '<button type="button" class="legal-link" data-legal="privacy">'
+    'Политику конфиденциальности</button> и '
+    '<button type="button" class="legal-link" data-legal="terms">'
+    'Пользовательское соглашение</button>.'
 )
 _CONSENT_PDN_REQUIRED_MSG = "Для регистрации необходимо согласие на обработку персональных данных."
 _ACCEPT_POLICY_REQUIRED_MSG = "Необходимо принять Политику конфиденциальности и Пользовательское соглашение."
@@ -52,7 +67,10 @@ class LoginForm(forms.Form):
     username = forms.CharField(
         label="Имя пользователя или email",
         max_length=254,
-        widget=forms.TextInput(attrs=_field_attrs(placeholder="username или you@example.com")),
+        widget=forms.TextInput(attrs=_email_field_attrs(
+            placeholder="username или you@example.com",
+            autocomplete="username",
+        )),
     )
     password = forms.CharField(
         label="Пароль",
@@ -68,7 +86,7 @@ class InviteCreateForm(forms.ModelForm):
         model = Invite
         fields = ["email", "role", "speaker"]
         widgets = {
-            "email": forms.EmailInput(attrs=_field_attrs(placeholder="speaker@example.com")),
+            "email": forms.EmailInput(attrs=_email_field_attrs(placeholder="speaker@example.com")),
             "role": forms.Select(attrs={"class": "select-compact"}),
             "speaker": forms.Select(attrs={"class": "select-compact"}),
         }
@@ -110,7 +128,7 @@ class RegisterForm(forms.Form):
     )
     email = forms.EmailField(
         label="Email",
-        widget=forms.EmailInput(attrs=_field_attrs(placeholder="you@example.com")),
+        widget=forms.EmailInput(attrs=_email_field_attrs(placeholder="you@example.com")),
     )
     password1 = forms.CharField(
         label="Пароль",
@@ -343,7 +361,7 @@ class SpeakerProfileForm(forms.Form):
 
 
 class EmailChangeForm(forms.Form):
-    new_email = forms.EmailField(label="Новый email", widget=forms.EmailInput(attrs=_field_attrs(placeholder="you@example.com")))
+    new_email = forms.EmailField(label="Новый email", widget=forms.EmailInput(attrs=_email_field_attrs(placeholder="you@example.com")))
     current_password = forms.CharField(
         label="Текущий пароль",
         strip=False,
@@ -382,7 +400,7 @@ class StarliftPasswordChangeForm(DjangoPasswordChangeForm):
 class StarliftPasswordResetForm(DjangoPasswordResetForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["email"].widget.attrs.update(_field_attrs(placeholder="you@example.com"))
+        self.fields["email"].widget.attrs.update(_email_field_attrs(placeholder="you@example.com"))
 
 
 class StarliftSetPasswordForm(DjangoSetPasswordForm):

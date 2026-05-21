@@ -54,6 +54,8 @@ class ModelTests(TestCase):
 
 
 class PermissionTests(TestCase):
+    # Support is drawer-only — permissions are tested through the JSON API
+    # used by the drawer pane.
     def test_speaker_cannot_view_other_users_ticket(self):
         a = _make_user("dan", "speaker")
         b = _make_user("eve", "speaker")
@@ -62,8 +64,8 @@ class PermissionTests(TestCase):
         )
         SupportMessage.objects.create(ticket=t, sender_kind="user", body="x")
         self.client.force_login(b)
-        resp = self.client.get(f"/assistant/support/t/{t.id}/")
-        self.assertEqual(resp.status_code, 404)
+        resp = self.client.get(f"/assistant/support/api/t/{t.id}/")
+        self.assertEqual(resp.status_code, 403)
 
     def test_speaker_can_view_own(self):
         a = _make_user("fred", "speaker")
@@ -72,7 +74,7 @@ class PermissionTests(TestCase):
         )
         SupportMessage.objects.create(ticket=t, sender_kind="user", body="x")
         self.client.force_login(a)
-        resp = self.client.get(f"/assistant/support/t/{t.id}/")
+        resp = self.client.get(f"/assistant/support/api/t/{t.id}/")
         self.assertEqual(resp.status_code, 200)
 
     def test_admin_can_view_any(self):
@@ -83,7 +85,7 @@ class PermissionTests(TestCase):
         )
         SupportMessage.objects.create(ticket=t, sender_kind="user", body="x")
         self.client.force_login(admin)
-        resp = self.client.get(f"/assistant/support/t/{t.id}/")
+        resp = self.client.get(f"/assistant/support/api/t/{t.id}/")
         self.assertEqual(resp.status_code, 200)
 
     def test_speaker_cannot_close(self):

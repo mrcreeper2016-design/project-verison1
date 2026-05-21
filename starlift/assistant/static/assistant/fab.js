@@ -34,7 +34,11 @@
         drawer.setAttribute('aria-hidden', 'false');
         if (fabBtn) {
             fabBtn.classList.add('open');
-            fabBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            var icon = fabBtn.querySelector('i.fa-solid');
+            if (icon) {
+                icon.classList.remove('fa-robot');
+                icon.classList.add('fa-xmark');
+            }
         }
         if (drawerWidget && !drawerWidget.hydrated) {
             drawerWidget.hydrate().then(() => drawerWidget.input.focus());
@@ -48,7 +52,11 @@
         drawer.setAttribute('aria-hidden', 'true');
         if (fabBtn) {
             fabBtn.classList.remove('open');
-            fabBtn.innerHTML = '<i class="fa-solid fa-robot"></i><span class="assistant-fab-dot"></span>';
+            var icon = fabBtn.querySelector('i.fa-solid');
+            if (icon) {
+                icon.classList.remove('fa-xmark');
+                icon.classList.add('fa-robot');
+            }
         }
     }
     function toggleDrawer() {

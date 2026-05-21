@@ -2,58 +2,67 @@
 {% load static %}
 
 {% block content %}
-<link rel="stylesheet" href="{% static 'assistant/chat.css' %}">
 <link rel="stylesheet" href="{% static 'support/support.css' %}">
 
-<div class="chat-page" style="grid-template-columns: 1fr;">
-    <section class="chat-main animate-fade">
-        <header class="chat-header">
-            <div class="chat-header-title">
-                <div class="chat-header-avatar"><i class="fa-solid fa-life-ring"></i></div>
-                <div style="min-width:0;">
-                    <h1 class="chat-title">{{ ticket.subject }}</h1>
-                    <p class="chat-subtitle">
+<div class="support-page support-page--single">
+    <section class="support-page-main animate-fade">
+        <div class="support-ui"
+             data-csrf="{{ csrf_token }}"
+             data-token="{{ token }}"
+             data-viewer-kind="guest"
+             data-is-guest="1"
+             data-status="{{ ticket.status }}">
+
+            <div class="support-guest-info">
+                <div class="support-guest-info-icon"><i class="fa-solid fa-life-ring"></i></div>
+                <div class="support-guest-info-body">
+                    <div class="support-guest-info-title">{{ ticket.subject }}</div>
+                    <div class="support-guest-info-meta">
                         Гость · {{ ticket.guest_email }} ·
                         {% if ticket.status == 'closed' %}закрыт{% else %}открыт{% endif %}
-                    </p>
+                    </div>
+                </div>
+                <span class="su-status-pill" data-status="{{ ticket.status }}">
+                    {% if ticket.status == 'closed' %}закрыт{% else %}open{% endif %}
+                </span>
+            </div>
+
+            <div class="su-conn-bar" data-su-conn hidden>
+                <i class="fa-solid fa-circle-notch"></i> Переподключение…
+            </div>
+
+            <div class="su-thread" data-thread-list></div>
+
+            <div class="su-typing" data-su-typing hidden>
+                <span class="su-typing-dots"><span></span><span></span><span></span></span>
+                <span class="su-typing-label">Печатает…</span>
+            </div>
+
+            <div class="su-composer" data-su-composer {% if ticket.status == 'closed' %}hidden{% endif %}>
+                <div class="su-composer-row">
+                    <textarea class="su-input" data-thread-input rows="1" maxlength="5000"
+                              placeholder="Напишите сообщение…" autocomplete="off"></textarea>
+                    <button class="su-send" type="button" data-thread-send aria-label="Отправить">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="su-composer-hint">
+                    <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
+                    <span data-thread-status></span>
                 </div>
             </div>
-        </header>
-
-        <div id="chat-thread" class="chat-thread">
-            {% for m in messages_list %}
-            {% include 'support/_message.html' with m=m %}
-            {% endfor %}
-        </div>
-
-        <div class="chat-composer">
-            {% if ticket.status == 'closed' %}
-            <div class="chat-empty" style="padding:18px;">
-                <p style="margin:0;">Тикет закрыт администратором.</p>
+            <div class="su-closed-banner" data-su-closed-banner {% if ticket.status != 'closed' %}hidden{% endif %}>
+                <i class="fa-solid fa-lock"></i> Тикет закрыт администратором.<br>
+                Чтобы продолжить общение, создайте новое обращение.
+                <a href="{% url 'support_guest:guest_new' %}" class="su-closed-banner-cta">
+                    <i class="fa-solid fa-plus"></i> Новое обращение
+                </a>
             </div>
-            {% else %}
-            <div class="chat-composer-row">
-                <textarea id="chat-input" class="chat-input" rows="1"
-                          placeholder="Напишите сообщение…" autocomplete="off"></textarea>
-                <button id="chat-send-btn" class="chat-send" type="button" aria-label="Отправить">
-                    <i class="fa-solid fa-paper-plane"></i>
-                </button>
-            </div>
-            <div class="chat-composer-hint">
-                <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
-                <span id="chat-status"></span>
-            </div>
-            {% endif %}
         </div>
     </section>
 </div>
 
-<div id="support-root"
-     data-token="{{ token }}"
-     data-csrf="{{ csrf_token }}"
-     data-is-admin="0"
-     data-is-guest="1"
-     data-status="{{ ticket.status }}"
-     style="display:none;"></div>
+{{ messages_data|json_script:"page-bootstrap-messages" }}
+<script src="{% static 'support/render.js' %}"></script>
 <script src="{% static 'support/support.js' %}"></script>
 {% endblock %}

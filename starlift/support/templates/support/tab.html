@@ -5,133 +5,178 @@
 <link rel="stylesheet" href="{% static 'assistant/chat.css' %}">
 <link rel="stylesheet" href="{% static 'support/support.css' %}">
 
-<div class="chat-page">
-    <aside class="chat-sidebar animate-fade">
-        <div class="chat-tabs">
-            <a class="chat-tab" href="/assistant/">
-                <i class="fa-solid fa-robot"></i> Ассистент
-            </a>
-            <a class="chat-tab active" href="{% url 'support:home' %}">
-                <i class="fa-solid fa-life-ring"></i> Поддержка
-                {% if unread_count %}<span class="chat-tab-badge">{{ unread_count }}</span>{% endif %}
-            </a>
-        </div>
+<div class="chat-tabs chat-tabs-top animate-fade">
+    <a class="chat-tab" href="/assistant/">
+        <i class="fa-solid fa-robot"></i> Ассистент
+    </a>
+    <a class="chat-tab active" href="{% url 'support:home' %}">
+        <i class="fa-solid fa-life-ring"></i> Поддержка
+        {% if unread_count %}<span class="chat-tab-badge">{{ unread_count }}</span>{% endif %}
+    </a>
+</div>
 
-        <div class="chat-sidebar-header">
-            <h2><i class="fa-solid fa-life-ring" style="color:var(--sber-green);"></i>
-                {% if is_admin %}Все обращения{% else %}Мои обращения{% endif %}</h2>
-        </div>
-        {% if not is_admin %}
-        <a class="chat-new-btn" href="{% url 'support:new_ticket' %}">
-            <i class="fa-solid fa-plus"></i> Новое обращение
-        </a>
-        {% endif %}
+<div class="support-page {% if new_form %}support-page--single{% endif %}">
 
-        <div class="chat-sidebar-section-label">Тикеты</div>
-        <div class="chat-sidebar-list">
-            {% for row in tickets %}
-            <div class="chat-sidebar-row {% if ticket and row.ticket.id == ticket.id %}active{% endif %}">
-                <a class="chat-sidebar-item-link" href="{% url 'support:ticket_detail' ticket_id=row.ticket.id %}">
-                    <div class="support-row-title">
-                        {{ row.ticket.subject|truncatechars:36 }}
-                        {% if row.unread %}<span class="support-dot"></span>{% endif %}
+    {% if not new_form %}
+    <aside class="support-page-sidebar animate-fade">
+        <div class="support-ui">
+            <div class="su-list-header">
+                <span class="su-list-title">{% if is_admin %}Все обращения{% else %}Мои обращения{% endif %}</span>
+                {% if not is_admin %}
+                <a class="su-new-btn" href="{% url 'support:new_ticket' %}">
+                    <i class="fa-solid fa-plus"></i> Новое
+                </a>
+                {% endif %}
+            </div>
+            <div class="su-list">
+                {% for row in tickets %}
+                <a class="su-list-item {% if ticket and row.ticket.id == ticket.id %}is-active{% endif %}"
+                   href="{% url 'support:ticket_detail' ticket_id=row.ticket.id %}">
+                    <div class="su-list-item-avatar" data-role="{{ row.ticket.last_message_sender_kind|default:'user' }}">
+                        {% if row.ticket.last_message_sender_kind == 'admin' %}<i class="fa-solid fa-headset"></i>
+                        {% elif row.ticket.last_message_sender_kind == 'guest' %}<i class="fa-solid fa-user"></i>
+                        {% else %}{{ row.ticket.author_label|slice:":1"|upper }}{% endif %}
                     </div>
-                    <div class="support-row-meta">
-                        {{ row.ticket.author_label|truncatechars:30 }} ·
-                        {% if row.ticket.status == 'closed' %}<span class="support-closed">closed</span>{% else %}open{% endif %}
+                    <div class="su-list-item-body">
+                        <div class="su-list-item-row">
+                            <div class="su-list-item-subject">{{ row.ticket.subject }}</div>
+                        </div>
+                        <div class="su-list-item-preview">{{ row.ticket.author_label }}</div>
+                        <div class="su-list-item-meta">
+                            <span class="su-status-pill" data-status="{{ row.ticket.status }}">
+                                {% if row.ticket.status == 'closed' %}закрыт{% else %}open{% endif %}
+                            </span>
+                            {% if row.unread %}<span class="su-unread-dot"></span>{% endif %}
+                        </div>
                     </div>
                 </a>
+                {% empty %}
+                <div class="su-list-empty">
+                    <div class="su-list-empty-icon"><i class="fa-solid fa-life-ring"></i></div>
+                    {% if is_admin %}<h4>Тишина</h4>Открытых обращений нет.
+                    {% else %}<h4>Обращений пока нет</h4>Нажмите «Новое», чтобы написать в поддержку.{% endif %}
+                </div>
+                {% endfor %}
             </div>
-            {% empty %}
-            <div class="chat-sidebar-empty">Обращений пока нет</div>
-            {% endfor %}
         </div>
     </aside>
+    {% endif %}
 
-    <section class="chat-main animate-fade">
+    <section class="support-page-main animate-fade">
+
         {% if new_form %}
-        <header class="chat-header">
-            <div class="chat-header-title">
-                <div class="chat-header-avatar"><i class="fa-solid fa-life-ring"></i></div>
-                <div><h1 class="chat-title">Новое обращение</h1>
-                    <p class="chat-subtitle">Опишите вопрос — поддержка свяжется в чате.</p></div>
-            </div>
-        </header>
-        <form method="post" action="{% url 'support:new_ticket' %}" class="support-new-form">
-            {% csrf_token %}
-            {% if error %}<div class="chat-error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div>{% endif %}
-            <label>Тема<input type="text" name="subject" required maxlength="200"></label>
-            <label>Сообщение<textarea name="body" required rows="6"></textarea></label>
-            <button class="chat-new-btn" type="submit"><i class="fa-solid fa-paper-plane"></i> Отправить</button>
-        </form>
-        {% elif ticket %}
-        <header class="chat-header">
-            <div class="chat-header-title">
-                <div class="chat-header-avatar"><i class="fa-solid fa-life-ring"></i></div>
-                <div style="min-width:0;">
-                    <h1 class="chat-title">{{ ticket.subject }}</h1>
-                    <p class="chat-subtitle">
-                        {{ ticket.author_label }} ·
-                        {% if ticket.status == 'closed' %}закрыт{% else %}открыт{% endif %}
-                    </p>
+        <div class="support-ui">
+            <div class="su-thread-header">
+                <a class="su-back" href="{% url 'support:home' %}" aria-label="Назад">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </a>
+                <div class="su-thread-title-wrap">
+                    <div class="su-thread-title">Новое обращение</div>
+                    <div class="su-thread-sub">Поддержка ответит здесь же</div>
                 </div>
             </div>
-            {% if is_admin and ticket.status != 'closed' %}
-            <button id="support-close-btn" class="chat-empty-hint" type="button">
-                <i class="fa-solid fa-circle-xmark"></i> Закрыть тикет
-            </button>
-            {% endif %}
-        </header>
-
-        <div id="chat-thread" class="chat-thread">
-            {% for m in messages_list %}
-            {% include 'support/_message.html' with m=m %}
-            {% endfor %}
-        </div>
-
-        <div class="chat-composer">
-            {% if ticket.status == 'closed' %}
-            <div class="chat-empty" style="padding:18px;">
-                <p style="margin:0;">Тикет закрыт.</p>
-            </div>
-            {% else %}
-            <div class="chat-composer-row">
-                <textarea id="chat-input" class="chat-input" rows="1"
-                          placeholder="Напишите сообщение…" autocomplete="off"></textarea>
-                <button id="chat-send-btn" class="chat-send" type="button" aria-label="Отправить">
-                    <i class="fa-solid fa-paper-plane"></i>
+            <form method="post" action="{% url 'support:new_ticket' %}" class="su-new-form">
+                {% csrf_token %}
+                {% if error %}<div class="su-new-form-error">{{ error }}</div>{% endif %}
+                <div class="su-new-form-field">
+                    <label for="page-new-subject">Тема</label>
+                    <input id="page-new-subject" type="text" name="subject" required maxlength="200"
+                           placeholder="Например: не открывается профиль">
+                </div>
+                <div class="su-new-form-field su-new-form-field--grow">
+                    <label for="page-new-body">Сообщение</label>
+                    <textarea id="page-new-body" name="body" required rows="8" maxlength="5000"
+                              placeholder="Опишите вопрос как можно подробнее…"></textarea>
+                </div>
+                <button class="su-submit-btn" type="submit">
+                    <i class="fa-solid fa-paper-plane"></i> Отправить
                 </button>
-            </div>
-            <div class="chat-composer-hint">
-                <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
-                <span id="chat-status"></span>
-            </div>
-            {% endif %}
+            </form>
         </div>
+
+        {% elif ticket %}
+        <div class="support-ui"
+             data-csrf="{{ csrf_token }}"
+             data-ticket-id="{{ ticket.id }}"
+             data-viewer-kind="{{ viewer_kind }}"
+             data-is-admin="{% if is_admin %}1{% else %}0{% endif %}"
+             data-status="{{ ticket.status }}"
+             data-user-initial="{{ user.first_name|default:user.username|slice:':1'|upper }}"
+             data-user-avatar="{{ header_avatar_url }}">
+
+            <div class="su-thread-header">
+                <a class="su-back" href="{% url 'support:home' %}" aria-label="К списку">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </a>
+                <div class="su-thread-title-wrap">
+                    <div class="su-thread-title">{{ ticket.subject }}</div>
+                    <div class="su-thread-sub">{{ ticket.author_label }} ·
+                        {% if ticket.status == 'closed' %}закрыт{% else %}открыт{% endif %}
+                    </div>
+                </div>
+                {% if is_admin and ticket.status != 'closed' %}
+                <div class="su-thread-menu-wrap">
+                    <button type="button" class="su-thread-menu-btn" data-action="toggle-menu" aria-label="Меню">
+                        <i class="fa-solid fa-ellipsis-vertical"></i>
+                    </button>
+                    <div class="su-thread-menu" data-thread-menu hidden>
+                        <button type="button" class="is-danger" data-action="close-ticket">
+                            <i class="fa-solid fa-circle-xmark"></i> Закрыть тикет
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="su-conn-bar" data-su-conn hidden>
+                <i class="fa-solid fa-circle-notch"></i> Переподключение…
+            </div>
+
+            <div class="su-thread" data-thread-list></div>
+
+            <div class="su-typing" data-su-typing hidden>
+                <span class="su-typing-dots"><span></span><span></span><span></span></span>
+                <span class="su-typing-label">Печатает…</span>
+            </div>
+
+            <div class="su-composer" data-su-composer {% if ticket.status == 'closed' %}hidden{% endif %}>
+                <div class="su-composer-row">
+                    <textarea class="su-input" data-thread-input rows="1" maxlength="5000"
+                              placeholder="Сообщение поддержке…" autocomplete="off"></textarea>
+                    <button class="su-send" type="button" data-thread-send aria-label="Отправить">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="su-composer-hint">
+                    <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
+                    <span data-thread-status></span>
+                </div>
+            </div>
+            <div class="su-closed-banner" data-su-closed-banner {% if ticket.status != 'closed' %}hidden{% endif %}>
+                <i class="fa-solid fa-lock"></i> Тикет закрыт администратором.
+            </div>
+        </div>
+
+        {{ messages_data|json_script:"page-bootstrap-messages" }}
+
         {% else %}
-        <div class="chat-empty">
-            <div class="chat-empty-icon"><i class="fa-solid fa-life-ring"></i></div>
-            <h3>Обращений пока нет</h3>
+        <div class="support-page-empty">
+            <div class="support-page-empty-icon"><i class="fa-solid fa-life-ring"></i></div>
+            <h3>Выберите обращение</h3>
+            <p>Слева — список тикетов. {% if not is_admin %}Или создайте новое.{% endif %}</p>
             {% if not is_admin %}
-            <p>Создайте новое обращение — поддержка ответит в этом же чате.</p>
-            <a class="chat-new-btn" style="display:inline-flex;width:auto;padding:10px 18px;" href="{% url 'support:new_ticket' %}">
+            <a class="su-submit-btn" style="text-decoration:none;" href="{% url 'support:new_ticket' %}">
                 <i class="fa-solid fa-plus"></i> Новое обращение
             </a>
-            {% else %}
-            <p>Сейчас нет открытых обращений от пользователей.</p>
             {% endif %}
         </div>
         {% endif %}
+
     </section>
 </div>
 
 {% if ticket %}
-<div id="support-root"
-     data-ticket-id="{{ ticket.id }}"
-     data-csrf="{{ csrf_token }}"
-     data-is-admin="{% if is_admin %}1{% else %}0{% endif %}"
-     data-status="{{ ticket.status }}"
-     style="display:none;"></div>
+<script src="{% static 'support/render.js' %}"></script>
 <script src="{% static 'support/support.js' %}"></script>
 {% endif %}
 {% endblock %}

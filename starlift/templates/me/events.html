@@ -1,0 +1,349 @@
+{% extends 'me/_base.html' %}
+
+{% block title %}Мои мероприятия — StarLift{% endblock %}
+
+{% block me_content %}
+<style>
+    .ev-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .ev-card { padding: 18px 20px; display: grid; gap: 10px; transition: var(--transition); position: relative; }
+    .ev-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(10,128,59,0.10); }
+    .ev-title { font-size: 16px; font-weight: 700; color: var(--text-main); margin: 0; }
+    .ev-meta { font-size: 12px; color: var(--text-muted); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .ev-meta i { margin-right: 4px; }
+    .ev-stats { display: flex; gap: 14px; align-items: center; padding-top: 8px; border-top: 1px solid var(--border-color); }
+    .ev-stat { display: flex; flex-direction: column; }
+    .ev-stat-val { font-size: 18px; font-weight: 800; color: var(--text-main); line-height: 1; }
+    .ev-stat-val.positive { color: var(--sber-green); }
+    .ev-stat-val.negative { color: #D93E4E; }
+    .ev-stat-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 3px; }
+
+    /* Моя оценка мероприятия — выделенный «золотой» чип/панель */
+    .ev-my-rating {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #FFE7A3, #FFD166);
+        color: #6B4F00;
+        font-weight: 800;
+        font-size: 13px;
+        border: 1px solid rgba(180, 130, 0, 0.4);
+        box-shadow: 0 4px 12px rgba(255, 209, 102, 0.35);
+        align-self: flex-start;
+    }
+    [data-theme="dark"] .ev-my-rating {
+        background: linear-gradient(135deg, #5a4310, #806012);
+        color: #FFE49A;
+        border-color: rgba(255, 209, 102, 0.35);
+    }
+    .ev-my-rating i { color: #B07A00; }
+    [data-theme="dark"] .ev-my-rating i { color: #FFD166; }
+
+    .ev-rate-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 700;
+        background: var(--white);
+        border: 1px dashed var(--border-color);
+        color: var(--text-main);
+        cursor: pointer;
+        transition: var(--transition);
+        align-self: flex-start;
+    }
+    .ev-rate-btn:hover {
+        border-color: var(--sber-green);
+        color: var(--sber-green);
+        border-style: solid;
+    }
+
+    /* Inline-форма оценки */
+    .ev-rate-form {
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 209, 102, 0.5);
+        background: rgba(255, 231, 163, 0.18);
+    }
+    [data-theme="dark"] .ev-rate-form {
+        background: rgba(255, 209, 102, 0.06);
+    }
+    .ev-rate-form.open { display: flex; }
+    .ev-rate-form .rate-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .ev-rate-form label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .ev-rate-form input[type="number"] {
+        width: 70px;
+        background: var(--white);
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 14px;
+        font-weight: 700;
+        outline: none;
+        font-family: inherit;
+        text-align: center;
+        -moz-appearance: textfield;
+    }
+    .ev-rate-form input[type="number"]::-webkit-outer-spin-button,
+    .ev-rate-form input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .ev-rate-form input[type="number"]:focus {
+        border-color: var(--sber-green);
+        box-shadow: 0 0 0 4px var(--light-green);
+    }
+    .ev-rate-form textarea {
+        width: 100%;
+        box-sizing: border-box;
+        background: var(--white);
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 13px;
+        font-family: inherit;
+        resize: vertical;
+        min-height: 50px;
+        outline: none;
+    }
+    .ev-rate-form textarea:focus {
+        border-color: var(--sber-green);
+        box-shadow: 0 0 0 4px var(--light-green);
+    }
+    .ev-rate-form .rate-buttons { display: flex; gap: 8px; }
+    .ev-rate-form .btn-save {
+        padding: 8px 14px;
+        border-radius: 10px;
+        background: var(--sber-green);
+        color: #fff;
+        border: none;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+    }
+    .ev-rate-form .btn-cancel {
+        padding: 8px 14px;
+        border-radius: 10px;
+        background: var(--white);
+        border: 1px solid var(--border-color);
+        color: var(--text-muted);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .ev-rate-form .rate-msg {
+        font-size: 12px;
+        color: #D93E4E;
+        min-height: 14px;
+    }
+    .ev-rate-form .rate-msg.success { color: var(--sber-green); }
+</style>
+
+<div style="display:grid; gap:20px;">
+    <section>
+        <h3 class="me-section-title"><i class="fa-regular fa-calendar"></i> Предстоящие <span class="chip chip-green">{{ upcoming|length }}</span></h3>
+        {% if upcoming %}
+        <div class="ev-grid">
+            {% for ev in upcoming %}
+            <div class="content-block ev-card">
+                <h4 class="ev-title">{{ ev.title }}</h4>
+                <div class="ev-meta">
+                    {% if ev.event_date %}<span><i class="fa-regular fa-clock"></i>{{ ev.event_date|date:'d.m.Y' }}</span>{% elif ev.date %}<span><i class="fa-regular fa-clock"></i>{{ ev.date }}</span>{% endif %}
+                    {% if ev.location %}<span><i class="fa-solid fa-location-dot"></i>{{ ev.location }}</span>{% endif %}
+                </div>
+                <span class="chip chip-amber" style="align-self:flex-start;">Предстоит</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="me-empty">Предстоящих мероприятий нет.</div>
+        {% endif %}
+    </section>
+
+    <section>
+        <h3 class="me-section-title"><i class="fa-solid fa-clock-rotate-left"></i> Прошедшие <span class="chip chip-gray">{{ past|length }}</span></h3>
+        {% if past %}
+        <div class="ev-grid">
+            {% for ev in past %}
+            <div class="content-block ev-card" data-event-id="{{ ev.id }}">
+                <h4 class="ev-title">{{ ev.title }}</h4>
+                <div class="ev-meta">
+                    {% if ev.event_date %}<span><i class="fa-regular fa-clock"></i>{{ ev.event_date|date:'d.m.Y' }}</span>{% elif ev.date %}<span><i class="fa-regular fa-clock"></i>{{ ev.date }}</span>{% endif %}
+                    {% if ev.location %}<span><i class="fa-solid fa-location-dot"></i>{{ ev.location }}</span>{% endif %}
+                </div>
+
+                {% if ev.my_event_rating is not None %}
+                <div class="ev-my-rating" data-rating-chip>
+                    <i class="fa-solid fa-star"></i>
+                    <span>Моя оценка: <span data-rating-value>{{ ev.my_event_rating }}</span>/10</span>
+                    <button type="button" class="btn-action btn-icon" data-rate-edit
+                            style="width:24px; height:24px; padding:0; font-size:11px; background:transparent; border:none; color:inherit;"
+                            title="Изменить оценку">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>
+                </div>
+                {% else %}
+                <button type="button" class="ev-rate-btn" data-rate-open>
+                    <i class="fa-solid fa-star"></i> Поставить оценку
+                </button>
+                {% endif %}
+
+                <form class="ev-rate-form" data-rate-form>
+                    {% csrf_token %}
+                    <div class="rate-row">
+                        <label>Оценка (0–10)</label>
+                        <input type="number" name="score" min="0" max="10" step="1" required
+                               value="{% if ev.my_event_rating is not None %}{{ ev.my_event_rating }}{% endif %}">
+                    </div>
+                    <textarea name="comment" placeholder="Комментарий (необязательно)">{{ ev.my_event_rating_comment }}</textarea>
+                    <div class="rate-msg" data-rate-msg></div>
+                    <div class="rate-buttons">
+                        <button type="submit" class="btn-save"><i class="fa-solid fa-floppy-disk"></i> Сохранить</button>
+                        <button type="button" class="btn-cancel" data-rate-cancel>Отмена</button>
+                    </div>
+                </form>
+
+                <div class="ev-stats">
+                    <div class="ev-stat">
+                        <span class="ev-stat-val {% if ev.my_nps is not None and ev.my_nps >= 0 %}positive{% elif ev.my_nps is not None %}negative{% endif %}">
+                            {% if ev.my_nps is not None %}{{ ev.my_nps }}{% else %}—{% endif %}
+                        </span>
+                        <span class="ev-stat-lbl">NPS</span>
+                    </div>
+                    <div class="ev-stat">
+                        <span class="ev-stat-val">{{ ev.fb_count }}</span>
+                        <span class="ev-stat-lbl">Отзывов</span>
+                    </div>
+                    <a href="{% url 'me_feedback' %}?event={{ ev.id }}" class="btn-action" style="margin-left:auto; height:36px; padding:0 12px; font-size:12px;" title="Посмотреть отзывы с этого мероприятия">
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="me-empty">Прошедших мероприятий нет.</div>
+        {% endif %}
+    </section>
+</div>
+
+<script>
+(function() {
+    function getCsrf(form) {
+        const inp = form.querySelector('input[name="csrfmiddlewaretoken"]');
+        return inp ? inp.value : '';
+    }
+
+    document.addEventListener('click', (e) => {
+        const openBtn = e.target.closest('[data-rate-open], [data-rate-edit]');
+        if (openBtn) {
+            const card = openBtn.closest('.ev-card');
+            if (!card) return;
+            const form = card.querySelector('[data-rate-form]');
+            if (form) {
+                form.classList.add('open');
+                const input = form.querySelector('input[name=score]');
+                if (input) { input.focus(); input.select(); }
+            }
+            return;
+        }
+        const cancelBtn = e.target.closest('[data-rate-cancel]');
+        if (cancelBtn) {
+            const form = cancelBtn.closest('[data-rate-form]');
+            if (form) {
+                form.classList.remove('open');
+                const msg = form.querySelector('[data-rate-msg]');
+                if (msg) { msg.textContent = ''; msg.classList.remove('success'); }
+            }
+        }
+    });
+
+    document.addEventListener('submit', async (e) => {
+        const form = e.target.closest('[data-rate-form]');
+        if (!form) return;
+        e.preventDefault();
+        const card = form.closest('.ev-card');
+        const eventId = card && card.dataset.eventId;
+        const msg = form.querySelector('[data-rate-msg]');
+        if (msg) { msg.textContent = ''; msg.classList.remove('success'); }
+        if (!eventId) return;
+
+        const score = form.querySelector('input[name=score]').value.trim();
+        const comment = form.querySelector('textarea[name=comment]').value.trim();
+        const n = Number(score);
+        if (!Number.isInteger(n) || n < 0 || n > 10) {
+            if (msg) msg.textContent = 'Оценка должна быть целым числом от 0 до 10.';
+            return;
+        }
+
+        const body = new URLSearchParams();
+        body.append('score', String(n));
+        body.append('comment', comment);
+
+        try {
+            const r = await fetch(`/me/events/${eventId}/rate/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrf(form),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                credentials: 'same-origin',
+                body: body.toString(),
+            });
+            const data = await r.json();
+            if (!r.ok || !data.ok) {
+                if (msg) msg.textContent = 'Не удалось сохранить оценку.';
+                return;
+            }
+
+            // Заменяем «Поставить оценку» на чип с оценкой, либо обновляем существующий чип.
+            let chip = card.querySelector('[data-rating-chip]');
+            const openBtn = card.querySelector('[data-rate-open]');
+            if (!chip) {
+                chip = document.createElement('div');
+                chip.className = 'ev-my-rating';
+                chip.setAttribute('data-rating-chip', '');
+                chip.innerHTML = `
+                    <i class="fa-solid fa-star"></i>
+                    <span>Моя оценка: <span data-rating-value>${data.score}</span>/10</span>
+                    <button type="button" class="btn-action btn-icon" data-rate-edit
+                            style="width:24px; height:24px; padding:0; font-size:11px; background:transparent; border:none; color:inherit;"
+                            title="Изменить оценку">
+                        <i class="fa-solid fa-pen"></i>
+                    </button>`;
+                const anchor = openBtn || form;
+                anchor.parentNode.insertBefore(chip, anchor);
+                if (openBtn) openBtn.remove();
+            } else {
+                chip.querySelector('[data-rating-value]').textContent = data.score;
+            }
+
+            if (msg) {
+                msg.textContent = 'Сохранено.';
+                msg.classList.add('success');
+            }
+            setTimeout(() => form.classList.remove('open'), 500);
+        } catch (err) {
+            if (msg) msg.textContent = 'Ошибка сети.';
+        }
+    });
+})();
+</script>
+{% endblock %}

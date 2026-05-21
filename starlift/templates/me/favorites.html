@@ -1,0 +1,47 @@
+{% extends 'me/_base.html' %}
+
+{% block title %}Избранные спикеры — StarLift{% endblock %}
+
+{% block me_content %}
+<style>
+    .fav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .fav-card { padding: 18px; display: grid; gap: 10px; text-align: center; transition: var(--transition); }
+    .fav-card:hover { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(10,128,59,0.12); }
+    .fav-avatar { width: 72px; height: 72px; border-radius: 50%; margin: 0 auto; object-fit: cover; background: var(--light-green); border: 2px solid var(--sber-green); display: inline-flex; align-items: center; justify-content: center; color: var(--sber-green); font-weight: 800; font-size: 24px; }
+    .fav-name { font-size: 15px; font-weight: 700; color: var(--text-main); margin: 0; }
+    .fav-sub { font-size: 12px; color: var(--text-muted); }
+    .fav-stats { display: flex; justify-content: center; gap: 14px; padding-top: 8px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted); }
+    .fav-nps { color: var(--sber-green); font-weight: 700; }
+</style>
+
+<div class="content-block" style="padding:22px;">
+    <h3 class="me-section-title"><i class="fa-solid fa-heart" style="color:#D93E4E;"></i> Спикеры, которым вы поставили лайк</h3>
+    {% if speakers %}
+    <div class="fav-grid" style="margin-top:14px;">
+        {% for s in speakers %}
+        <a href="{% url 'speakers' %}?speaker={{ s.id }}" class="content-block fav-card" style="text-decoration:none; color:inherit;">
+            {% if s.avatar_url %}
+            <img src="{{ s.avatar_url }}" alt="{{ s.name }}" class="fav-avatar">
+            {% else %}
+            <div class="fav-avatar">{{ s.name|slice:":1"|upper }}</div>
+            {% endif %}
+            <div>
+                <h4 class="fav-name">{{ s.name }}</h4>
+                <div class="fav-sub">{{ s.sub }}{% if s.city %} · {{ s.city }}{% endif %}</div>
+            </div>
+            <div class="fav-stats">
+                <span><span class="fav-nps">{{ s.nps }}</span> NPS</span>
+                <span>{{ s.liked_at|date:'d.m.Y' }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="me-empty" style="margin-top:14px;">
+        <i class="fa-regular fa-heart" style="font-size:22px; display:block; margin-bottom:8px;"></i>
+        Вы ещё никого не добавили в избранное.
+        <div style="margin-top:10px;"><a href="{% url 'speakers' %}" class="btn-action btn-contact"><i class="fa-solid fa-magnifying-glass"></i> Найти спикеров</a></div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
