@@ -6,6 +6,15 @@
 
 <div class="chat-page">
     <aside class="chat-sidebar animate-fade">
+        <div class="chat-tabs">
+            <a class="chat-tab active" href="{% url 'assistant:home' %}">
+                <i class="fa-solid fa-robot"></i> Ассистент
+            </a>
+            <a class="chat-tab" href="/assistant/support/">
+                <i class="fa-solid fa-life-ring"></i> Поддержка
+                <span class="chat-tab-badge" id="supportTabBadge" style="display:none;">0</span>
+            </a>
+        </div>
         <div class="chat-sidebar-header">
             <h2><i class="fa-solid fa-comments" style="color:var(--sber-green);"></i> Беседы</h2>
         </div>
@@ -109,4 +118,20 @@
      style="display:none;"></div>
 
 <script src="{% static 'assistant/chat.js' %}"></script>
+<script>
+(function(){
+  // Lightweight: fetch support unread for the sidebar tab badge.
+  var badge = document.getElementById('supportTabBadge');
+  if (!badge) return;
+  fetch('/assistant/support/api/unread/', { credentials: 'same-origin' })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){
+      if (!d) return;
+      if (d.count > 0) {
+        badge.textContent = d.count > 99 ? '99+' : String(d.count);
+        badge.style.display = '';
+      }
+    }).catch(function(){});
+})();
+</script>
 {% endblock %}

@@ -38,6 +38,9 @@ urlpatterns = [
     path('consent/', ConsentView.as_view(), name='consent'),
     path('terms/', TermsView.as_view(), name='terms'),
     path('assistant/', include('assistant.urls')),
+    path('assistant/support/', include(('support.urls', 'support'), namespace='support')),
+    path('support/', include(('support.urls_guest', 'support_guest'), namespace='support_guest')),
+    path('api/notifications/', views.notifications_api, name='notifications_api'),
 ]
 
 if settings.MEDIA_URL.startswith("/"):

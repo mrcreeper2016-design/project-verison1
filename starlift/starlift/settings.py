@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'accounts',
     'starlift',
     'assistant',
+    'support',
 ]
 
 USE_OBJECT_STORAGE = os.getenv("USE_OBJECT_STORAGE", "false").lower() == "true"
@@ -268,4 +269,11 @@ ASSISTANT_DAILY_TOKEN_BUDGET_SPEAKER = int(os.getenv("ASSISTANT_DAILY_TOKEN_BUDG
 ASSISTANT_DAILY_BUDGET_ACTION = os.getenv("ASSISTANT_DAILY_BUDGET_ACTION", "warn").lower()
 ASSISTANT_DAILY_GLOBAL_BUDGET = int(os.getenv("ASSISTANT_DAILY_GLOBAL_BUDGET", "2000000"))
 ASSISTANT_TOOL_RESULT_MAX_BYTES = int(os.getenv("ASSISTANT_TOOL_RESULT_MAX_BYTES", "4096"))
+
+# ---------------------------------------------------------------------------
+# Support chat
+# ---------------------------------------------------------------------------
+SUPPORT_RATE_LIMIT_PER_USER = int(os.getenv("SUPPORT_RATE_LIMIT_PER_USER", "30"))
+SUPPORT_RATE_LIMIT_PER_GUEST = int(os.getenv("SUPPORT_RATE_LIMIT_PER_GUEST", "5"))
+SUPPORT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("SUPPORT_RATE_LIMIT_WINDOW_SECONDS", "300"))
 

@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'assistant/chat.css' %}">
+<link rel="stylesheet" href="{% static 'support/support.css' %}">
+
+<div class="chat-page" style="grid-template-columns: 1fr;">
+    <section class="chat-main animate-fade">
+        <header class="chat-header">
+            <div class="chat-header-title">
+                <div class="chat-header-avatar"><i class="fa-solid fa-life-ring"></i></div>
+                <div style="min-width:0;">
+                    <h1 class="chat-title">{{ ticket.subject }}</h1>
+                    <p class="chat-subtitle">
+                        Гость · {{ ticket.guest_email }} ·
+                        {% if ticket.status == 'closed' %}закрыт{% else %}открыт{% endif %}
+                    </p>
+                </div>
+            </div>
+        </header>
+
+        <div id="chat-thread" class="chat-thread">
+            {% for m in messages_list %}
+            {% include 'support/_message.html' with m=m %}
+            {% endfor %}
+        </div>
+
+        <div class="chat-composer">
+            {% if ticket.status == 'closed' %}
+            <div class="chat-empty" style="padding:18px;">
+                <p style="margin:0;">Тикет закрыт администратором.</p>
+            </div>
+            {% else %}
+            <div class="chat-composer-row">
+                <textarea id="chat-input" class="chat-input" rows="1"
+                          placeholder="Напишите сообщение…" autocomplete="off"></textarea>
+                <button id="chat-send-btn" class="chat-send" type="button" aria-label="Отправить">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+            <div class="chat-composer-hint">
+                <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
+                <span id="chat-status"></span>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+<div id="support-root"
+     data-token="{{ token }}"
+     data-csrf="{{ csrf_token }}"
+     data-is-admin="0"
+     data-is-guest="1"
+     data-status="{{ ticket.status }}"
+     style="display:none;"></div>
+<script src="{% static 'support/support.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'assistant/chat.css' %}">
+<link rel="stylesheet" href="{% static 'support/support.css' %}">
+
+<div class="chat-page">
+    <aside class="chat-sidebar animate-fade">
+        <div class="chat-tabs">
+            <a class="chat-tab" href="/assistant/">
+                <i class="fa-solid fa-robot"></i> Ассистент
+            </a>
+            <a class="chat-tab active" href="{% url 'support:home' %}">
+                <i class="fa-solid fa-life-ring"></i> Поддержка
+                {% if unread_count %}<span class="chat-tab-badge">{{ unread_count }}</span>{% endif %}
+            </a>
+        </div>
+
+        <div class="chat-sidebar-header">
+            <h2><i class="fa-solid fa-life-ring" style="color:var(--sber-green);"></i>
+                {% if is_admin %}Все обращения{% else %}Мои обращения{% endif %}</h2>
+        </div>
+        {% if not is_admin %}
+        <a class="chat-new-btn" href="{% url 'support:new_ticket' %}">
+            <i class="fa-solid fa-plus"></i> Новое обращение
+        </a>
+        {% endif %}
+
+        <div class="chat-sidebar-section-label">Тикеты</div>
+        <div class="chat-sidebar-list">
+            {% for row in tickets %}
+            <div class="chat-sidebar-row {% if ticket and row.ticket.id == ticket.id %}active{% endif %}">
+                <a class="chat-sidebar-item-link" href="{% url 'support:ticket_detail' ticket_id=row.ticket.id %}">
+                    <div class="support-row-title">
+                        {{ row.ticket.subject|truncatechars:36 }}
+                        {% if row.unread %}<span class="support-dot"></span>{% endif %}
+                    </div>
+                    <div class="support-row-meta">
+                        {{ row.ticket.author_label|truncatechars:30 }} ·
+                        {% if row.ticket.status == 'closed' %}<span class="support-closed">closed</span>{% else %}open{% endif %}
+                    </div>
+                </a>
+            </div>
+            {% empty %}
+            <div class="chat-sidebar-empty">Обращений пока нет</div>
+            {% endfor %}
+        </div>
+    </aside>
+
+    <section class="chat-main animate-fade">
+        {% if new_form %}
+        <header class="chat-header">
+            <div class="chat-header-title">
+                <div class="chat-header-avatar"><i class="fa-solid fa-life-ring"></i></div>
+                <div><h1 class="chat-title">Новое обращение</h1>
+                    <p class="chat-subtitle">Опишите вопрос — поддержка свяжется в чате.</p></div>
+            </div>
+        </header>
+        <form method="post" action="{% url 'support:new_ticket' %}" class="support-new-form">
+            {% csrf_token %}
+            {% if error %}<div class="chat-error"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</div>{% endif %}
+            <label>Тема<input type="text" name="subject" required maxlength="200"></label>
+            <label>Сообщение<textarea name="body" required rows="6"></textarea></label>
+            <button class="chat-new-btn" type="submit"><i class="fa-solid fa-paper-plane"></i> Отправить</button>
+        </form>
+        {% elif ticket %}
+        <header class="chat-header">
+            <div class="chat-header-title">
+                <div class="chat-header-avatar"><i class="fa-solid fa-life-ring"></i></div>
+                <div style="min-width:0;">
+                    <h1 class="chat-title">{{ ticket.subject }}</h1>
+                    <p class="chat-subtitle">
+                        {{ ticket.author_label }} ·
+                        {% if ticket.status == 'closed' %}закрыт{% else %}открыт{% endif %}
+                    </p>
+                </div>
+            </div>
+            {% if is_admin and ticket.status != 'closed' %}
+            <button id="support-close-btn" class="chat-empty-hint" type="button">
+                <i class="fa-solid fa-circle-xmark"></i> Закрыть тикет
+            </button>
+            {% endif %}
+        </header>
+
+        <div id="chat-thread" class="chat-thread">
+            {% for m in messages_list %}
+            {% include 'support/_message.html' with m=m %}
+            {% endfor %}
+        </div>
+
+        <div class="chat-composer">
+            {% if ticket.status == 'closed' %}
+            <div class="chat-empty" style="padding:18px;">
+                <p style="margin:0;">Тикет закрыт.</p>
+            </div>
+            {% else %}
+            <div class="chat-composer-row">
+                <textarea id="chat-input" class="chat-input" rows="1"
+                          placeholder="Напишите сообщение…" autocomplete="off"></textarea>
+                <button id="chat-send-btn" class="chat-send" type="button" aria-label="Отправить">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+            <div class="chat-composer-hint">
+                <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
+                <span id="chat-status"></span>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="chat-empty">
+            <div class="chat-empty-icon"><i class="fa-solid fa-life-ring"></i></div>
+            <h3>Обращений пока нет</h3>
+            {% if not is_admin %}
+            <p>Создайте новое обращение — поддержка ответит в этом же чате.</p>
+            <a class="chat-new-btn" style="display:inline-flex;width:auto;padding:10px 18px;" href="{% url 'support:new_ticket' %}">
+                <i class="fa-solid fa-plus"></i> Новое обращение
+            </a>
+            {% else %}
+            <p>Сейчас нет открытых обращений от пользователей.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+</div>
+
+{% if ticket %}
+<div id="support-root"
+     data-ticket-id="{{ ticket.id }}"
+     data-csrf="{{ csrf_token }}"
+     data-is-admin="{% if is_admin %}1{% else %}0{% endif %}"
+     data-status="{{ ticket.status }}"
+     style="display:none;"></div>
+<script src="{% static 'support/support.js' %}"></script>
+{% endif %}
+{% endblock %}

@@ -1207,17 +1207,13 @@
             <button class="burger-btn" id="burgerBtn" aria-label="Открыть меню" aria-controls="sidebar" aria-expanded="false">
                 <i class="fa-solid fa-bars"></i>
             </button>
-            {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+            {% if user.is_authenticated and user.is_superuser or user.profile.role == 'admin' or user.profile.role == 'speaker' %}
             <div class="notif-wrap">
                 <button class="theme-toggle" id="notifToggle" title="Уведомления" aria-haspopup="true" aria-expanded="false">
                     <i class="fa-solid fa-bell"></i>
                     <span class="notif-badge" id="notifBadge">0</span>
                 </button>
                 <div class="notif-dropdown" id="notifDropdown" role="menu">
-                    <div class="notif-dropdown-header">
-                        <span>Заявки на рассмотрении</span>
-                        <a href="{% url 'accounts:event_requests' %}" class="nav-item" style="font-size: 12px; color: var(--sber-green); text-decoration: none; padding: 0;">Все →</a>
-                    </div>
                     <div id="notifList">
                         <div class="notif-empty">Загрузка…</div>
                     </div>
@@ -1349,8 +1345,8 @@
             setTheme(currentTheme === 'dark' ? 'light' : 'dark');
         });
 
-        // --- Колокольчик уведомлений (для админа) ---
-        {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+        // --- Колокольчик уведомлений (заявки + поддержка) ---
+        {% if user.is_authenticated and user.is_superuser or user.profile.role == 'admin' or user.profile.role == 'speaker' %}
         (function() {
             const toggle = document.getElementById('notifToggle');
             const dropdown = document.getElementById('notifDropdown');
@@ -1366,31 +1362,55 @@
                 return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
             }
 
+            function renderEventRequest(r) {
+                const head = r.kind === 'create' ? 'Новое мероприятие' : 'Заявка на участие';
+                const title = escapeHtml(r.event_title || '—');
+                const meta = [escapeHtml(r.speaker_name)];
+                if (r.topic) meta.push('Тема: ' + escapeHtml(r.topic));
+                return `<div class="notif-item" data-req-id="${r.id}">
+                    <p class="notif-item-title">${escapeHtml(head)}: ${title}</p>
+                    <div class="notif-item-meta">${meta.join(' · ')}</div>
+                    <div class="notif-actions">
+                        <button type="button" class="notif-approve" data-action="approve"><i class="fa-solid fa-check"></i> Одобрить</button>
+                        <a class="notif-open" href="/console/event-requests/?status=pending">Открыть</a>
+                    </div>
+                </div>`;
+            }
+            function renderSupportItem(t) {
+                return `<div class="notif-item">
+                    <p class="notif-item-title">${escapeHtml(t.subject)}</p>
+                    <div class="notif-item-meta">${escapeHtml(t.author)}</div>
+                    <div class="notif-actions">
+                        <a class="notif-open" href="${escapeHtml(t.url)}"><i class="fa-solid fa-life-ring"></i> Открыть чат</a>
+                    </div>
+                </div>`;
+            }
+
             async function loadNotifs() {
                 try {
-                    const r = await fetch('/api/admin/pending-requests/', { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    const r = await fetch('/api/notifications/', { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                     if (!r.ok) return;
                     const data = await r.json();
-                    badge.textContent = data.count > 99 ? '99+' : String(data.count);
-                    badge.classList.toggle('has', data.count > 0);
-                    if (!data.requests.length) {
-                        list.innerHTML = '<div class="notif-empty">Новых заявок нет</div>';
-                        return;
+                    const total = data.total || 0;
+                    badge.textContent = total > 99 ? '99+' : String(total);
+                    badge.classList.toggle('has', total > 0);
+
+                    const blocks = [];
+                    const er = data.event_requests || {count:0, items:[]};
+                    if (er.items && er.items.length) {
+                        blocks.push('<div class="notif-dropdown-header"><span>Заявки на рассмотрении</span><a href="/console/event-requests/?status=pending" class="nav-item" style="font-size:12px;color:var(--sber-green);text-decoration:none;padding:0;">Все →</a></div>');
+                        blocks.push(er.items.map(renderEventRequest).join(''));
                     }
-                    list.innerHTML = data.requests.map(r => {
-                        const head = r.kind === 'create' ? 'Новое мероприятие' : 'Заявка на участие';
-                        const title = escapeHtml(r.event_title || '—');
-                        const meta = [escapeHtml(r.speaker_name)];
-                        if (r.topic) meta.push('Тема: ' + escapeHtml(r.topic));
-                        return `<div class="notif-item" data-req-id="${r.id}">
-                            <p class="notif-item-title">${escapeHtml(head)}: ${title}</p>
-                            <div class="notif-item-meta">${meta.join(' · ')}</div>
-                            <div class="notif-actions">
-                                <button type="button" class="notif-approve" data-action="approve"><i class="fa-solid fa-check"></i> Одобрить</button>
-                                <a class="notif-open" href="/console/event-requests/?status=pending">Открыть</a>
-                            </div>
-                        </div>`;
-                    }).join('');
+                    const sup = data.support || {count:0, items:[]};
+                    if (sup.items && sup.items.length) {
+                        blocks.push('<div class="notif-dropdown-header"><span>Поддержка</span><a href="/assistant/support/" class="nav-item" style="font-size:12px;color:var(--sber-green);text-decoration:none;padding:0;">Все →</a></div>');
+                        blocks.push(sup.items.map(renderSupportItem).join(''));
+                    }
+                    if (!blocks.length) {
+                        list.innerHTML = '<div class="notif-empty">Новых уведомлений нет</div>';
+                    } else {
+                        list.innerHTML = blocks.join('');
+                    }
                 } catch (e) { /* silent */ }
             }
 

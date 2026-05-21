@@ -828,6 +828,54 @@ def admin_pending_requests_api(request):
     return JsonResponse({'count': total, 'requests': items})
 
 
+@member_required
+def notifications_api(request):
+    """Aggregated bell payload: event-requests (admins only) + support tickets.
+
+    Speakers see only support; admins see both. Guests cannot reach this view.
+    """
+    from support.services import notifications as support_notif
+
+    user = request.user
+    profile = getattr(user, 'profile', None)
+    is_admin = user.is_superuser or (profile and profile.role == 'admin')
+
+    event_items = []
+    event_count = 0
+    if is_admin:
+        qs = EventRequest.objects.filter(
+            status=EventRequest.STATUS_PENDING
+        ).select_related('speaker', 'event').order_by('-created_at')[:10]
+        for r in qs:
+            event_items.append({
+                'id': r.id,
+                'kind': r.kind,
+                'speaker_name': r.speaker.name,
+                'event_title': r.event.title if r.event else r.proposed_title,
+                'topic': r.topic,
+                'created_at': r.created_at.isoformat(),
+            })
+        event_count = EventRequest.objects.filter(status=EventRequest.STATUS_PENDING).count()
+
+    support_tickets = list(support_notif.unread_tickets(user)[:10])
+    support_items = []
+    for t in support_tickets:
+        support_items.append({
+            'id': t.id,
+            'subject': t.subject,
+            'author': t.author_label,
+            'last_message_at': t.last_message_at.isoformat() if t.last_message_at else None,
+            'url': f'/assistant/support/t/{t.id}/',
+        })
+    support_count = support_notif.unread_count(user)
+
+    return JsonResponse({
+        'total': event_count + support_count,
+        'event_requests': {'count': event_count, 'items': event_items},
+        'support': {'count': support_count, 'items': support_items},
+    })
+
+
 @role_required('admin')
 def admin_quick_approve(request, request_id):
     """Быстрое одобрение из колокольчика."""
