@@ -1885,7 +1885,7 @@
 
             // Обработка кликов по ссылкам в навигации (обычные + sub-итемы + табы /me/)
             document.body.addEventListener('click', async (e) => {
-                const link = e.target.closest('a.nav-item, a.nav-subitem, .me-nav a');
+                const link = e.target.closest('a.nav-item, a.nav-subitem, .me-nav a, a.home-kpi-card');
 
                 if (link && link.href && link.href.startsWith(window.location.origin)) {
                     // Не перехватываем явный download / open-in-new / модификаторы.

@@ -369,6 +369,7 @@ def speakers_view(request):
             "nps": round(float(speaker.nps), 1) if speaker.nps else 0,
             "img": speaker.img,
             "avatar": avatar,
+            "created_at": speaker.created_at.isoformat() if speaker.created_at else None,
             "events": ev_list,
             "feedbacks": feedbacks_data,
         })
@@ -460,6 +461,7 @@ def speakers_api(request):
                 "nps": round(float(speaker.nps), 1) if speaker.nps else 0,
                 "img": speaker.img,
                 "avatar": avatar,
+                "created_at": speaker.created_at.isoformat() if speaker.created_at else None,
                 "events": ev_list,
                 "feedbacks": feedbacks_data,
                 "like_count": getattr(speaker, "like_count", 0),

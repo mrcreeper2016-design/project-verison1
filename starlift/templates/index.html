@@ -124,7 +124,10 @@
         display: flex; flex-direction: column; gap: 6px; min-width: 0;
         backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         transition: var(--transition);
+        color: var(--text-main); text-decoration: none;
     }
+    a.home-kpi-card { cursor: pointer; }
+    a.home-kpi-card:hover { text-decoration: none; color: var(--text-main); }
     .home-kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
     .home-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .home-kpi-icon {
@@ -718,28 +721,31 @@
                 icon: 'fa-users', label: 'Всего спикеров',
                 value: fmtCount(k.total_speakers),
                 hint: 'В базе StarLift',
+                href: '/speakers/',
             },
             {
                 icon: 'fa-bolt', label: 'Активных спикеров',
                 value: fmtCount(k.active_speakers),
                 hint: `С отзывами за последние ${windowDays} дн.`,
                 accent: true,
+                href: '/speakers/?filter=active',
             },
             {
                 icon: 'fa-user-plus', label: 'Новые спикеры',
                 value: fmtCount(k.new_speakers),
                 hint: 'За последние 30 дней',
+                href: '/speakers/?filter=new',
             },
         ];
         els.kpi.innerHTML = cards.map(c => `
-            <div class="home-kpi-card ${c.accent ? 'accent' : ''}">
+            <a class="home-kpi-card ${c.accent ? 'accent' : ''}" href="${escapeHtml(c.href)}">
                 <div class="home-kpi-top">
                     <span class="home-kpi-label">${escapeHtml(c.label)}</span>
                     <span class="home-kpi-icon"><i class="fa-solid ${c.icon}"></i></span>
                 </div>
                 <div class="home-kpi-value">${escapeHtml(String(c.value))}</div>
                 <div class="home-kpi-hint">${escapeHtml(c.hint || '')}</div>
-            </div>
+            </a>
         `).join('');
     }
 

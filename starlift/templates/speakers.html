@@ -595,6 +595,14 @@
                 return true;
             })
             .filter(s => {
+                // «Новые спикеры» — фильтр приходит из ?filter=new (карточка KPI на главной).
+                if (!window.__speakersNewOnly) return true;
+                if (!s.created_at) return false;
+                const d = new Date(s.created_at);
+                if (isNaN(d.getTime())) return false;
+                return (Date.now() - d.getTime()) <= 30 * 24 * 60 * 60 * 1000;
+            })
+            .filter(s => {
                 const v = Number(s.nps);
                 if (!Number.isFinite(v)) return false;
                 if (minVal != null && v < minVal) return false;
@@ -887,6 +895,17 @@
     window.loadStarliftSpeakersData = loadSpeakersData;
 
     function initSpeakersPage() {
+        // Пред-применение фильтров из URL (карточки KPI с главной)
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const filterParam = params.get('filter');
+            window.__speakersNewOnly = (filterParam === 'new');
+            const statusFilterEl = document.getElementById('statusFilter');
+            if (statusFilterEl) {
+                statusFilterEl.value = (filterParam === 'active') ? 'active' : 'all';
+            }
+        } catch (e) { /* noop */ }
+
         const actionsToggle = document.getElementById('tableActionsToggle');
         const actionsMenu = document.getElementById('tableActionsMenu');
 
