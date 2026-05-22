@@ -72,16 +72,11 @@
                 <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-user-shield"></i> Сменить роль</button>
             </form>
 
-            <form method="post" style="display:flex; gap:8px; align-items:center;">
+            <form method="post" style="display:grid; gap:10px;">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="set_company">
-                <select name="company" class="select-compact" style="flex:1;">
-                    <option value="" {% if not profile.company %}selected{% endif %}>— без компании —</option>
-                    {% for c in allowed_companies %}
-                    <option value="{{ c }}" {% if profile.company == c %}selected{% endif %}>{{ c }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-building"></i> Сохранить компанию</button>
+                {% include "accounts/_company_picker.html" with name="company" selected=profile.company options=allowed_companies %}
+                <button type="submit" class="btn-action btn-contact" style="justify-self:start;"><i class="fa-solid fa-building"></i> Сохранить компанию</button>
             </form>
 
             <form method="post" onsubmit="return confirm('{% if target.is_active %}Отключить{% else %}Включить{% endif %} аккаунт {{ target.username }}?');">

@@ -104,8 +104,8 @@
                 </div>
                 {% endif %}
                 <div class="form-row">
-                    <label for="{{ form.company.id_for_label }}">{{ form.company.label }}</label>
-                    {{ form.company }}
+                    <label>{{ form.company.label }}</label>
+                    {% include "accounts/_company_picker.html" with name="company" selected=form.company.value options=allowed_companies %}
                     {% if form.company.errors %}<div class="field-errors">{% for e in form.company.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
                 </div>
                 <div class="form-row">

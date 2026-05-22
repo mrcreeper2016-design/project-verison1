@@ -23,6 +23,7 @@ from starlift.models import Speaker
 from ..forms import EmailChangeForm, ProfileEditForm, SpeakerProfileMainForm
 from ..models import AuditLog, EmailVerification, UserProfile
 from ..services import audit, email as email_svc, tokens as token_svc
+from ..services.companies import ALLOWED_COMPANIES
 from ..services.speaker_avatar import backfill_profile_avatar_if_empty
 
 
@@ -166,6 +167,7 @@ def profile_view(request: HttpRequest) -> HttpResponse:
         "linked_speaker": linked_speaker,
         "is_speaker_role": is_speaker_role,
         "speaker_card_linked": is_speaker_role and linked_speaker is not None,
+        "allowed_companies": ALLOWED_COMPANIES,
         "active": "settings",
     }
     return render(request, "accounts/profile.html", context)

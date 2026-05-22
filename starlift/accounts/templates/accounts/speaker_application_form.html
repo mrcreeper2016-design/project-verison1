@@ -31,9 +31,9 @@
         <form method="post" enctype="multipart/form-data" style="display:grid; gap:14px;">
             {% csrf_token %}
 
-            <div style="display:grid; gap:6px;">
+            <div style="display:grid; gap:8px;">
                 <label style="font-size:13px; font-weight:700; color:var(--text-muted);">Компания (опционально)</label>
-                {{ form.company }}
+                {% include "accounts/_company_picker.html" with name="company" selected=form.company.value options=allowed_companies %}
                 {% if form.company.errors %}<div style="color:#D93E4E; font-size:12px;">{{ form.company.errors|join:" " }}</div>{% endif %}
             </div>
 

@@ -507,7 +507,29 @@
         if (img && (img.startsWith('/media/') || img.startsWith('http'))) {
             return img;
         }
-        return `https://i.pravatar.cc/${size}?img=${img}`;
+        // Only use pravatar when img is a non-empty numeric/short ID (legacy data);
+        // an empty img must NOT produce a random avatar.
+        if (img) {
+            return `https://i.pravatar.cc/${size}?img=${img}`;
+        }
+        return '';
+    }
+
+    function getInitials(name) {
+        if (!name) return '?';
+        const parts = String(name).trim().split(/\s+/).filter(Boolean);
+        if (!parts.length) return '?';
+        const first = parts[0][0] || '';
+        const second = parts.length > 1 ? (parts[1][0] || '') : '';
+        return (first + second).toUpperCase();
+    }
+
+    function renderAvatarHtml(s, size, className = 'avatar', extraStyle = '') {
+        const url = getAvatarUrl(s, size);
+        if (url) {
+            return `<img src="${escapeHtml(url)}" class="${className}" style="object-fit: cover; ${extraStyle}">`;
+        }
+        return `<div class="${className} avatar-initials" style="display:inline-flex;align-items:center;justify-content:center;background:var(--light-green);color:var(--sber-green);font-weight:700;${extraStyle}">${escapeHtml(getInitials(s && s.name))}</div>`;
     }
 
     function escapeHtml(str) {
@@ -640,7 +662,7 @@
             <tr class="${i % 2 !== 0 ? 'alt-row' : ''}">
                 <td data-label="ФИО" onclick="showEvents(${s.id})">
                     <div class="speaker-info">
-                        <img src="${getAvatarUrl(s, 150)}" class="avatar" style="object-fit: cover;">
+                        ${renderAvatarHtml(s, 150)}
                         <div><strong>${s.name}</strong></div>
                     </div>
                 </td>
@@ -677,7 +699,7 @@
         const speaker = speakersData.find(s => s.id === id);
         if (!speaker) return;
         
-        document.getElementById('modalAvatarImg').src = getAvatarUrl(speaker, 300);
+        document.getElementById('modalAvatarSlot').innerHTML = renderAvatarHtml(speaker, 300, 'modal-avatar-img', 'width:100%;height:100%;border-radius:inherit;font-size:64px;');
         document.getElementById('modalAvatarNameText').innerText = speaker.name;
         
         document.getElementById('modalStackVal').innerText = speaker.stack;
@@ -1068,7 +1090,7 @@
             <div class="modal-body-split">
                 <div class="modal-left">
                     <div class="modal-avatar-wrapper">
-                        <img id="modalAvatarImg" src="" alt="Speaker Avatar">
+                        <div id="modalAvatarSlot" style="width:100%;height:100%;"></div>
                         <div class="modal-avatar-name" id="modalAvatarNameText"></div>
                         {% if user.is_authenticated %}
                         <button type="button" class="modal-heart-btn" id="modalHeartBtn"
