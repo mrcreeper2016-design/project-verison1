@@ -72,10 +72,13 @@
                 <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-user-shield"></i> Сменить роль</button>
             </form>
 
+            <datalist id="company-suggestions">
+                {% for c in company_suggestions %}<option value="{{ c }}">{% endfor %}
+            </datalist>
             <form method="post" style="display:flex; gap:8px; align-items:center;">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="set_company">
-                <input type="text" name="company" class="input-compact" value="{{ profile.company }}" placeholder="Компания (для DevRel — зона ответственности; для спикеров — место работы)" style="flex:1;">
+                <input type="text" name="company" class="input-compact" value="{{ profile.company }}" list="company-suggestions" autocomplete="off" placeholder="Компания (для DevRel — зона ответственности; для спикеров — место работы)" style="flex:1;">
                 <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-building"></i> Сохранить компанию</button>
             </form>
 

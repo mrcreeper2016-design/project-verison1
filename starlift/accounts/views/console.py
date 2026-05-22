@@ -24,6 +24,7 @@ from starlift.models import Event, EventRequest, Speaker, SpeakerApplication
 from ..decorators import role_required
 from ..models import AuditLog, LoginAttempt, UserProfile
 from ..services import audit, lockout
+from ..services.companies import get_company_suggestions
 from ..services.speaker_avatar import seed_user_profile_avatar_from_linked_speaker
 
 
@@ -295,6 +296,7 @@ def user_detail_view(request: HttpRequest, user_id: int) -> HttpResponse:
             "recent_attempts": recent_attempts,
             "recent_events": recent_events,
             "is_locked": lockout.is_locked(target.username),
+            "company_suggestions": get_company_suggestions(),
         },
     )
 

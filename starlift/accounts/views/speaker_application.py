@@ -19,6 +19,7 @@ from starlift.models import SpeakerApplication
 from ..forms import SpeakerApplicationForm
 from ..models import AuditLog, UserProfile
 from ..services import audit
+from ..services.companies import get_company_suggestions
 
 
 def _ensure_guest(view_func):
@@ -102,6 +103,7 @@ def speaker_application_form_view(request: HttpRequest) -> HttpResponse:
             "form": form,
             "existing": existing,
             "is_resubmit": bool(existing and existing.status == SpeakerApplication.STATUS_REJECTED),
+            "company_suggestions": get_company_suggestions(),
         },
     )
 

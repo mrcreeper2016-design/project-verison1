@@ -103,13 +103,14 @@
                     Карточка спикера в базе ещё не привязана. Обратитесь к администратору — после привязки здесь же появится поле «Описание» для ленты спикеров.
                 </div>
                 {% endif %}
-                {% if speaker_card_linked %}
                 <div class="form-row">
                     <label for="{{ form.company.id_for_label }}">{{ form.company.label }}</label>
                     {{ form.company }}
                     {% if form.company.errors %}<div class="field-errors">{% for e in form.company.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
                 </div>
-                {% endif %}
+                <datalist id="company-suggestions">
+                    {% for c in company_suggestions %}<option value="{{ c }}">{% endfor %}
+                </datalist>
                 <div class="form-row">
                     {% if speaker_card_linked %}
                     <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>

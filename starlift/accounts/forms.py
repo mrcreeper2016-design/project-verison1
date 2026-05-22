@@ -299,11 +299,20 @@ class ProfileEditForm(forms.Form):
             "accept": "image/jpeg,image/png,image/webp",
         }),
     )
+    company = forms.CharField(
+        label="Компания",
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={**_field_attrs(placeholder="Сбербанк, Тинькофф..."), "list": "company-suggestions", "autocomplete": "off"}),
+    )
     bio = forms.CharField(
         label="О себе",
         required=False,
         widget=forms.Textarea(attrs={**_field_attrs(), "rows": 4, "style": "width:100%; min-height:120px;"}),
     )
+
+    def clean_company(self):
+        return (self.cleaned_data.get("company") or "").strip()
 
     def clean_avatar(self):
         avatar = self.cleaned_data.get("avatar")
@@ -334,7 +343,7 @@ class SpeakerProfileMainForm(forms.Form):
         label="Компания",
         max_length=200,
         required=False,
-        widget=forms.TextInput(attrs=_field_attrs(placeholder="Сбербанк, СберТех...")),
+        widget=forms.TextInput(attrs={**_field_attrs(placeholder="Сбербанк, СберТех..."), "list": "company-suggestions", "autocomplete": "off"}),
     )
     description = forms.CharField(
         label="Описание",
@@ -389,7 +398,7 @@ class SpeakerApplicationForm(forms.Form):
         label="Компания",
         max_length=200,
         required=False,
-        widget=forms.TextInput(attrs=_field_attrs(placeholder="Сбербанк, СберТех... (опционально)")),
+        widget=forms.TextInput(attrs={**_field_attrs(placeholder="Сбербанк, СберТех... (опционально)"), "list": "company-suggestions", "autocomplete": "off"}),
     )
     city = forms.CharField(
         label="Город",
