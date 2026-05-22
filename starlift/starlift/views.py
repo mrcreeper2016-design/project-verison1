@@ -1161,7 +1161,7 @@ def notifications_api(request):
                 'company': a.company,
                 'city': a.city,
                 'created_at': a.created_at.isoformat(),
-                'url': f'/accounts/console/speaker-applications/{a.id}/',
+                'url': f'/console/speaker-applications/{a.id}/',
             })
         application_count = _devrel_visible_applications(user).filter(
             status=SpeakerApplication.STATUS_PENDING

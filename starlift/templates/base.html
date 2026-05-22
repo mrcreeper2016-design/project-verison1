@@ -1690,7 +1690,7 @@
                     }
                     const apps = data.speaker_applications || {count:0, items:[]};
                     if (apps.items && apps.items.length) {
-                        blocks.push('<div class="notif-dropdown-header"><span>Спикерские заявки</span><a href="/accounts/console/event-requests/?status=pending&kind=speaker" class="nav-item" style="font-size:12px;color:var(--sber-green);text-decoration:none;padding:0;">Все →</a></div>');
+                        blocks.push('<div class="notif-dropdown-header"><span>Спикерские заявки</span><a href="/console/event-requests/?status=pending&kind=speaker" class="nav-item" style="font-size:12px;color:var(--sber-green);text-decoration:none;padding:0;">Все →</a></div>');
                         blocks.push(apps.items.map(renderSpeakerApplication).join(''));
                     }
                     const sup = data.support || {count:0, items:[]};
