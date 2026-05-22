@@ -1,0 +1,177 @@
+{% extends 'me/_base.html' %}
+
+{% block me_title %}{% if instance %}Изменить мероприятие{% else %}Загрузить мероприятие{% endif %}{% endblock %}
+{% block me_subtitle %}{% if instance %}После сохранения заявка снова уйдёт на верификацию DevRel.{% else %}Заполните карточку прошедшего выступления. После сохранения DevRel компании подтвердит публикацию.{% endif %}{% endblock %}
+
+{% block me_content %}
+<style>
+    .ev-up-form { display: grid; gap: 18px; max-width: 760px; }
+    .ev-up-form .field { display: grid; gap: 6px; }
+    .ev-up-form .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 600px) { .ev-up-form .field-row { grid-template-columns: 1fr; } }
+    .ev-up-form .field-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+    .ev-up-form input[type=text],
+    .ev-up-form input[type=url],
+    .ev-up-form input[type=date],
+    .ev-up-form textarea,
+    .ev-up-form select {
+        width: 100%; box-sizing: border-box; padding: 12px 14px;
+        border-radius: 12px; border: 1.5px solid var(--border-color);
+        background: var(--white); color: var(--text-main);
+        font-family: inherit; font-size: 14px; outline: none;
+        transition: var(--transition);
+    }
+    .ev-up-form input:focus, .ev-up-form textarea:focus, .ev-up-form select:focus {
+        border-color: var(--sber-green);
+        box-shadow: 0 0 0 3px var(--light-green);
+    }
+    .ev-up-form textarea { min-height: 140px; resize: vertical; line-height: 1.5; }
+    .ev-up-form .field-hint { font-size: 12px; color: var(--text-muted); }
+    .ev-up-form .field-errors { color: #D93E4E; font-size: 12px; }
+    .ev-up-form .ev-submit {
+        align-self: start;
+        padding: 12px 22px; border-radius: 12px;
+        background: var(--sber-green); color: #fff; border: none;
+        font-weight: 700; font-size: 14px; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 8px;
+        box-shadow: 0 4px 14px rgba(10,128,59,0.22);
+    }
+    .ev-up-form .ev-submit:hover { transform: translateY(-1px); }
+    .ev-up-form .ev-submit:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+    .file-row { display: grid; gap: 6px; padding: 14px; background: var(--light-green); border-radius: 12px; border: 1.5px dashed rgba(10,128,59,0.4); }
+    .file-row .file-name { font-size: 12px; color: var(--text-muted); }
+    .photo-preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 10px; margin-top: 8px; }
+    .photo-preview { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; border: 1px solid var(--border-color); }
+    .photo-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .photo-preview .rm { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.65); color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; }
+</style>
+
+{% if instance and instance.verification_status == 'rejected' %}
+<div style="padding:12px 14px; border-radius:12px; background:rgba(217,62,78,0.08); border:1px solid rgba(217,62,78,0.25); margin-bottom:12px;">
+    <div style="font-weight:700; color:#D93E4E;"><i class="fa-solid fa-triangle-exclamation"></i> Заявка отклонена</div>
+    {% if instance.rejection_reason %}<div style="margin-top:4px; font-size:13px;">Причина: {{ instance.rejection_reason }}</div>{% endif %}
+    <div style="margin-top:6px; font-size:12px; color:var(--text-muted);">Внесите изменения и отправьте снова.</div>
+</div>
+{% endif %}
+
+<form class="ev-up-form" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="field-errors">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+
+    <div class="field">
+        <label class="field-label">Название *</label>
+        {{ form.title }}
+        {% if form.title.errors %}<div class="field-errors">{{ form.title.errors|join:" " }}</div>{% endif %}
+    </div>
+
+    <div class="field-row">
+        <div class="field">
+            <label class="field-label">Дата *</label>
+            <input type="date" name="event_date" value="{{ form.event_date.value|default_if_none:'' }}" max="{{ today }}" required>
+            {% if form.event_date.errors %}<div class="field-errors">{{ form.event_date.errors|join:" " }}</div>{% endif %}
+        </div>
+        <div class="field">
+            <label class="field-label">Формат</label>
+            {{ form.format }}
+        </div>
+    </div>
+
+    <div class="field-row">
+        <div class="field">
+            <label class="field-label">Место</label>
+            {{ form.location }}
+        </div>
+        <div class="field">
+            <label class="field-label">Тема доклада</label>
+            {{ form.topic }}
+        </div>
+    </div>
+
+    <div class="field">
+        <label class="field-label">Теги / стек</label>
+        {{ form.tags }}
+        <span class="field-hint">Через запятую: python, django, ml</span>
+    </div>
+
+    <div class="field">
+        <label class="field-label">Описание *</label>
+        {{ form.description }}
+        {% if form.description.errors %}<div class="field-errors">{{ form.description.errors|join:" " }}</div>{% endif %}
+    </div>
+
+    <div class="field">
+        <label class="field-label">Ссылка на анонс/страницу</label>
+        {{ form.link }}
+    </div>
+
+    <div class="field">
+        <label class="field-label">Ссылка на видео</label>
+        {{ form.video_url }}
+        <span class="field-hint">YouTube, VK Video, RuTube</span>
+        {% if form.video_url.errors %}<div class="field-errors">{{ form.video_url.errors|join:" " }}</div>{% endif %}
+    </div>
+
+    <div class="field">
+        <label class="field-label">Презентация (PDF/PPTX, до 50 МБ)</label>
+        <div class="file-row">
+            <input type="file" name="presentation" accept=".pdf,.ppt,.pptx" id="presentationFile">
+            {% if instance and instance.presentation %}<div class="file-name">Текущая: {{ instance.presentation.name|cut:'events/presentations/' }}</div>{% endif %}
+        </div>
+        {% if form.presentation.errors %}<div class="field-errors">{{ form.presentation.errors|join:" " }}</div>{% endif %}
+    </div>
+
+    <div class="field">
+        <label class="field-label">Фото (JPEG/PNG/WebP, до 10 МБ каждое, максимум {{ max_photos }})</label>
+        <div class="file-row">
+            <input type="file" name="photos" id="photosInput" accept="image/jpeg,image/png,image/webp" multiple>
+            <span class="field-hint">Можно выбрать несколько файлов сразу.</span>
+            <div id="photoPreview" class="photo-preview-grid"></div>
+        </div>
+    </div>
+
+    <button type="submit" class="ev-submit"><i class="fa-solid fa-paper-plane"></i> Отправить на верификацию</button>
+</form>
+
+<script>
+(function() {
+    const input = document.getElementById('photosInput');
+    const preview = document.getElementById('photoPreview');
+    if (!input || !preview) return;
+    let files = [];
+
+    function render() {
+        preview.innerHTML = '';
+        files.forEach((file, idx) => {
+            const url = URL.createObjectURL(file);
+            const wrap = document.createElement('div');
+            wrap.className = 'photo-preview';
+            wrap.innerHTML = `<img src="${url}"><button type="button" class="rm" title="Удалить">×</button>`;
+            wrap.querySelector('.rm').addEventListener('click', () => {
+                files.splice(idx, 1);
+                syncInput();
+                render();
+            });
+            preview.appendChild(wrap);
+        });
+    }
+
+    function syncInput() {
+        const dt = new DataTransfer();
+        files.forEach(f => dt.items.add(f));
+        input.files = dt.files;
+    }
+
+    input.addEventListener('change', () => {
+        const list = Array.from(input.files);
+        const max = {{ max_photos }};
+        if (files.length + list.length > max) {
+            alert('Максимум ' + max + ' фотографий.');
+            list.length = Math.max(0, max - files.length);
+        }
+        files = files.concat(list);
+        syncInput();
+        render();
+    });
+})();
+</script>
+{% endblock %}

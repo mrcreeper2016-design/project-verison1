@@ -408,8 +408,11 @@ def speakers_api(request):
         from django.db.models import Count, Prefetch
         from accounts.models import UserProfile
 
+        # Только подтверждённые мероприятия — pending/rejected self-submissions
+        # не показываются в публичных списках спикеров.
+        verified_events_qs = Event.objects.filter(verification_status=Event.VERIFICATION_VERIFIED)
         speakers = Speaker.objects.prefetch_related(
-            "events",
+            Prefetch("events", queryset=verified_events_qs),
             Prefetch("feedbacks", queryset=Feedback.objects.select_related("event").order_by("-created_at")),
             Prefetch("event_ratings", queryset=SpeakerEventRating.objects.select_related("event").order_by("-created_at")),
             Prefetch("user__profile", queryset=UserProfile.objects.only("user_id", "avatar")),
@@ -477,7 +480,7 @@ def speakers_api(request):
 def events_api(request):
     try:
         today = timezone.now().date()
-        events = Event.objects.prefetch_related("speakers").all()
+        events = Event.objects.filter(verification_status=Event.VERIFICATION_VERIFIED).prefetch_related("speakers").all()
         # Подтягиваем оценки от спикеров одним запросом, группируем по event_id.
         ratings_by_event: dict[int, list[SpeakerEventRating]] = {}
         for r in (
@@ -1145,6 +1148,8 @@ def notifications_api(request):
     event_count = 0
     application_items = []
     application_count = 0
+    speaker_event_items = []
+    speaker_event_count = 0
     if is_admin:
         qs = EventRequest.objects.filter(
             status=EventRequest.STATUS_PENDING
@@ -1179,6 +1184,28 @@ def notifications_api(request):
         application_count = _devrel_visible_applications(user).filter(
             status=SpeakerApplication.STATUS_PENDING
         ).count()
+
+        from accounts.views.console import _devrel_visible_speaker_events
+        se_qs = _devrel_visible_speaker_events(user)[:10]
+        for ev in se_qs:
+            submitter = ev.submitted_by
+            submitter_name = ''
+            company = ''
+            if submitter is not None:
+                submitter_name = (f"{submitter.first_name} {submitter.last_name}".strip()) or submitter.username
+                try:
+                    company = (submitter.profile.company or '')
+                except Exception:
+                    company = ''
+            speaker_event_items.append({
+                'id': ev.id,
+                'title': ev.title,
+                'submitter_name': submitter_name,
+                'company': company,
+                'created_at': ev.created_at.isoformat() if ev.created_at else None,
+                'url': f'/console/speaker-events/{ev.id}/',
+            })
+        speaker_event_count = _devrel_visible_speaker_events(user).count()
 
     support_tickets = list(support_notif.unread_tickets(user)[:10])
     support_items = []
@@ -1217,9 +1244,10 @@ def notifications_api(request):
             ).count()
 
     return JsonResponse({
-        'total': event_count + support_count + application_count + invitation_count,
+        'total': event_count + support_count + application_count + invitation_count + speaker_event_count,
         'event_requests': {'count': event_count, 'items': event_items},
         'speaker_applications': {'count': application_count, 'items': application_items},
+        'speaker_events': {'count': speaker_event_count, 'items': speaker_event_items},
         'support': {'count': support_count, 'items': support_items},
         'event_invitations': {'count': invitation_count, 'items': invitation_items},
     })

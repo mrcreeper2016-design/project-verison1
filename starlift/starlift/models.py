@@ -141,6 +141,21 @@ class Event(models.Model):
         ('future', 'Предстоящее'),
     ]
 
+    VERIFICATION_PENDING = 'pending'
+    VERIFICATION_VERIFIED = 'verified'
+    VERIFICATION_REJECTED = 'rejected'
+    VERIFICATION_CHOICES = [
+        (VERIFICATION_PENDING, 'На верификации'),
+        (VERIFICATION_VERIFIED, 'Подтверждено'),
+        (VERIFICATION_REJECTED, 'Отклонено'),
+    ]
+
+    FORMAT_CHOICES = [
+        ('online', 'Онлайн'),
+        ('offline', 'Офлайн'),
+        ('hybrid', 'Гибрид'),
+    ]
+
     title = models.CharField(max_length=200)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='future')
     date = models.CharField(max_length=100, null=True, blank=True)
@@ -178,6 +193,35 @@ class Event(models.Model):
         verbose_name="Источник данных",
     )
     speakers = models.ManyToManyField(Speaker, related_name='events')
+
+    # Self-service: спикер загружает прошедшее мероприятие → pending; DevRel
+    # его компании одобряет → verified (показывается публично) или отклоняет.
+    verification_status = models.CharField(
+        max_length=16,
+        choices=VERIFICATION_CHOICES,
+        default=VERIFICATION_VERIFIED,
+        db_index=True,
+    )
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='submitted_events',
+    )
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='verified_events',
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, default='')
+
+    format = models.CharField(max_length=16, choices=FORMAT_CHOICES, blank=True, default='')
+    tags = models.CharField(max_length=300, blank=True, default='')
+    presentation = models.FileField(upload_to='events/presentations/', null=True, blank=True)
+    video_url = models.URLField(max_length=500, blank=True, default='')
+
     created_at = models.DateTimeField(
         auto_now_add=True,
         null=True,
@@ -191,12 +235,34 @@ class Event(models.Model):
     def __str__(self):
         return f"{self.title} ({self.status})"
 
+    def save(self, *args, **kwargs):
+        # Если дедлайн не задан, но известна дата события — ставим дедлайн
+        # за 14 дней до события. Так у спикеров всегда есть окно подачи без
+        # вмешательства DevRel; «только по приглашению» остаётся как режим
+        # для событий без даты.
+        if self.application_deadline is None and self.event_date is not None:
+            from datetime import timedelta
+            self.application_deadline = self.event_date - timedelta(days=14)
+        super().save(*args, **kwargs)
+
     def can_self_submit(self) -> bool:
         """Спикер может сам подать заявку, только если дедлайн задан и не прошёл."""
         if self.application_deadline is None:
             return False
         from django.utils import timezone
         return self.application_deadline >= timezone.localdate()
+
+
+class EventPhoto(models.Model):
+    """Фотографии события, загруженные спикером при self-submit."""
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='photos')
+    image = models.ImageField(upload_to='events/photos/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'starlift_event_photo'
+        ordering = ['uploaded_at']
 
 
 class Feedback(models.Model):

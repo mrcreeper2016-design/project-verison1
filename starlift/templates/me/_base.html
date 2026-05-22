@@ -6,8 +6,12 @@
     .me-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
     .me-title { margin: 0; font-size: clamp(24px, 3vw, 32px); font-weight: 800; letter-spacing: -0.03em; color: var(--text-main); }
     .me-subtitle { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; }
-    .me-nav { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px; background: var(--white); border: 1px solid var(--border-color); border-radius: 14px; }
-    .me-nav a { padding: 8px 14px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 13px; color: var(--text-muted); transition: var(--transition); display: inline-flex; align-items: center; gap: 6px; }
+    .me-nav { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px; background: var(--white); border: 1px solid var(--border-color); border-radius: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    @media (max-width: 600px) {
+        .me-nav { flex-wrap: nowrap; }
+        .me-nav a { flex-shrink: 0; }
+    }
+    .me-nav a { padding: 8px 14px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 13px; color: var(--text-muted); transition: var(--transition); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
     .me-nav a:hover { color: var(--text-main); background: var(--light-green); text-decoration: none; }
     .me-nav a.active { background: var(--sber-green); color: #fff; }
 

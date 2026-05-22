@@ -32,12 +32,13 @@ class DevRelInvitationCreationTests(TestCase):
         cls.spk_tin = Speaker.objects.create(name="Speaker Tin", sub="Т-Банк", stack="py", city="m", img="", user=cls.spk_tin_user)
         cls.event = Event.objects.create(
             title="EV", status="future",
-            event_date=timezone.localdate() + timedelta(days=10),
+            event_date=timezone.localdate() + timedelta(days=30),
             application_deadline=timezone.localdate() + timedelta(days=3),
         )
+        # Событие без event_date вообще → дедлайн не автозаполняется, остаётся None.
         cls.event_no_dl = Event.objects.create(
             title="No-DL", status="future",
-            event_date=timezone.localdate() + timedelta(days=10),
+            event_date=None,
             application_deadline=None,
         )
 
@@ -106,7 +107,7 @@ class SpeakerInvitationResponseTests(TestCase):
         cls.devrel = _make_user("dr", UserProfile.ROLE_DEVREL, "Сбер")
         cls.event = Event.objects.create(
             title="EV", status="future",
-            event_date=timezone.localdate() + timedelta(days=10),
+            event_date=timezone.localdate() + timedelta(days=30),
             application_deadline=timezone.localdate() + timedelta(days=3),
         )
 

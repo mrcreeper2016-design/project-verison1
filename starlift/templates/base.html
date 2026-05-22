@@ -73,14 +73,20 @@
             --status-future-color: #21A038;
         }
 
+        html {
+            min-height: 100%;
+        }
         body {
             margin: 0;
             font-family: 'Inter', sans-serif;
             background-color: transparent;
             color: var(--text-main);
             display: flex;
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
+            /* Не блокируем вертикальный скролл всей страницы — нужен, если контент
+               больше окна (зум-ин, узкие экраны). Горизонтальный режем, чтобы
+               внутренние контейнеры сами решали через overflow-x: auto. */
+            overflow-x: hidden;
             transition: background-color 0.3s, color 0.3s;
         }
 
@@ -371,7 +377,7 @@
         aside.collapsed .nav-group-chevron { display: none; }
         aside.collapsed .nav-submenu { display: none; }
 
-        main { flex-grow: 1; padding: 30px 40px; overflow-y: auto; background: transparent !important; position: relative; }
+        main { flex: 1 1 auto; min-width: 0; padding: 30px 40px; overflow-y: auto; overflow-x: auto; background: transparent !important; position: relative; }
 
         .main-header {
             display: flex;
@@ -551,7 +557,7 @@
         .search-box input { background: transparent; border: none; color: var(--text-main); outline: none; margin-left: 14px; width: 100%; font-size: 16px; }
         .search-box input::placeholder { color: var(--text-muted); }
 
-        .table-wrapper { border: 1px solid var(--border-color); border-radius: 16px; overflow: hidden; }
+        .table-wrapper { border: 1px solid var(--border-color); border-radius: 16px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
         table { width: 100%; border-collapse: collapse; color: var(--text-main); }
 
         .bulk-action-bar {
@@ -912,7 +918,10 @@
             background: rgba(0,0,0,0.35);
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
-            display: none; justify-content: center; align-items: center; z-index: 2000;
+            display: none; justify-content: center; align-items: flex-start; z-index: 2000;
+            padding: 24px 12px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
             animation: fadeInOverlay 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .modal-content {
@@ -921,7 +930,13 @@
             backdrop-filter: blur(40px) saturate(180%);
             -webkit-backdrop-filter: blur(40px) saturate(180%);
             border: 1px solid rgba(255,255,255,0.45);
-            width: 800px; max-width: 90%; position: relative;
+            width: 800px; max-width: min(800px, calc(100vw - 24px));
+            position: relative;
+            box-sizing: border-box;
+            margin: auto;
+            max-height: calc(100vh - 48px);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
             box-shadow: 0 24px 60px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.6);
             animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1);
             transition: background-color 0.3s, color 0.3s;
@@ -1227,7 +1242,8 @@
             body { display: block; }
             main {
                 padding: 16px 14px;
-                overflow: visible;
+                overflow-x: auto;
+                overflow-y: visible;
                 height: auto;
                 min-height: 100vh;
                 width: 100%;
@@ -1674,6 +1690,17 @@
                 </div>`;
             }
 
+            function renderSpeakerEvent(ev) {
+                const company = ev.company ? ' · ' + escapeHtml(ev.company) : '';
+                return `<div class="notif-item">
+                    <p class="notif-item-title">Мероприятие на верификации: ${escapeHtml(ev.title)}</p>
+                    <div class="notif-item-meta">${escapeHtml(ev.submitter_name || 'спикер')}${company}</div>
+                    <div class="notif-actions">
+                        <a class="notif-open" href="${escapeHtml(ev.url)}"><i class="fa-solid fa-clipboard-check"></i> Открыть</a>
+                    </div>
+                </div>`;
+            }
+
             function renderInvitation(it) {
                 const when = it.event_date || '';
                 return `<div class="notif-item">
@@ -1704,6 +1731,11 @@
                     if (apps.items && apps.items.length) {
                         blocks.push('<div class="notif-dropdown-header"><span>Спикерские заявки</span><a href="/console/event-requests/?status=pending&kind=speaker" class="nav-item" style="font-size:12px;color:var(--sber-green);text-decoration:none;padding:0;">Все →</a></div>');
                         blocks.push(apps.items.map(renderSpeakerApplication).join(''));
+                    }
+                    const sev = data.speaker_events || {count:0, items:[]};
+                    if (sev.items && sev.items.length) {
+                        blocks.push('<div class="notif-dropdown-header"><span>Мероприятия на верификации</span><a href="/console/event-requests/?status=pending&kind=event" class="nav-item" style="font-size:12px;color:var(--sber-green);text-decoration:none;padding:0;">Все →</a></div>');
+                        blocks.push(sev.items.map(renderSpeakerEvent).join(''));
                     }
                     const sup = data.support || {count:0, items:[]};
                     if (sup.items && sup.items.length) {

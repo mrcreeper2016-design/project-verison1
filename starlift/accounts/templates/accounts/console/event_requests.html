@@ -31,6 +31,7 @@
             <option value="create" {% if kind == 'create' %}selected{% endif %}>Создание мероприятия</option>
             <option value="join" {% if kind == 'join' %}selected{% endif %}>Заявка на участие</option>
             <option value="speaker" {% if kind == 'speaker' %}selected{% endif %}>Спикерская заявка</option>
+            <option value="event" {% if kind == 'event' %}selected{% endif %}>Мероприятие на верификации</option>
         </select>
     </form>
 </div>
@@ -45,7 +46,39 @@
     <div class="empty-state">Заявок нет.</div>
 {% else %}
     {% for item in page.object_list %}
-    {% if item.kind == 'speaker_application' %}
+    {% if item.kind == 'speaker_event' %}
+    {% with ev=item.obj %}
+    <div class="req-card">
+        <div class="req-head">
+            <div>
+                <h3 class="req-title">
+                    <i class="fa-solid fa-clipboard-check" style="color: var(--sber-green);"></i> Мероприятие на верификации: {{ ev.title }}
+                </h3>
+                <div class="req-meta">
+                    {% if ev.event_date %}{{ ev.event_date|date:'d.m.Y' }} · {% endif %}
+                    {{ ev.submitted_by.get_full_name|default:ev.submitted_by.username|default:'—' }}
+                    · {{ ev.created_at|date:'d.m.Y H:i' }}
+                </div>
+            </div>
+            <span class="chip {% if ev.verification_status == 'pending' %}chip-amber{% elif ev.verification_status == 'verified' %}chip-green{% else %}chip-red{% endif %}">
+                {{ ev.get_verification_status_display }}
+            </span>
+        </div>
+        <div class="req-body">
+            <dl>
+                {% if ev.location %}<dt>Место:</dt><dd>{{ ev.location }}</dd>{% endif %}
+                {% if ev.format %}<dt>Формат:</dt><dd>{{ ev.get_format_display }}</dd>{% endif %}
+                {% if ev.tags %}<dt>Теги:</dt><dd>{{ ev.tags }}</dd>{% endif %}
+                {% if ev.description %}<dt>Описание:</dt><dd>{{ ev.description|truncatechars:240 }}</dd>{% endif %}
+                {% if ev.rejection_reason %}<dt>Причина отказа:</dt><dd style="color:#D93E4E;">{{ ev.rejection_reason }}</dd>{% endif %}
+            </dl>
+        </div>
+        <div class="req-actions">
+            <a class="btn-sm btn-approve" href="{% url 'accounts:speaker_event_detail' ev.id %}" style="text-decoration:none;"><i class="fa-solid fa-arrow-right"></i> Открыть</a>
+        </div>
+    </div>
+    {% endwith %}
+    {% elif item.kind == 'speaker_application' %}
     {% with app=item.obj %}
     <div class="req-card">
         <div class="req-head">

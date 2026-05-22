@@ -23,7 +23,7 @@ from django.views.decorators.http import require_POST
 
 from accounts.decorators import member_required
 
-from .models import Event, EventInvitation, EventRequest, Feedback, Speaker, SpeakerEventRating, SpeakerLike
+from .models import Event, EventInvitation, EventPhoto, EventRequest, Feedback, Speaker, SpeakerEventRating, SpeakerLike
 
 
 def _get_speaker(user):
@@ -54,24 +54,32 @@ def speaker_required(view_func):
 
 
 def _nps_from_scores(scores):
-    """NPS = (promoters - detractors) / total * 100, where promoters >= 9, detractors <= 6."""
+    """NPS на шкале 0..10 (а не классической -100..+100).
+
+    Базовая формула: ``(promoters - detractors) / total`` — диапазон -1..+1,
+    где promoters ≥ 9, detractors ≤ 6. Маппим линейно в 0..10: значение
+    +1 (все promoters) → 10, 0 (нейтрально) → 5, -1 (все detractors) → 0.
+    """
     if not scores:
         return None
     promoters = sum(1 for s in scores if s >= 9)
     detractors = sum(1 for s in scores if s <= 6)
-    return round((promoters - detractors) / len(scores) * 100, 1)
+    raw = (promoters - detractors) / len(scores)  # -1..+1
+    return round((raw + 1) * 5, 1)  # 0..10
 
 
 @speaker_required
 def dashboard_view(request):
     speaker = request.my_speaker
+    # NPS считаем только по подтверждённым мероприятиям, чтобы спикер не мог
+    # «накачать» себе статистику pending self-submissions.
     feedbacks = list(
-        Feedback.objects.filter(speaker=speaker)
+        Feedback.objects.filter(speaker=speaker, event__verification_status=Event.VERIFICATION_VERIFIED)
         .select_related("event")
         .order_by("-created_at")
     )
     own_ratings_full = list(
-        SpeakerEventRating.objects.filter(speaker=speaker)
+        SpeakerEventRating.objects.filter(speaker=speaker, event__verification_status=Event.VERIFICATION_VERIFIED)
         .select_related("event")
         .order_by("-created_at")
     )
@@ -285,6 +293,9 @@ def events_view(request):
             "my_nps": nps_value if nps_value else None,
             "my_event_rating": rating.score if rating else None,
             "my_event_rating_comment": rating.comment if rating else "",
+            "verification_status": ev.verification_status,
+            "rejection_reason": ev.rejection_reason or "",
+            "is_mine": ev.submitted_by_id == request.user.pk,
         }
 
     upcoming, past = [], []
@@ -503,3 +514,140 @@ def invitation_decline_view(request, invitation_id):
     )
     messages.success(request, "Приглашение отклонено.")
     return redirect("me_invitations")
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Загрузка прошедшего мероприятия (портфолио)
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _humanize_ru_date(d):
+    months = {1:'января',2:'февраля',3:'марта',4:'апреля',5:'мая',6:'июня',
+              7:'июля',8:'августа',9:'сентября',10:'октября',11:'ноября',12:'декабря'}
+    return f"{d.day} {months[d.month]} {d.year}"
+
+
+@speaker_required
+def event_upload_view(request, pk=None):
+    """GET — форма; POST — создание/редактирование pending-события."""
+    from accounts.models import AuditLog
+    from accounts.services import audit
+    from .forms import SpeakerEventUploadForm
+
+    speaker = request.my_speaker
+    instance = None
+    if pk is not None:
+        instance = get_object_or_404(Event, pk=pk)
+        if instance.submitted_by_id != request.user.pk:
+            return redirect("me_events")
+        if instance.verification_status not in (Event.VERIFICATION_PENDING, Event.VERIFICATION_REJECTED):
+            messages.info(request, "Это мероприятие уже подтверждено — изменение недоступно.")
+            return redirect("me_events")
+
+    if request.method == "POST":
+        form = SpeakerEventUploadForm(request.POST, request.FILES)
+        photos_files = request.FILES.getlist("photos")
+        form_valid = form.is_valid()
+        photo_error = None
+        try:
+            cleaned_photos = SpeakerEventUploadForm.validate_photos(photos_files)
+        except Exception as e:
+            cleaned_photos = []
+            photo_error = str(e)
+            form_valid = False
+            if not form.errors:
+                form.add_error(None, photo_error)
+            else:
+                form.add_error(None, photo_error)
+
+        if form_valid:
+            data = form.cleaned_data
+            with transaction.atomic():
+                if instance is None:
+                    event = Event(
+                        title=data["title"],
+                        event_date=data["event_date"],
+                        date=_humanize_ru_date(data["event_date"]),
+                        status="past",
+                        source="self",
+                        verification_status=Event.VERIFICATION_PENDING,
+                        submitted_by=request.user,
+                    )
+                else:
+                    event = instance
+                    event.verification_status = Event.VERIFICATION_PENDING
+                    event.rejection_reason = ""
+                    event.verified_by = None
+                    event.verified_at = None
+                    event.event_date = data["event_date"]
+                    event.date = _humanize_ru_date(data["event_date"])
+                    event.title = data["title"]
+                    event.status = "past"
+
+                event.location = data.get("location") or None
+                event.link = data.get("link") or None
+                event.topic = data.get("topic") or None
+                event.description = data.get("description") or None
+                event.format = data.get("format") or ""
+                event.tags = data.get("tags") or ""
+                event.video_url = data.get("video_url") or ""
+                if data.get("presentation"):
+                    event.presentation = data["presentation"]
+                event.save()
+                event.speakers.add(speaker)
+
+                # Фото добавляются к существующим (не заменяют), чтобы при edit
+                # пользователь мог дозагрузить. Удаление отдельных фото — TODO.
+                for f in cleaned_photos:
+                    EventPhoto.objects.create(event=event, image=f)
+
+                audit.log(
+                    action=AuditLog.ACTION_EVENT_SUBMISSION_SUBMITTED,
+                    actor=request.user,
+                    request=request,
+                    target=request.user,
+                    metadata={"event_id": event.pk, "edit": instance is not None},
+                )
+            messages.success(request, "Мероприятие отправлено на верификацию.")
+            return redirect("me_events")
+    else:
+        initial = {}
+        if instance is not None:
+            initial = {
+                "title": instance.title,
+                "event_date": instance.event_date,
+                "location": instance.location or "",
+                "link": instance.link or "",
+                "topic": instance.topic or "",
+                "format": instance.format or "",
+                "tags": instance.tags or "",
+                "description": instance.description or "",
+                "video_url": instance.video_url or "",
+            }
+        form = SpeakerEventUploadForm(initial=initial)
+
+    return render(
+        request,
+        "me/event_upload.html",
+        {
+            "active": "events",
+            "form": form,
+            "instance": instance,
+            "max_photos": 10,
+            "today": timezone.localdate().isoformat(),
+        },
+    )
+
+
+@require_POST
+@speaker_required
+def event_delete_view(request, pk):
+    event = get_object_or_404(Event, pk=pk)
+    if event.submitted_by_id != request.user.pk:
+        return redirect("me_events")
+    if event.verification_status not in (Event.VERIFICATION_PENDING, Event.VERIFICATION_REJECTED):
+        messages.error(request, "Подтверждённое мероприятие удалить нельзя.")
+        return redirect("me_events")
+    event.delete()
+    messages.success(request, "Мероприятие удалено.")
+    return redirect("me_events")

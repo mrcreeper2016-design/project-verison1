@@ -9,12 +9,133 @@
     .req-meta { font-size: 12px; color: var(--text-muted); }
     .req-title { font-weight: 700; font-size: 15px; color: var(--text-main); margin: 0; }
     .req-body { font-size: 13px; color: var(--text-main); line-height: 1.5; }
-    .invite-form { display: grid; gap: 10px; }
-    .invite-form select, .invite-form textarea {
-        padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-color);
-        font-family: inherit; font-size: 13px; background: var(--white); color: var(--text-main);
+
+    .invite-form { display: grid; gap: 16px; }
+    .invite-form .field { display: grid; gap: 6px; }
+    .invite-form .field-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .invite-form input[type=text],
+    .invite-form textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1.5px solid var(--border-color);
+        font-family: inherit;
+        font-size: 14px;
+        background: var(--white);
+        color: var(--text-main);
+        outline: none;
+        transition: var(--transition);
     }
-    .invite-form textarea { min-height: 90px; resize: vertical; }
+    .invite-form input[type=text]:focus,
+    .invite-form textarea:focus {
+        border-color: var(--sber-green);
+        box-shadow: 0 0 0 3px var(--light-green);
+    }
+
+    /* --- Speaker combobox (как в qr-generator) --- */
+    .qr-combo {
+        position: relative;
+        display: flex;
+        align-items: center;
+        background: var(--white);
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        transition: var(--transition);
+    }
+    .qr-combo:focus-within {
+        border-color: var(--sber-green);
+        box-shadow: 0 0 0 4px var(--light-green);
+    }
+    .qr-combo input {
+        flex: 1;
+        background: transparent;
+        border: none;
+        outline: none;
+        padding: 14px 16px;
+        font-size: 15px;
+        color: var(--text-main);
+        font-family: inherit;
+        min-width: 0;
+    }
+    .qr-combo input::placeholder { color: var(--text-muted); }
+    .qr-combo .qr-clear {
+        flex: 0 0 auto;
+        background: none;
+        border: none;
+        padding: 0 14px;
+        height: 100%;
+        font-size: 16px;
+        color: var(--text-muted);
+        cursor: pointer;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .15s, color .15s;
+    }
+    .qr-combo input:not(:placeholder-shown) + .qr-clear {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .qr-combo .qr-clear:hover { color: var(--sber-green); }
+    .qr-suggest {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0; right: 0;
+        max-height: 260px;
+        overflow-y: auto;
+        background: #fff;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+        z-index: 20;
+        display: none;
+    }
+    [data-theme="dark"] .qr-suggest { background: #1a221d; }
+    .qr-suggest.show { display: block; }
+    .qr-suggest-item {
+        padding: 10px 14px;
+        font-size: 14px;
+        color: var(--text-main);
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        transition: background .15s;
+    }
+    .qr-suggest-item + .qr-suggest-item { border-top: 1px solid var(--border-color); }
+    .qr-suggest-item:hover,
+    .qr-suggest-item.active { background: var(--light-green); color: var(--sber-green); }
+    .qr-suggest-item .meta { font-size: 11px; color: var(--text-muted); }
+    .qr-suggest-empty { padding: 14px; font-size: 13px; color: var(--text-muted); text-align: center; }
+    .qr-hint { font-size: 12px; color: var(--text-muted); line-height: 1.4; margin: 2px 2px 0; min-height: 16px; }
+    .qr-hint.ok { color: var(--sber-green); }
+    .invite-form textarea {
+        min-height: 110px;
+        resize: vertical;
+        line-height: 1.5;
+    }
+    .invite-form textarea::placeholder { color: var(--text-muted); opacity: 0.7; }
+
+    .invite-submit {
+        align-self: start;
+        padding: 12px 22px;
+        border-radius: 12px;
+        background: var(--sber-green);
+        color: #fff;
+        border: none;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 14px rgba(10,128,59,0.22);
+        transition: var(--transition);
+    }
+    .invite-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(10,128,59,0.32); }
+    .invite-submit:active { transform: translateY(0); }
+    .invite-submit:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
     .btn-sm { padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; }
 </style>
 
@@ -54,23 +175,121 @@
         {% if not speakers %}
             <div class="empty-state">Нет спикеров вашей компании, доступных для приглашения.</div>
         {% else %}
-            <form method="post" action="{% url 'accounts:event_invite' event.id %}" class="invite-form">
+            <form id="inviteForm" method="post" action="{% url 'accounts:event_invite' event.id %}" class="invite-form"
+                  data-speakers='[{% for s in speakers %}{"id":{{ s.pk }},"name":"{{ s.name|escapejs }}","sub":"{{ s.sub|default_if_none:""|escapejs }}","username":"{% if s.user %}{{ s.user.username|escapejs }}{% endif %}"}{% if not forloop.last %},{% endif %}{% endfor %}]'>
                 {% csrf_token %}
-                <label style="font-size:13px; color:var(--text-muted);">Спикер
-                    <select name="speaker_id" required>
-                        <option value="">— выберите спикера —</option>
-                        {% for s in speakers %}
-                        <option value="{{ s.pk }}">{{ s.name }}{% if s.user %} @{{ s.user.username }}{% endif %}</option>
-                        {% endfor %}
-                    </select>
-                </label>
-                <label style="font-size:13px; color:var(--text-muted);">Сообщение спикеру (необязательно)
-                    <textarea name="message" placeholder="Почему вы хотите видеть этого спикера на событии..."></textarea>
-                </label>
-                <div>
-                    <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-paper-plane"></i> Отправить приглашение</button>
+                <input type="hidden" name="speaker_id" id="inviteSpeakerId" value="" required>
+                <div class="field">
+                    <label for="speakerInput" class="field-label">Спикер</label>
+                    <div class="qr-combo">
+                        <input type="text" id="speakerInput" placeholder="Начните вводить имя…" autocomplete="off">
+                        <button type="button" class="qr-clear" id="speakerClear" aria-label="Очистить" title="Очистить"><i class="fa-solid fa-xmark"></i></button>
+                        <div class="qr-suggest" id="speakerSuggest" role="listbox"></div>
+                    </div>
+                    <div class="qr-hint" id="speakerHint"></div>
                 </div>
+                <div class="field">
+                    <label for="inviteMsg" class="field-label">Сообщение спикеру <span style="color:var(--text-muted); font-weight:500; text-transform:none;">— необязательно</span></label>
+                    <textarea id="inviteMsg" name="message" placeholder="Почему вы хотите видеть этого спикера на событии…"></textarea>
+                </div>
+                <button type="submit" id="inviteSubmit" class="invite-submit" disabled><i class="fa-solid fa-paper-plane"></i> Отправить приглашение</button>
             </form>
+            <script>
+            (function() {
+                const form = document.getElementById('inviteForm');
+                const SPEAKERS = JSON.parse(form.dataset.speakers || '[]');
+                const input = document.getElementById('speakerInput');
+                const clearBtn = document.getElementById('speakerClear');
+                const sug = document.getElementById('speakerSuggest');
+                const hint = document.getElementById('speakerHint');
+                const hidden = document.getElementById('inviteSpeakerId');
+                const submit = document.getElementById('inviteSubmit');
+                let selected = null;
+
+                function escapeHtml(s) {
+                    return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+                }
+
+                function filter(query) {
+                    const q = (query || '').trim().toLowerCase();
+                    if (!q) return SPEAKERS.slice();
+                    return SPEAKERS.filter(sp =>
+                        (sp.name || '').toLowerCase().includes(q)
+                        || (sp.sub || '').toLowerCase().includes(q)
+                        || (sp.username || '').toLowerCase().includes(q)
+                    );
+                }
+
+                function renderSuggest(items) {
+                    sug.innerHTML = '';
+                    if (!items.length) {
+                        const empty = document.createElement('div');
+                        empty.className = 'qr-suggest-empty';
+                        empty.textContent = 'Ничего не найдено';
+                        sug.appendChild(empty);
+                        sug.classList.add('show');
+                        return;
+                    }
+                    items.slice(0, 50).forEach(sp => {
+                        const el = document.createElement('div');
+                        el.className = 'qr-suggest-item';
+                        el.setAttribute('role', 'option');
+                        const sub = sp.sub || '';
+                        const handle = sp.username ? `@${sp.username}` : '';
+                        const meta = [handle, sub].filter(Boolean).join(' · ');
+                        el.innerHTML = `<span>${escapeHtml(sp.name)}</span>${meta ? `<span class="meta">${escapeHtml(meta)}</span>` : ''}`;
+                        el.addEventListener('mousedown', e => { e.preventDefault(); pick(sp); });
+                        sug.appendChild(el);
+                    });
+                    sug.classList.add('show');
+                }
+
+                function hideSuggest() { sug.classList.remove('show'); }
+
+                function pick(sp) {
+                    selected = sp;
+                    input.value = sp.name;
+                    hidden.value = sp.id;
+                    const sub = sp.sub || '';
+                    const handle = sp.username ? `@${sp.username}` : '';
+                    hint.textContent = [handle, sub].filter(Boolean).join(' · ');
+                    hint.className = 'qr-hint ok';
+                    submit.disabled = false;
+                    hideSuggest();
+                }
+
+                input.addEventListener('focus', () => renderSuggest(filter(input.value)));
+                input.addEventListener('input', () => {
+                    selected = null;
+                    hidden.value = '';
+                    hint.textContent = '';
+                    hint.className = 'qr-hint';
+                    submit.disabled = true;
+                    renderSuggest(filter(input.value));
+                });
+                input.addEventListener('blur', () => setTimeout(hideSuggest, 120));
+                clearBtn.addEventListener('click', () => {
+                    input.value = '';
+                    selected = null;
+                    hidden.value = '';
+                    hint.textContent = '';
+                    hint.className = 'qr-hint';
+                    submit.disabled = true;
+                    input.focus();
+                });
+
+                // Block submit if no speaker selected
+                form.addEventListener('submit', e => {
+                    if (!hidden.value) {
+                        e.preventDefault();
+                        hint.textContent = 'Выберите спикера из списка.';
+                        hint.className = 'qr-hint';
+                        hint.style.color = '#D93E4E';
+                        input.focus();
+                    }
+                });
+            })();
+            </script>
         {% endif %}
     </div>
 

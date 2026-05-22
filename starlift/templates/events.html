@@ -299,6 +299,33 @@
         color: var(--text-muted);
     }
 
+    /* Compact action buttons in the event modal (admin/devrel/speaker) */
+    .ev-act {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
+        cursor: pointer;
+        text-decoration: none;
+        border: 1px solid transparent;
+        transition: var(--transition);
+        white-space: nowrap;
+    }
+    .ev-act i { font-size: 11px; }
+    .ev-act-primary { background: var(--sber-green); color: #fff; border-color: var(--sber-green); }
+    .ev-act-primary:hover:not(:disabled) { background: #086d31; }
+    .ev-act-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ev-act-accent { background: var(--light-green); color: var(--sber-green); border-color: rgba(10,128,59,0.3); }
+    .ev-act-accent:hover { background: rgba(10,128,59,0.18); }
+    .ev-act-ghost { background: var(--white); color: var(--text-main); border-color: var(--border-color); }
+    .ev-act-ghost:hover { background: var(--light-green); color: var(--sber-green); border-color: rgba(10,128,59,0.3); }
+    .ev-act-danger { background: rgba(217,62,78,0.08); color: #D93E4E; border-color: rgba(217,62,78,0.25); padding: 6px 9px; }
+    .ev-act-danger:hover { background: rgba(217,62,78,0.16); }
+
     .section-title {
         margin: 0;
         font-size: 18px;
@@ -1228,6 +1255,43 @@ function renderEventModal(eventId) {
     window.__currentEventId = ev.id;
     window.__currentEventTitle = ev.title;
 
+    // --- Deadline display + join button state ---
+    const fmtDeadline = (iso) => {
+        if (!iso) return '';
+        const parts = String(iso).split('-');
+        if (parts.length === 3) return `${parts[2]}.${parts[1]}.${parts[0]}`;
+        return iso;
+    };
+    const joinBtnEl = document.getElementById('btnRequestJoin');
+    const joinInfoEl = document.getElementById('joinDeadlineInfo');
+    if (joinBtnEl && joinInfoEl) {
+        if (ev.can_self_submit) {
+            joinBtnEl.disabled = false;
+            joinBtnEl.style.opacity = '';
+            joinBtnEl.style.cursor = 'pointer';
+            joinInfoEl.textContent = ev.application_deadline
+                ? `Приём заявок открыт до ${fmtDeadline(ev.application_deadline)}`
+                : '';
+        } else {
+            joinBtnEl.disabled = true;
+            joinBtnEl.style.opacity = '0.5';
+            joinBtnEl.style.cursor = 'not-allowed';
+            joinInfoEl.textContent = ev.application_deadline
+                ? `Приём заявок закрыт (дедлайн ${fmtDeadline(ev.application_deadline)})`
+                : 'Подача заявок только по приглашению DevRel';
+        }
+    }
+    const inviteBtnEl = document.getElementById('btnInviteSpeaker');
+    if (inviteBtnEl) {
+        inviteBtnEl.href = `/console/events/${ev.id}/invite/`;
+    }
+    const evDeadlineInfo = document.getElementById('eventDeadlineInfo');
+    if (evDeadlineInfo) {
+        evDeadlineInfo.textContent = ev.application_deadline
+            ? `Дедлайн подачи заявок: ${fmtDeadline(ev.application_deadline)}`
+            : 'Дедлайн подачи заявок не задан — попасть в событие можно только по приглашению DevRel';
+    }
+
     const descEl = document.getElementById('eventModalDescription');
     const descToggle = document.getElementById('eventModalDescToggle');
     const rawDesc = ev.description && ev.description !== 'None' ? String(ev.description) : '';
@@ -1520,19 +1584,26 @@ if (document.readyState === 'loading') {
                     <div id="eventSpeakersList" style="display:grid; gap:10px;"></div>
 
                     {% if user.is_authenticated and user.profile.role == 'speaker' %}
-                    <button type="button" id="btnRequestJoin" style="margin-top: 14px; padding: 10px 16px; border-radius: 12px; background: var(--sber-green); color: #fff; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-paper-plane"></i> Подать заявку на участие
-                    </button>
+                    <div id="joinSection" style="margin-top:12px; display:grid; gap:4px;">
+                        <button type="button" id="btnRequestJoin" class="ev-act ev-act-primary">
+                            <i class="fa-solid fa-paper-plane"></i> Подать заявку
+                        </button>
+                        <span id="joinDeadlineInfo" style="font-size:11px; color:var(--text-muted);"></span>
+                    </div>
                     {% endif %}
                     {% if user.is_authenticated and user.profile.role == 'admin' or user.profile.role == 'devrel' or user.is_superuser %}
-                    <div style="margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button type="button" id="btnAdminEditEvent" style="padding: 8px 14px; border-radius: 10px; background: var(--white); color: var(--text-main); border: 1px solid var(--border-color); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                    <div style="margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap;">
+                        <a id="btnInviteSpeaker" href="#" class="ev-act ev-act-accent">
+                            <i class="fa-solid fa-paper-plane"></i> Пригласить
+                        </a>
+                        <button type="button" id="btnAdminEditEvent" class="ev-act ev-act-ghost">
                             <i class="fa-solid fa-pen"></i> Редактировать
                         </button>
-                        <button type="button" id="btnAdminDeleteEvent" style="padding: 8px 14px; border-radius: 10px; background: rgba(217,62,78,0.1); color: #D93E4E; border: 1px solid rgba(217,62,78,0.3); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                            <i class="fa-solid fa-trash"></i> Удалить
+                        <button type="button" id="btnAdminDeleteEvent" class="ev-act ev-act-danger" title="Удалить">
+                            <i class="fa-solid fa-trash"></i>
                         </button>
                     </div>
+                    <div id="eventDeadlineInfo" style="margin-top:6px; font-size:11px; color:var(--text-muted);"></div>
                     {% endif %}
 
                     <h3 class="section-title" id="eventScheduleHeading" style="margin: 18px 0 14px; font-size: 18px;"><i class="fa-solid fa-clock"></i> Расписание</h3>
@@ -1556,6 +1627,10 @@ if (document.readyState === 'loading') {
                 <div class="ev-form-grid">
                     <label>Дата
                         <input type="date" name="event_date">
+                    </label>
+                    <label>Дедлайн подачи заявок
+                        <input type="date" name="application_deadline">
+                        <span style="display:block; font-size:11px; color:var(--text-muted); margin-top:4px;">Если не указать — будет автоматически за 14 дней до события</span>
                     </label>
                     <label>Место
                         <input type="text" name="location" maxlength="200" placeholder="Москва, Сколково">
@@ -1588,6 +1663,7 @@ if (document.readyState === 'loading') {
             const f = document.getElementById('adminEventForm');
             f.querySelector('[name=title]').value = ev ? (ev.title || '') : '';
             f.querySelector('[name=event_date]').value = ev && ev.event_date ? ev.event_date : '';
+            f.querySelector('[name=application_deadline]').value = ev && ev.application_deadline ? ev.application_deadline : '';
             f.querySelector('[name=location]').value = ev ? (ev.location || '') : '';
             f.querySelector('[name=link]').value = ev ? (ev.link || '') : '';
             f.querySelector('[name=topic]').value = ev ? (ev.topic || '') : '';
@@ -1805,6 +1881,7 @@ if (document.readyState === 'loading') {
                             already_pending: 'Вы уже подали заявку на это мероприятие.',
                             topic_required: 'Укажите тему доклада.',
                             no_speaker_profile: 'У вашего аккаунта не привязан профиль спикера.',
+                            submissions_closed: 'Приём заявок на это мероприятие закрыт. Попасть можно только по приглашению DevRel.',
                         };
                         msg.textContent = errMap[data.error] || ('Ошибка: ' + (data.error || 'не удалось отправить'));
                     }

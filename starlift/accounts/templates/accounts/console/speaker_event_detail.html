@@ -1,0 +1,109 @@
+{% extends 'accounts/console/_base.html' %}
+
+{% block title %}Мероприятие на верификации — StarLift{% endblock %}
+
+{% block console_content %}
+<style>
+    .se-section-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--text-main); }
+    .se-meta-grid { display: grid; gap: 6px; padding: 14px; background: var(--white); border: 1px solid var(--border-color); border-radius: 12px; font-size: 13px; }
+    .se-meta-grid .lbl { color: var(--text-muted); }
+    .se-photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+    .se-photo { aspect-ratio: 1; border-radius: 10px; overflow: hidden; border: 1px solid var(--border-color); }
+    .se-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .se-video-embed { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 12px; }
+    .se-video-embed iframe { position: absolute; top:0; left:0; width: 100%; height: 100%; border: 0; }
+</style>
+
+<div class="content-block" style="padding:22px; display:grid; gap:16px;">
+    <div>
+        <a href="{% url 'accounts:event_requests' %}" style="color:var(--text-muted); text-decoration:none; font-size:13px;"><i class="fa-solid fa-arrow-left"></i> К списку заявок</a>
+    </div>
+
+    {% if messages %}
+        {% for msg in messages %}
+        <div style="padding:10px 12px; border-radius:10px; font-size:13px;
+            {% if msg.tags == 'error' %}background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3);
+            {% else %}background:var(--light-green); color:var(--sber-green); border:1px solid rgba(10,128,59,0.25);{% endif %}">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <h2 style="margin:0; font-size:22px; font-weight:800;">
+        <i class="fa-solid fa-clipboard-check" style="color: var(--sber-green);"></i>
+        {{ event.title }}
+        <span class="chip {% if event.verification_status == 'pending' %}chip-amber{% elif event.verification_status == 'verified' %}chip-green{% else %}chip-red{% endif %}" style="margin-left:6px; font-size:11px; vertical-align:middle;">
+            {{ event.get_verification_status_display }}
+        </span>
+    </h2>
+
+    <div class="se-meta-grid">
+        <div><span class="lbl">Дата:</span> {% if event.event_date %}{{ event.event_date|date:'d.m.Y' }}{% else %}—{% endif %}</div>
+        <div><span class="lbl">Место:</span> {{ event.location|default:'—' }}</div>
+        <div><span class="lbl">Формат:</span> {{ event.get_format_display|default:'—' }}</div>
+        <div><span class="lbl">Тема:</span> {{ event.topic|default:'—' }}</div>
+        {% if event.tags %}<div><span class="lbl">Теги:</span> {{ event.tags }}</div>{% endif %}
+        {% if event.link %}<div><span class="lbl">Анонс:</span> <a href="{{ event.link }}" target="_blank">{{ event.link }}</a></div>{% endif %}
+        <div><span class="lbl">Спикеры:</span>
+            {% for s in speakers %}{{ s.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+        </div>
+        <div><span class="lbl">Загрузил:</span> {{ event.submitted_by.get_full_name|default:event.submitted_by.username|default:'—' }} · {{ event.created_at|date:'d.m.Y H:i' }}</div>
+    </div>
+
+    {% if event.description %}
+    <div>
+        <h3 class="se-section-title"><i class="fa-solid fa-align-left"></i> Описание</h3>
+        <div style="margin-top:6px; font-size:14px; line-height:1.55; white-space:pre-wrap;">{{ event.description }}</div>
+    </div>
+    {% endif %}
+
+    {% if event.presentation %}
+    <div>
+        <h3 class="se-section-title"><i class="fa-solid fa-file-pdf"></i> Презентация</h3>
+        <div style="margin-top:6px;"><a class="btn-action btn-contact" href="{{ event.presentation.url }}" target="_blank" style="text-decoration:none;"><i class="fa-solid fa-download"></i> Скачать</a></div>
+    </div>
+    {% endif %}
+
+    {% if event.video_url %}
+    <div>
+        <h3 class="se-section-title"><i class="fa-solid fa-video"></i> Видео</h3>
+        <div style="margin-top:6px;">
+            <a href="{{ event.video_url }}" target="_blank" style="font-size:13px;"><i class="fa-solid fa-up-right-from-square"></i> {{ event.video_url }}</a>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if photos %}
+    <div>
+        <h3 class="se-section-title"><i class="fa-solid fa-images"></i> Фото ({{ photos|length }})</h3>
+        <div class="se-photo-grid" style="margin-top:6px;">
+            {% for p in photos %}
+            <a class="se-photo" href="{{ p.image.url }}" target="_blank"><img src="{{ p.image.url }}" alt=""></a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if event.verification_status == 'pending' %}
+    <div class="content-block" style="padding:16px; background:var(--white); display:grid; gap:14px;">
+        <h3 class="se-section-title"><i class="fa-solid fa-check"></i> Одобрить</h3>
+        <form method="post" action="{% url 'accounts:speaker_event_action' event.id 'approve' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-action btn-contact" style="justify-self:start;"><i class="fa-solid fa-check"></i> Подтвердить публикацию</button>
+        </form>
+    </div>
+
+    <div class="content-block" style="padding:16px; background:var(--white); display:grid; gap:10px;">
+        <h3 class="se-section-title" style="color:#D93E4E;"><i class="fa-solid fa-xmark"></i> Отклонить</h3>
+        <form method="post" action="{% url 'accounts:speaker_event_action' event.id 'reject' %}" style="display:grid; gap:10px;">
+            {% csrf_token %}
+            <textarea name="rejection_reason" required placeholder="Причина (увидит спикер)" rows="3" style="width:100%; padding:10px; border:1.5px solid var(--border-color); border-radius:10px; font-family:inherit;"></textarea>
+            <button type="submit" class="btn-action btn-danger" style="justify-self:start;"><i class="fa-solid fa-xmark"></i> Отклонить</button>
+        </form>
+    </div>
+    {% else %}
+    <div style="padding:12px; background:var(--light-green); border-radius:10px; font-size:13px;">
+        Обработано: {{ event.verified_at|date:'d.m.Y H:i'|default:'—' }} · {{ event.verified_by.username|default:'—' }}
+        {% if event.rejection_reason %}<div style="margin-top:6px; color:#D93E4E;">Причина: {{ event.rejection_reason }}</div>{% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

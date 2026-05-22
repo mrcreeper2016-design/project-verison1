@@ -84,8 +84,8 @@
     <div class="me-grid-4">
         <div class="content-block me-stat">
             <span class="me-stat-label">Текущий NPS</span>
-            <span class="me-stat-value {% if nps_total is not None and nps_total >= 0 %}positive{% elif nps_total is not None %}negative{% endif %}">
-                {% if nps_total is not None %}{{ nps_total }}{% else %}—{% endif %}
+            <span class="me-stat-value {% if nps_total is not None and nps_total >= 5 %}positive{% elif nps_total is not None %}negative{% endif %}">
+                {% if nps_total is not None %}{{ nps_total }}<span style="font-size:14px; color:var(--text-muted); font-weight:600;"> / 10</span>{% else %}—{% endif %}
             </span>
             <span class="me-stat-sub">по всем отзывам</span>
         </div>
@@ -101,8 +101,8 @@
         </div>
         <div class="content-block me-stat">
             <span class="me-stat-label">За 30 дней</span>
-            <span class="me-stat-value {% if nps_30 is not None and nps_30 >= 0 %}positive{% elif nps_30 is not None %}negative{% endif %}">
-                {% if nps_30 is not None %}{{ nps_30 }}{% else %}—{% endif %}
+            <span class="me-stat-value {% if nps_30 is not None and nps_30 >= 5 %}positive{% elif nps_30 is not None %}negative{% endif %}">
+                {% if nps_30 is not None %}{{ nps_30 }}<span style="font-size:14px; color:var(--text-muted); font-weight:600;"> / 10</span>{% else %}—{% endif %}
             </span>
             <span class="me-stat-sub">{{ feedback_30 }} новых отзывов</span>
         </div>

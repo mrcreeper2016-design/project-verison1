@@ -156,6 +156,12 @@
 </style>
 
 <div style="display:grid; gap:20px;">
+    <div style="display:flex; justify-content:flex-end;">
+        <a href="{% url 'me_event_upload' %}" class="btn-action btn-contact" style="text-decoration:none;">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Загрузить мероприятие
+        </a>
+    </div>
+
     <section>
         <h3 class="me-section-title"><i class="fa-regular fa-calendar"></i> Предстоящие <span class="chip chip-green">{{ upcoming|length }}</span></h3>
         {% if upcoming %}
@@ -186,7 +192,26 @@
                 <div class="ev-meta">
                     {% if ev.event_date %}<span><i class="fa-regular fa-clock"></i>{{ ev.event_date|date:'d.m.Y' }}</span>{% elif ev.date %}<span><i class="fa-regular fa-clock"></i>{{ ev.date }}</span>{% endif %}
                     {% if ev.location %}<span><i class="fa-solid fa-location-dot"></i>{{ ev.location }}</span>{% endif %}
+                    {% if ev.verification_status == 'pending' %}<span class="chip chip-amber"><i class="fa-solid fa-hourglass-half"></i> На верификации</span>
+                    {% elif ev.verification_status == 'rejected' %}<span class="chip chip-red"><i class="fa-solid fa-circle-xmark"></i> Отклонено</span>
+                    {% endif %}
                 </div>
+
+                {% if ev.is_mine and ev.verification_status == 'rejected' and ev.rejection_reason %}
+                <div style="padding:8px 10px; border-radius:8px; background:rgba(217,62,78,0.08); color:#D93E4E; font-size:12px;">
+                    <strong>Причина отказа:</strong> {{ ev.rejection_reason }}
+                </div>
+                {% endif %}
+
+                {% if ev.is_mine and ev.verification_status != 'verified' %}
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <a href="{% url 'me_event_edit' ev.id %}" class="btn-action" style="padding:6px 10px; font-size:12px; text-decoration:none;"><i class="fa-solid fa-pen"></i> Изменить</a>
+                    <form method="post" action="{% url 'me_event_delete' ev.id %}" style="display:inline;" onsubmit="return confirm('Удалить это мероприятие?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-action btn-danger" style="padding:6px 10px; font-size:12px;"><i class="fa-solid fa-trash"></i> Удалить</button>
+                    </form>
+                </div>
+                {% endif %}
 
                 {% if ev.my_event_rating is not None %}
                 <div class="ev-my-rating" data-rating-chip>

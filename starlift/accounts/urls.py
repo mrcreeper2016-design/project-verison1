@@ -49,6 +49,9 @@ urlpatterns = [
     path("console/speaker-applications/<int:application_id>/", console_views.speaker_application_detail_view, name="speaker_application_detail"),
     path("console/speaker-applications/<int:application_id>/<str:action>/", console_views.speaker_application_action_view, name="speaker_application_action"),
 
+    path("console/speaker-events/<int:event_id>/", console_views.speaker_event_detail_view, name="speaker_event_detail"),
+    path("console/speaker-events/<int:event_id>/<str:action>/", console_views.speaker_event_action_view, name="speaker_event_action"),
+
     path("application/", application_views.speaker_application_form_view, name="speaker_application_form"),
     path("application/pending/", application_views.application_pending_view, name="speaker_application_pending"),
 ]

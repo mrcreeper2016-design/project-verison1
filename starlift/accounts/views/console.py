@@ -362,6 +362,40 @@ def _devrel_visible_applications(actor) -> "QuerySet[SpeakerApplication]":
     return SpeakerApplication.objects.none()
 
 
+def _devrel_visible_speaker_events(actor):
+    """Event queryset (pending self-submissions) filtered per actor's routing.
+
+    Та же логика, что у SpeakerApplication: DevRel видит события, чей
+    submitted_by.profile.company совпадает с его company, плюс события, у
+    submitter'а которых company пустая. Admin/superuser видят все.
+    """
+    from starlift.models import Event
+
+    qs = (
+        Event.objects.filter(verification_status=Event.VERIFICATION_PENDING)
+        .select_related("submitted_by", "submitted_by__profile", "verified_by")
+        .prefetch_related("speakers")
+        .order_by("-created_at")
+    )
+    if actor.is_superuser:
+        return qs
+    profile = getattr(actor, "profile", None)
+    if profile is None:
+        return Event.objects.none()
+    if profile.role == UserProfile.ROLE_ADMIN:
+        return qs
+    if profile.role == UserProfile.ROLE_DEVREL:
+        actor_company = (profile.company or "").strip()
+        if actor_company:
+            return qs.filter(
+                Q(submitted_by__profile__company__iexact=actor_company)
+                | Q(submitted_by__profile__company="")
+                | Q(submitted_by__isnull=True)
+            )
+        return qs.filter(Q(submitted_by__profile__company="") | Q(submitted_by__isnull=True))
+    return Event.objects.none()
+
+
 @role_required("admin", "devrel")
 @never_cache
 @require_http_methods(["GET"])
@@ -379,8 +413,23 @@ def event_requests_view(request: HttpRequest) -> HttpResponse:
     if status in (SpeakerApplication.STATUS_PENDING, SpeakerApplication.STATUS_APPROVED, SpeakerApplication.STATUS_REJECTED):
         apps_qs = apps_qs.filter(status=status)
 
+    # Self-submitted events ждут верификации. Чтобы их видеть в approved/
+    # rejected состояниях нужны верифицированные/отклонённые Event'ы — берём
+    # тот же фильтр статусов.
+    from starlift.models import Event
+    speaker_events_qs = _devrel_visible_speaker_events(request.user)  # pending base
+    if status == EventRequest.STATUS_APPROVED:
+        # Подтверждённые: фильтруем все события self-source, переключаем queryset
+        base = Event.objects.filter(verification_status=Event.VERIFICATION_VERIFIED, submitted_by__isnull=False)
+        speaker_events_qs = base.select_related("submitted_by", "verified_by").prefetch_related("speakers")
+    elif status == EventRequest.STATUS_REJECTED:
+        base = Event.objects.filter(verification_status=Event.VERIFICATION_REJECTED, submitted_by__isnull=False)
+        speaker_events_qs = base.select_related("submitted_by", "verified_by").prefetch_related("speakers")
+    # для pending — берём _devrel_visible_speaker_events как есть
+
     show_event_requests = kind in ("", EventRequest.KIND_CREATE, EventRequest.KIND_JOIN)
     show_applications = kind in ("", "speaker")
+    show_speaker_events = kind in ("", "event")
 
     items = []
     if show_event_requests:
@@ -389,7 +438,10 @@ def event_requests_view(request: HttpRequest) -> HttpResponse:
     if show_applications:
         for a in apps_qs:
             items.append({"kind": "speaker_application", "obj": a, "created_at": a.created_at})
-    items.sort(key=lambda x: x["created_at"], reverse=True)
+    if show_speaker_events:
+        for ev in speaker_events_qs:
+            items.append({"kind": "speaker_event", "obj": ev, "created_at": ev.created_at})
+    items.sort(key=lambda x: x["created_at"] or timezone.now(), reverse=True)
 
     paginator = Paginator(items, 50)
     page = paginator.get_page(request.GET.get("page"))
@@ -397,6 +449,7 @@ def event_requests_view(request: HttpRequest) -> HttpResponse:
     pending_count = (
         EventRequest.objects.filter(status=EventRequest.STATUS_PENDING).count()
         + _devrel_visible_applications(request.user).filter(status=SpeakerApplication.STATUS_PENDING).count()
+        + _devrel_visible_speaker_events(request.user).count()
     )
 
     return render(
@@ -756,3 +809,109 @@ def event_invitation_cancel_view(request, invitation_id):
     )
     messages.success(request, "Приглашение отменено.")
     return redirect(reverse("accounts:event_invite", args=[inv.event_id]))
+
+
+def _can_moderate_speaker_event(actor, event) -> bool:
+    """Проверка прав на одобрение/отклонение self-submitted события."""
+    if actor.is_superuser:
+        return True
+    profile = getattr(actor, "profile", None)
+    if profile is None:
+        return False
+    if profile.role == UserProfile.ROLE_ADMIN:
+        return True
+    if profile.role != UserProfile.ROLE_DEVREL:
+        return False
+    actor_company = (profile.company or "").strip()
+    submitter = event.submitted_by
+    if submitter is None:
+        return True  # «без owner-а» — общий пул
+    submitter_company = ""
+    try:
+        submitter_company = (submitter.profile.company or "").strip()
+    except UserProfile.DoesNotExist:
+        submitter_company = ""
+    if not submitter_company:
+        return True
+    if not actor_company:
+        return False
+    return actor_company.lower() == submitter_company.lower()
+
+
+@role_required("admin", "devrel")
+@never_cache
+@require_http_methods(["GET"])
+def speaker_event_detail_view(request: HttpRequest, event_id: int) -> HttpResponse:
+    from starlift.models import Event
+
+    event = get_object_or_404(
+        Event.objects.select_related("submitted_by", "verified_by")
+        .prefetch_related("speakers", "photos"),
+        pk=event_id,
+    )
+    if not _can_moderate_speaker_event(request.user, event):
+        return redirect(reverse("accounts:event_requests"))
+
+    return render(
+        request,
+        "accounts/console/speaker_event_detail.html",
+        {
+            "active": "event_requests",
+            "event": event,
+            "photos": list(event.photos.all()),
+            "speakers": list(event.speakers.all()),
+        },
+    )
+
+
+@role_required("admin", "devrel")
+@never_cache
+@csrf_protect
+@require_http_methods(["POST"])
+def speaker_event_action_view(request: HttpRequest, event_id: int, action: str) -> HttpResponse:
+    from starlift.models import Event
+
+    event = get_object_or_404(Event.objects.select_related("submitted_by"), pk=event_id)
+    if not _can_moderate_speaker_event(request.user, event):
+        return redirect(reverse("accounts:event_requests"))
+
+    if event.verification_status != Event.VERIFICATION_PENDING:
+        messages.info(request, "Это мероприятие уже обработано.")
+        return redirect(reverse("accounts:event_requests"))
+
+    if action == "approve":
+        event.verification_status = Event.VERIFICATION_VERIFIED
+        event.verified_by = request.user
+        event.verified_at = timezone.now()
+        event.rejection_reason = ""
+        event.save(update_fields=["verification_status", "verified_by", "verified_at", "rejection_reason"])
+        audit.log(
+            action=AuditLog.ACTION_EVENT_SUBMISSION_APPROVED,
+            actor=request.user,
+            request=request,
+            target=event.submitted_by,
+            metadata={"event_id": event.pk},
+        )
+        messages.success(request, f"«{event.title}» подтверждено.")
+    elif action == "reject":
+        reason = (request.POST.get("rejection_reason") or "").strip()
+        if not reason:
+            messages.error(request, "Укажите причину отклонения.")
+            return redirect(reverse("accounts:speaker_event_detail", args=[event.pk]))
+        event.verification_status = Event.VERIFICATION_REJECTED
+        event.rejection_reason = reason
+        event.verified_by = request.user
+        event.verified_at = timezone.now()
+        event.save(update_fields=["verification_status", "rejection_reason", "verified_by", "verified_at"])
+        audit.log(
+            action=AuditLog.ACTION_EVENT_SUBMISSION_REJECTED,
+            actor=request.user,
+            request=request,
+            target=event.submitted_by,
+            metadata={"event_id": event.pk, "reason": reason},
+        )
+        messages.success(request, "Мероприятие отклонено.")
+    else:
+        messages.error(request, "Неизвестное действие.")
+
+    return redirect(reverse("accounts:event_requests"))

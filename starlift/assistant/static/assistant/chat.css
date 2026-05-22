@@ -5,15 +5,14 @@
     display: grid;
     grid-template-columns: 280px 1fr;
     gap: 18px;
-    height: calc(100vh - 130px);
-    min-height: 540px;
+    /* min-height вместо height: даёт расти при зум-ине, при normal-zoom выглядит как раньше */
+    min-height: max(540px, calc(100vh - 130px));
     max-width: 1400px;
     margin: 0 auto;
 }
 @media (max-width: 960px) {
     .chat-page {
         grid-template-columns: 1fr;
-        height: auto;
         min-height: 0;
     }
     .chat-sidebar { display: none; }

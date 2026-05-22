@@ -6,8 +6,12 @@
     .console-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
     .console-title { margin: 0; font-size: clamp(26px, 3vw, 36px); font-weight: 800; letter-spacing: -0.03em; color: var(--text-main); }
     .console-subtitle { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; line-height: 1.5; }
-    .console-nav { display: flex; gap: 8px; flex-wrap: wrap; padding: 6px; background: var(--white); border: 1px solid var(--border-color); border-radius: 14px; }
-    .console-nav a { padding: 8px 14px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 13px; color: var(--text-muted); transition: var(--transition); }
+    .console-nav { display: flex; gap: 8px; flex-wrap: wrap; padding: 6px; background: var(--white); border: 1px solid var(--border-color); border-radius: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    @media (max-width: 600px) {
+        .console-nav { flex-wrap: nowrap; }
+        .console-nav a { flex-shrink: 0; }
+    }
+    .console-nav a { padding: 8px 14px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 13px; color: var(--text-muted); transition: var(--transition); white-space: nowrap; }
     .console-nav a:hover { color: var(--text-main); background: var(--light-green); }
     .console-nav a.active { background: var(--sber-green); color: #fff; }
     .console-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
