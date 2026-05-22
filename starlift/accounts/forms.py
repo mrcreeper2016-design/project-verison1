@@ -62,7 +62,12 @@ class LoginForm(forms.Form):
 
 
 class InviteCreateForm(forms.ModelForm):
-    send_email = forms.BooleanField(required=False, initial=True, label="Отправить письмо с приглашением")
+    send_email = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Отправить письмо с приглашением",
+        widget=forms.CheckboxInput(attrs={"class": "sl-checkbox"}),
+    )
 
     class Meta:
         model = Invite
