@@ -24,7 +24,7 @@ from starlift.models import Event, EventRequest, Speaker, SpeakerApplication
 from ..decorators import role_required
 from ..models import AuditLog, LoginAttempt, UserProfile
 from ..services import audit, lockout
-from ..services.companies import get_company_suggestions
+from ..services.companies import ALLOWED_COMPANIES, is_allowed_company
 from ..services.speaker_avatar import seed_user_profile_avatar_from_linked_speaker
 
 
@@ -235,19 +235,22 @@ def user_detail_view(request: HttpRequest, user_id: int) -> HttpResponse:
                 except Speaker.DoesNotExist:
                     messages.error(request, "Спикер не найден.")
         elif action == "set_company":
-            new_company = (request.POST.get("company") or "").strip()[:200]
-            old_company = profile.company
-            if new_company != old_company:
-                profile.company = new_company
-                profile.save(update_fields=["company", "updated_at"])
-                audit.log(
-                    action=AuditLog.ACTION_PROFILE_UPDATED,
-                    actor=request.user,
-                    request=request,
-                    target=target,
-                    metadata={"field": "company", "from": old_company, "to": new_company},
-                )
-                messages.success(request, "Компания обновлена.")
+            new_company = (request.POST.get("company") or "").strip()
+            if not is_allowed_company(new_company):
+                messages.error(request, "Недопустимое значение компании.")
+            else:
+                old_company = profile.company
+                if new_company != old_company:
+                    profile.company = new_company
+                    profile.save(update_fields=["company", "updated_at"])
+                    audit.log(
+                        action=AuditLog.ACTION_PROFILE_UPDATED,
+                        actor=request.user,
+                        request=request,
+                        target=target,
+                        metadata={"field": "company", "from": old_company, "to": new_company},
+                    )
+                    messages.success(request, "Компания обновлена.")
 
         elif action == "delete_guest":
             if profile.role != UserProfile.ROLE_GUEST:
@@ -296,7 +299,7 @@ def user_detail_view(request: HttpRequest, user_id: int) -> HttpResponse:
             "recent_attempts": recent_attempts,
             "recent_events": recent_events,
             "is_locked": lockout.is_locked(target.username),
-            "company_suggestions": get_company_suggestions(),
+            "allowed_companies": ALLOWED_COMPANIES,
         },
     )
 

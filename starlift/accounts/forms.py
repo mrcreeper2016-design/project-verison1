@@ -12,6 +12,7 @@ from django.db.models import Q
 from django.utils.safestring import mark_safe
 
 from .models import Invite, UserProfile
+from .services.companies import get_company_choices
 
 
 User = get_user_model()
@@ -299,11 +300,11 @@ class ProfileEditForm(forms.Form):
             "accept": "image/jpeg,image/png,image/webp",
         }),
     )
-    company = forms.CharField(
+    company = forms.ChoiceField(
         label="Компания",
-        max_length=200,
         required=False,
-        widget=forms.TextInput(attrs={**_field_attrs(placeholder="Сбербанк, Тинькофф..."), "list": "company-suggestions", "autocomplete": "off"}),
+        choices=get_company_choices,
+        widget=forms.Select(attrs={"class": "select-compact", "style": "width:100%"}),
     )
     bio = forms.CharField(
         label="О себе",
@@ -339,11 +340,11 @@ class SpeakerProfileMainForm(forms.Form):
             "accept": "image/jpeg,image/png,image/webp,image/gif",
         }),
     )
-    company = forms.CharField(
+    company = forms.ChoiceField(
         label="Компания",
-        max_length=200,
         required=False,
-        widget=forms.TextInput(attrs={**_field_attrs(placeholder="Сбербанк, СберТех..."), "list": "company-suggestions", "autocomplete": "off"}),
+        choices=get_company_choices,
+        widget=forms.Select(attrs={"class": "select-compact", "style": "width:100%"}),
     )
     description = forms.CharField(
         label="Описание",
@@ -394,11 +395,11 @@ class SpeakerProfileForm(forms.Form):
 class SpeakerApplicationForm(forms.Form):
     """Форма заявки на статус спикера, заполняется гостем после email-верификации."""
 
-    company = forms.CharField(
+    company = forms.ChoiceField(
         label="Компания",
-        max_length=200,
         required=False,
-        widget=forms.TextInput(attrs={**_field_attrs(placeholder="Сбербанк, СберТех... (опционально)"), "list": "company-suggestions", "autocomplete": "off"}),
+        choices=get_company_choices,
+        widget=forms.Select(attrs={"class": "select-compact", "style": "width:100%"}),
     )
     city = forms.CharField(
         label="Город",

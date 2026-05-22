@@ -108,9 +108,6 @@
                     {{ form.company }}
                     {% if form.company.errors %}<div class="field-errors">{% for e in form.company.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
                 </div>
-                <datalist id="company-suggestions">
-                    {% for c in company_suggestions %}<option value="{{ c }}">{% endfor %}
-                </datalist>
                 <div class="form-row">
                     {% if speaker_card_linked %}
                     <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>

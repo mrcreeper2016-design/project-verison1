@@ -1,33 +1,24 @@
-"""Helpers for collecting unique company names across the platform.
+"""Canonical list of companies the platform supports.
 
-Used to power the `<datalist>` autocomplete on every form where a user
-enters a company (DevRel zone, applicant company, speaker card).
+A user (DevRel/speaker/applicant) can either belong to one of these companies
+or have no company at all. The list is intentionally short and hard-coded —
+when business grows, move this to a DB-backed `Company` model.
 """
 from __future__ import annotations
 
 
-def get_company_suggestions(limit: int = 200) -> list[str]:
-    """Return distinct non-empty company names sorted alphabetically.
+ALLOWED_COMPANIES: tuple[str, ...] = (
+    "Сбер",
+    "Т-Банк",
+    "Авито",
+    "Яндекс",
+)
 
-    Sources: UserProfile.company, SpeakerApplication.company, Speaker.sub
-    (the canonical company field on a speaker card).
-    """
-    # Deferred imports to avoid app-loading cycles.
-    from accounts.models import UserProfile
-    from starlift.models import Speaker, SpeakerApplication
 
-    names: set[str] = set()
-    for value in UserProfile.objects.exclude(company="").values_list("company", flat=True):
-        s = (value or "").strip()
-        if s:
-            names.add(s)
-    for value in SpeakerApplication.objects.exclude(company="").values_list("company", flat=True):
-        s = (value or "").strip()
-        if s:
-            names.add(s)
-    for value in Speaker.objects.exclude(sub="").values_list("sub", flat=True):
-        s = (value or "").strip()
-        if s:
-            names.add(s)
+def get_company_choices(blank_label: str = "— без компании —") -> list[tuple[str, str]]:
+    """Choices for a Django ChoiceField — empty option first."""
+    return [("", blank_label)] + [(c, c) for c in ALLOWED_COMPANIES]
 
-    return sorted(names, key=str.lower)[:limit]
+
+def is_allowed_company(value: str) -> bool:
+    return value == "" or value in ALLOWED_COMPANIES

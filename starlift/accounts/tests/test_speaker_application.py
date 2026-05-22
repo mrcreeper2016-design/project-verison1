@@ -42,7 +42,7 @@ class SpeakerApplicationFlowTests(TestCase):
     def test_resubmit_after_reject(self):
         SpeakerApplication.objects.create(
             applicant=self.guest,
-            company="X",
+            company="Сбер",
             city="Y",
             stack="Z",
             description="...",
@@ -53,7 +53,7 @@ class SpeakerApplicationFlowTests(TestCase):
         resp = self.client.post(
             reverse("accounts:speaker_application_form"),
             {
-                "company": "X",
+                "company": "Сбер",
                 "city": "Y2",
                 "stack": "Z",
                 "description": "Теперь больше деталей про опыт и темы выступлений.",

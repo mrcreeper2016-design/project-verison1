@@ -28,10 +28,6 @@
         </div>
         {% endif %}
 
-        <datalist id="company-suggestions">
-            {% for c in company_suggestions %}<option value="{{ c }}">{% endfor %}
-        </datalist>
-
         <form method="post" enctype="multipart/form-data" style="display:grid; gap:14px;">
             {% csrf_token %}
 
