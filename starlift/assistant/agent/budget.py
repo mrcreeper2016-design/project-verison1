@@ -51,7 +51,7 @@ def _daily_limit_for(user) -> int:
         role = user.profile.role
     except (UserProfile.DoesNotExist, AttributeError):
         role = UserProfile.ROLE_GUEST
-    if role == UserProfile.ROLE_ADMIN:
+    if role in (UserProfile.ROLE_ADMIN, UserProfile.ROLE_DEVREL):
         return settings.ASSISTANT_DAILY_TOKEN_BUDGET_ADMIN
     return settings.ASSISTANT_DAILY_TOKEN_BUDGET_SPEAKER
 

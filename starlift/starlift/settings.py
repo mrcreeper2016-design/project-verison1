@@ -75,6 +75,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'accounts.middleware.GuestApplicationRedirectMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -156,6 +157,10 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 _secure_cookies_default = 'False' if DEBUG else 'True'
 SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', _secure_cookies_default).lower() == 'true'
 CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', _secure_cookies_default).lower() == 'true'
+
+# Trust nginx's X-Forwarded-Proto header — without this Django thinks every
+# request is plain HTTP (the container only speaks HTTP to the proxy).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')

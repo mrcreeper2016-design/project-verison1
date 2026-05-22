@@ -46,10 +46,12 @@
     </div>
 
     <nav class="me-nav animate-fade" style="animation-delay:0.04s;" id="me-nav">
+        {% if user.profile.role == 'speaker' %}
         <a href="{% url 'me_dashboard' %}" class="{% if active == 'dashboard' %}active{% endif %}"><i class="fa-solid fa-chart-line"></i> Статистика</a>
         <a href="{% url 'me_events' %}" class="{% if active == 'events' %}active{% endif %}"><i class="fa-regular fa-calendar"></i> Мероприятия</a>
         <a href="{% url 'me_feedback' %}" class="{% if active == 'feedback' %}active{% endif %}"><i class="fa-solid fa-comments"></i> Отзывы</a>
         <a href="{% url 'me_requests' %}" class="{% if active == 'requests' %}active{% endif %}"><i class="fa-solid fa-paper-plane"></i> Заявки</a>
+        {% endif %}
         <a href="{% url 'me_favorites' %}" class="{% if active == 'favorites' %}active{% endif %}"><i class="fa-solid fa-heart"></i> Избранные</a>
         <a href="{% url 'accounts:profile' %}" class="{% if active == 'settings' %}active{% endif %}"><i class="fa-solid fa-gear"></i> Настройки</a>
     </nav>

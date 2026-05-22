@@ -18,6 +18,7 @@
         <select name="role">
             <option value="">Все роли</option>
             <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Админ</option>
+            <option value="devrel" {% if role_filter == 'devrel' %}selected{% endif %}>DevRel</option>
             <option value="speaker" {% if role_filter == 'speaker' %}selected{% endif %}>Спикер</option>
             <option value="guest" {% if role_filter == 'guest' %}selected{% endif %}>Гость (ожидает)</option>
         </select>
@@ -54,6 +55,7 @@
                 <td>{{ u.email|default:"—" }}{% if u.profile.email_verified %}<i class="fa-solid fa-circle-check" style="color:var(--sber-green); margin-left:4px;" title="Email подтверждён"></i>{% endif %}</td>
                 <td>
                     {% if u.profile.role == 'admin' %}<span class="chip chip-green">Админ</span>
+                    {% elif u.profile.role == 'devrel' %}<span class="chip chip-green">DevRel</span>
                     {% elif u.profile.role == 'speaker' %}<span class="chip chip-gray">Спикер</span>
                     {% else %}<span class="chip chip-red" title="Ожидает подтверждения администратора">Гость</span>{% endif %}
                 </td>
@@ -80,6 +82,7 @@
                             <select name="role" aria-label="Роль пользователя">
                                 <option value="guest" {% if u.profile.role == 'guest' %}selected{% endif %}>Гость</option>
                                 <option value="speaker" {% if u.profile.role == 'speaker' %}selected{% endif %}>Спикер</option>
+                                <option value="devrel" {% if u.profile.role == 'devrel' %}selected{% endif %}>DevRel</option>
                                 <option value="admin" {% if u.profile.role == 'admin' %}selected{% endif %}>Админ</option>
                             </select>
                             <button type="submit" title="Применить роль" aria-label="Применить роль">

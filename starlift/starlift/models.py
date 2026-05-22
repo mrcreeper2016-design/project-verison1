@@ -267,6 +267,64 @@ class EventRequest(models.Model):
         return f"{self.get_kind_display()} от {self.speaker.name} ({self.status})"
 
 
+class SpeakerApplication(models.Model):
+    """Заявка пользователя-гостя на получение роли спикера.
+
+    Создаётся после email-верификации, когда гость заполняет форму
+    профиля. Маршрутизируется DevRel'у по `company` (см. notifications_api
+    и event_requests_view). Approve → роль становится `speaker`, Speaker-
+    карточка создаётся/привязывается. Reject → пользователь остаётся
+    гостем и может переподать.
+    """
+
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'На рассмотрении'),
+        (STATUS_APPROVED, 'Одобрено'),
+        (STATUS_REJECTED, 'Отклонено'),
+    ]
+
+    applicant = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='speaker_application',
+    )
+    status = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True,
+    )
+    company = models.CharField(max_length=200, blank=True, default='')
+    city = models.CharField(max_length=100, blank=True, default='')
+    stack = models.CharField(max_length=200, blank=True, default='')
+    description = models.TextField(blank=True, default='')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reviewed_speaker_applications',
+    )
+    rejection_reason = models.TextField(blank=True, default='')
+    resulting_speaker = models.ForeignKey(
+        Speaker,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='+',
+    )
+
+    class Meta:
+        db_table = 'starlift_speaker_application'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['status', '-created_at'])]
+
+    def __str__(self):
+        return f"SpeakerApplication<{self.applicant.username} / {self.status}>"
+
+
 class SpeakerEventRating(models.Model):
     """Спикер ставит оценку прошедшему мероприятию, в котором участвовал.
 

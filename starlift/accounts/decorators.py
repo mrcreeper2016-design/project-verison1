@@ -51,7 +51,7 @@ def anonymous_required(redirect_to: str = "/"):
 
 
 def member_required(view_func):
-    """Require an `admin` or `speaker` role.
+    """Require any non-guest role (`admin`, `devrel`, `speaker`).
 
     Unlike ``role_required``, guests are *redirected* to the explore page
     instead of getting a 403 — this is our main pattern for "authenticated
@@ -61,7 +61,7 @@ def member_required(view_func):
     @wraps(view_func)
     @login_required(login_url=settings.LOGIN_URL)
     def _wrapped(request, *args, **kwargs):
-        if _has_role(request.user, {"admin", "speaker"}):
+        if _has_role(request.user, {"admin", "devrel", "speaker"}):
             return view_func(request, *args, **kwargs)
         return redirect("/explore/")
 

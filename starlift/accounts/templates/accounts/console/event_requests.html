@@ -30,6 +30,7 @@
             <option value="" {% if not kind %}selected{% endif %}>Любой тип</option>
             <option value="create" {% if kind == 'create' %}selected{% endif %}>Создание мероприятия</option>
             <option value="join" {% if kind == 'join' %}selected{% endif %}>Заявка на участие</option>
+            <option value="speaker" {% if kind == 'speaker' %}selected{% endif %}>Спикерская заявка</option>
         </select>
     </form>
 </div>
@@ -43,7 +44,42 @@
 {% if not page.object_list %}
     <div class="empty-state">Заявок нет.</div>
 {% else %}
-    {% for req in page.object_list %}
+    {% for item in page.object_list %}
+    {% if item.kind == 'speaker_application' %}
+    {% with app=item.obj %}
+    <div class="req-card">
+        <div class="req-head">
+            <div>
+                <h3 class="req-title">
+                    <i class="fa-solid fa-user-check" style="color: var(--sber-green);"></i> Заявка спикера: {{ app.applicant.get_full_name|default:app.applicant.username }}
+                </h3>
+                <div class="req-meta">
+                    {% if app.company %}{{ app.company }} ·{% else %}— без компании ·{% endif %} {{ app.city }} · {{ app.created_at|date:"d.m.Y H:i" }}
+                </div>
+            </div>
+            <span class="chip {% if app.status == 'pending' %}chip-amber{% elif app.status == 'approved' %}chip-green{% else %}chip-red{% endif %}">
+                {{ app.get_status_display }}
+            </span>
+        </div>
+        <div class="req-body">
+            <dl>
+                <dt>Стек:</dt><dd>{{ app.stack }}</dd>
+                <dt>О себе:</dt><dd>{{ app.description|truncatechars:240 }}</dd>
+                {% if app.status == 'rejected' and app.rejection_reason %}
+                    <dt>Причина отказа:</dt><dd style="color: #D93E4E;">{{ app.rejection_reason }}</dd>
+                {% endif %}
+                {% if app.reviewed_by %}
+                    <dt>Рассмотрел:</dt><dd>{{ app.reviewed_by.username }} ({{ app.reviewed_at|date:"d.m.Y H:i" }})</dd>
+                {% endif %}
+            </dl>
+        </div>
+        <div class="req-actions">
+            <a class="btn-sm btn-approve" href="{% url 'accounts:speaker_application_detail' app.id %}" style="text-decoration:none;"><i class="fa-solid fa-arrow-right"></i> Открыть</a>
+        </div>
+    </div>
+    {% endwith %}
+    {% else %}
+    {% with req=item.obj %}
     <div class="req-card">
         <div class="req-head">
             <div>
@@ -100,6 +136,8 @@
         </div>
         {% endif %}
     </div>
+    {% endwith %}
+    {% endif %}
     {% endfor %}
 {% endif %}
 {% endblock %}

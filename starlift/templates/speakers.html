@@ -320,7 +320,7 @@
             <p class="page-subtitle-xl">Управление базой экспертов, фильтрами и массовыми действиями</p>
         </div>
         <div class="speakers-meta">
-            {% if user.is_superuser or user.profile.role == 'admin' %}
+            {% if user.is_superuser or user.profile.role == 'admin' or user.profile.role == 'devrel' %}
             <span class="badge-inactive"><i class="fa-solid fa-shield-halved"></i> Доступ администратора</span>
             {% endif %}
         </div>
@@ -335,7 +335,7 @@
                     <input type="text" id="searchInput" placeholder="Поиск по имени или описанию">
                 </div>
 
-                {% if user.is_superuser or user.profile.role == 'admin' %}
+                {% if user.is_superuser or user.profile.role == 'admin' or user.profile.role == 'devrel' %}
                 <a href="{% url 'speaker_add' %}" class="btn-action btn-contact" style="flex: none; display: inline-flex; padding: 10px 20px; white-space: nowrap; align-items: center; gap: 8px;">
                     <i class="fa-solid fa-plus"></i> Добавить спикера
                 </a>
@@ -437,7 +437,7 @@
                                     <span class="sort-indicator hidden" data-indicator-for="4"></span>
                                 </span>
                             </th>
-                            {% if user.is_superuser or user.profile.role == 'admin' %}
+                            {% if user.is_superuser or user.profile.role == 'admin' or user.profile.role == 'devrel' %}
                             <th id="actionsHeader"></th>
                             {% endif %}
                         </tr>
@@ -450,7 +450,7 @@
 </div>
 
 <script>
-    window.isAdmin = {% if user.is_superuser or user.profile.role == 'admin' %}true{% else %}false{% endif %};
+    window.isAdmin = {% if user.is_superuser or user.profile.role == 'admin' or user.profile.role == 'devrel' %}true{% else %}false{% endif %};
     /* Отдельный кеш: нельзя писать `var speakersData = window.speakersData` — в браузере это тот же слот, что и window.speakersData
        после `var`, из‑за чего при SPA‑переходе список мог сбрасываться в []. */
     var __serverSpeakersData = {{ speakers_json|safe }};
@@ -1078,7 +1078,7 @@
                         </button>
                         {% endif %}
                     </div>
-                    {% if user.is_superuser or user.profile.role == 'admin' %}
+                    {% if user.is_superuser or user.profile.role == 'admin' or user.profile.role == 'devrel' %}
                     <div class="modal-admin-actions">
                         <button type="button" id="modalRecommendBtn"
                                 class="modal-admin-btn modal-admin-btn--recommend"

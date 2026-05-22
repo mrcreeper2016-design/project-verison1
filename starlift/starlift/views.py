@@ -21,7 +21,7 @@ from accounts.services.speaker_avatar import mirror_speaker_uploaded_avatar_to_p
 from . import analytics as analytics_lib
 from . import home_metrics
 from .forms import FeedbackForm, SpeakerForm, SpeakerSelfEditForm
-from .models import Event, EventRequest, Feedback, Speaker, SpeakerEventRating, SpeakerLike
+from .models import Event, EventRequest, Feedback, Speaker, SpeakerApplication, SpeakerEventRating, SpeakerLike
 
 RU_MONTHS_GEN = {
     "января": 1,
@@ -380,7 +380,7 @@ def speakers_view(request):
 def events_view(request):
     return render(request, 'events.html')
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def analytics_view(request):
     filters = analytics_lib.parse_filters(request.GET)
     dashboard = analytics_lib.build_dashboard(filters)
@@ -577,7 +577,7 @@ def events_api(request):
         logger.exception("Error fetching events")
         return JsonResponse({"error": "Internal server error"}, status=500)
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def speaker_add(request):
     if request.method == 'POST':
         form = SpeakerForm(request.POST, request.FILES)
@@ -592,7 +592,7 @@ def speaker_add(request):
 def speaker_edit(request, pk):
     speaker = get_object_or_404(Speaker, pk=pk)
     profile = getattr(request.user, "profile", None)
-    is_admin = bool(request.user.is_superuser or (profile and profile.role == "admin"))
+    is_admin = bool(request.user.is_superuser or (profile and profile.role in ("admin", "devrel")))
     is_own_speaker = bool(profile and profile.role == "speaker" and speaker.user_id == request.user.id)
 
     if not is_admin and not is_own_speaker:
@@ -614,7 +614,7 @@ def speaker_edit(request, pk):
         form = form_cls(instance=speaker)
     return render(request, 'speaker_form.html', {'form': form, 'title': 'Редактировать спикера'})
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def speaker_delete(request, pk):
     speaker = get_object_or_404(Speaker, pk=pk)
     if request.method == 'POST':
@@ -623,10 +623,11 @@ def speaker_delete(request, pk):
     return render(request, 'speaker_confirm_delete.html', {'speaker': speaker})
 
 def _is_platform_admin(user) -> bool:
+    """True for admin or devrel (staff-level platform roles)."""
     if user.is_superuser:
         return True
     profile = getattr(user, "profile", None)
-    return bool(profile and profile.role == "admin")
+    return bool(profile and profile.role in ("admin", "devrel"))
 
 
 @member_required
@@ -1009,7 +1010,7 @@ def _parse_event_post(request):
     }
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def admin_event_create(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -1026,7 +1027,7 @@ def admin_event_create(request):
     return JsonResponse({'ok': True, 'id': ev.id})
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def admin_event_edit(request, event_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -1047,7 +1048,7 @@ def admin_event_edit(request, event_id):
     return JsonResponse({'ok': True, 'id': ev.id})
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def admin_event_remove_speaker(request, event_id, speaker_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -1057,7 +1058,7 @@ def admin_event_remove_speaker(request, event_id, speaker_id):
     return JsonResponse({'ok': True})
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def admin_event_delete(request, event_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -1066,7 +1067,7 @@ def admin_event_delete(request, event_id):
     return JsonResponse({'ok': True})
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def admin_pending_requests_api(request):
     """Список pending заявок для уведомлений админа."""
     qs = EventRequest.objects.filter(
@@ -1086,7 +1087,7 @@ def admin_pending_requests_api(request):
     return JsonResponse({'count': total, 'requests': items})
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def speaker_recommend_toggle(request, speaker_id):
     """Admin-only: toggle Speaker.recommended flag."""
     if request.method != "POST":
@@ -1116,18 +1117,21 @@ def speaker_like_toggle(request, speaker_id):
 
 @member_required
 def notifications_api(request):
-    """Aggregated bell payload: event-requests (admins only) + support tickets.
+    """Aggregated bell payload: event-requests (admin/devrel) + support tickets.
 
-    Speakers see only support; admins see both. Guests cannot reach this view.
+    Speakers/devrel see only their own support; admin/devrel additionally see
+    pending event-requests. Guests cannot reach this view.
     """
     from support.services import notifications as support_notif
 
     user = request.user
     profile = getattr(user, 'profile', None)
-    is_admin = user.is_superuser or (profile and profile.role == 'admin')
+    is_admin = user.is_superuser or (profile and profile.role in ('admin', 'devrel'))
 
     event_items = []
     event_count = 0
+    application_items = []
+    application_count = 0
     if is_admin:
         qs = EventRequest.objects.filter(
             status=EventRequest.STATUS_PENDING
@@ -1143,6 +1147,26 @@ def notifications_api(request):
             })
         event_count = EventRequest.objects.filter(status=EventRequest.STATUS_PENDING).count()
 
+        from accounts.views.console import _devrel_visible_applications
+        app_qs = (
+            _devrel_visible_applications(user)
+            .filter(status=SpeakerApplication.STATUS_PENDING)
+            .select_related('applicant')[:10]
+        )
+        for a in app_qs:
+            name = (f"{a.applicant.first_name} {a.applicant.last_name}".strip() or a.applicant.username)
+            application_items.append({
+                'id': a.id,
+                'applicant_name': name,
+                'company': a.company,
+                'city': a.city,
+                'created_at': a.created_at.isoformat(),
+                'url': f'/accounts/console/speaker-applications/{a.id}/',
+            })
+        application_count = _devrel_visible_applications(user).filter(
+            status=SpeakerApplication.STATUS_PENDING
+        ).count()
+
     support_tickets = list(support_notif.unread_tickets(user)[:10])
     support_items = []
     for t in support_tickets:
@@ -1156,13 +1180,14 @@ def notifications_api(request):
     support_count = support_notif.unread_count(user)
 
     return JsonResponse({
-        'total': event_count + support_count,
+        'total': event_count + support_count + application_count,
         'event_requests': {'count': event_count, 'items': event_items},
+        'speaker_applications': {'count': application_count, 'items': application_items},
         'support': {'count': support_count, 'items': support_items},
     })
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def admin_quick_approve(request, request_id):
     """Быстрое одобрение из колокольчика."""
     if request.method != 'POST':

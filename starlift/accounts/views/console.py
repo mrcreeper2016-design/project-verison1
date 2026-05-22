@@ -19,7 +19,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 
-from starlift.models import Event, EventRequest, Speaker
+from starlift.models import Event, EventRequest, Speaker, SpeakerApplication
 
 from ..decorators import role_required
 from ..models import AuditLog, LoginAttempt, UserProfile
@@ -53,7 +53,7 @@ def users_view(request: HttpRequest) -> HttpResponse:
             | Q(first_name__icontains=q)
             | Q(last_name__icontains=q)
         )
-    if role_filter in (UserProfile.ROLE_ADMIN, UserProfile.ROLE_SPEAKER, UserProfile.ROLE_GUEST):
+    if role_filter in (UserProfile.ROLE_ADMIN, UserProfile.ROLE_DEVREL, UserProfile.ROLE_SPEAKER, UserProfile.ROLE_GUEST):
         qs = qs.filter(profile__role=role_filter)
     if active_filter == "active":
         qs = qs.filter(is_active=True)
@@ -119,7 +119,7 @@ def user_detail_view(request: HttpRequest, user_id: int) -> HttpResponse:
 
         elif action == "change_role":
             new_role = request.POST.get("role")
-            if new_role in (UserProfile.ROLE_ADMIN, UserProfile.ROLE_SPEAKER, UserProfile.ROLE_GUEST):
+            if new_role in (UserProfile.ROLE_ADMIN, UserProfile.ROLE_DEVREL, UserProfile.ROLE_SPEAKER, UserProfile.ROLE_GUEST):
                 if new_role != profile.role:
                     old_role = profile.role
                     profile.role = new_role
@@ -233,6 +233,21 @@ def user_detail_view(request: HttpRequest, user_id: int) -> HttpResponse:
                             messages.success(request, f"Связан со спикером «{speaker.name}».")
                 except Speaker.DoesNotExist:
                     messages.error(request, "Спикер не найден.")
+        elif action == "set_company":
+            new_company = (request.POST.get("company") or "").strip()[:200]
+            old_company = profile.company
+            if new_company != old_company:
+                profile.company = new_company
+                profile.save(update_fields=["company", "updated_at"])
+                audit.log(
+                    action=AuditLog.ACTION_PROFILE_UPDATED,
+                    actor=request.user,
+                    request=request,
+                    target=target,
+                    metadata={"field": "company", "from": old_company, "to": new_company},
+                )
+                messages.success(request, "Компания обновлена.")
+
         elif action == "delete_guest":
             if profile.role != UserProfile.ROLE_GUEST:
                 messages.error(request, "Удаление разрешено только для пользователей с ролью «Гость».")
@@ -319,23 +334,65 @@ def audit_view(request: HttpRequest) -> HttpResponse:
     )
 
 
-@role_required("admin")
+def _devrel_visible_applications(actor) -> "QuerySet[SpeakerApplication]":
+    """SpeakerApplication queryset filtered per actor's routing rules.
+
+    Admin/superuser sees all. DevRel sees applications whose `company`
+    matches their `UserProfile.company` (case-insensitive) plus all
+    applications with empty company ("общий пул"). Other roles get nothing.
+    """
+    qs = SpeakerApplication.objects.select_related("applicant", "reviewed_by").order_by("-created_at")
+    if actor.is_superuser:
+        return qs
+    profile = getattr(actor, "profile", None)
+    if profile is None:
+        return SpeakerApplication.objects.none()
+    if profile.role == UserProfile.ROLE_ADMIN:
+        return qs
+    if profile.role == UserProfile.ROLE_DEVREL:
+        actor_company = (profile.company or "").strip()
+        if actor_company:
+            return qs.filter(Q(company__iexact=actor_company) | Q(company=""))
+        return qs.filter(company="")
+    return SpeakerApplication.objects.none()
+
+
+@role_required("admin", "devrel")
 @never_cache
 @require_http_methods(["GET"])
 def event_requests_view(request: HttpRequest) -> HttpResponse:
     status = request.GET.get("status", "pending")
     kind = request.GET.get("kind", "")
 
-    qs = EventRequest.objects.select_related("speaker", "event", "reviewed_by").order_by("-created_at")
+    er_qs = EventRequest.objects.select_related("speaker", "event", "reviewed_by").order_by("-created_at")
     if status in (EventRequest.STATUS_PENDING, EventRequest.STATUS_APPROVED, EventRequest.STATUS_REJECTED):
-        qs = qs.filter(status=status)
+        er_qs = er_qs.filter(status=status)
     if kind in (EventRequest.KIND_CREATE, EventRequest.KIND_JOIN):
-        qs = qs.filter(kind=kind)
+        er_qs = er_qs.filter(kind=kind)
 
-    paginator = Paginator(qs, 50)
+    apps_qs = _devrel_visible_applications(request.user)
+    if status in (SpeakerApplication.STATUS_PENDING, SpeakerApplication.STATUS_APPROVED, SpeakerApplication.STATUS_REJECTED):
+        apps_qs = apps_qs.filter(status=status)
+
+    show_event_requests = kind in ("", EventRequest.KIND_CREATE, EventRequest.KIND_JOIN)
+    show_applications = kind in ("", "speaker")
+
+    items = []
+    if show_event_requests:
+        for r in er_qs:
+            items.append({"kind": "event_request", "obj": r, "created_at": r.created_at})
+    if show_applications:
+        for a in apps_qs:
+            items.append({"kind": "speaker_application", "obj": a, "created_at": a.created_at})
+    items.sort(key=lambda x: x["created_at"], reverse=True)
+
+    paginator = Paginator(items, 50)
     page = paginator.get_page(request.GET.get("page"))
 
-    pending_count = EventRequest.objects.filter(status=EventRequest.STATUS_PENDING).count()
+    pending_count = (
+        EventRequest.objects.filter(status=EventRequest.STATUS_PENDING).count()
+        + _devrel_visible_applications(request.user).filter(status=SpeakerApplication.STATUS_PENDING).count()
+    )
 
     return render(
         request,
@@ -350,7 +407,7 @@ def event_requests_view(request: HttpRequest) -> HttpResponse:
     )
 
 
-@role_required("admin")
+@role_required("admin", "devrel")
 @never_cache
 @require_http_methods(["POST"])
 @csrf_protect
@@ -415,3 +472,141 @@ def event_request_action_view(request: HttpRequest, request_id: int, action: str
         messages.error(request, "Неизвестное действие.")
 
     return redirect(reverse("accounts:event_requests") + f"?status={request.POST.get('return_status', 'pending')}")
+
+
+def _check_application_access(actor, application: SpeakerApplication):
+    """Return True if actor may view/act on `application`."""
+    visible_ids = _devrel_visible_applications(actor).values_list("pk", flat=True)
+    return application.pk in set(visible_ids)
+
+
+@role_required("admin", "devrel")
+@never_cache
+@require_http_methods(["GET"])
+def speaker_application_detail_view(request: HttpRequest, application_id: int) -> HttpResponse:
+    app = get_object_or_404(SpeakerApplication.objects.select_related("applicant"), pk=application_id)
+    if not _check_application_access(request.user, app):
+        return redirect(reverse("accounts:event_requests"))
+
+    available_speakers = Speaker.objects.filter(user__isnull=True).order_by("name")[:500]
+    return render(
+        request,
+        "accounts/console/speaker_application_detail.html",
+        {
+            "active": "event_requests",
+            "application": app,
+            "available_speakers": available_speakers,
+        },
+    )
+
+
+@role_required("admin", "devrel")
+@never_cache
+@csrf_protect
+@require_http_methods(["POST"])
+def speaker_application_action_view(request: HttpRequest, application_id: int, action: str) -> HttpResponse:
+    app = get_object_or_404(SpeakerApplication.objects.select_related("applicant"), pk=application_id)
+    if not _check_application_access(request.user, app):
+        return redirect(reverse("accounts:event_requests"))
+
+    if app.status != SpeakerApplication.STATUS_PENDING:
+        messages.error(request, "Заявка уже обработана.")
+        return redirect(reverse("accounts:event_requests"))
+
+    applicant = app.applicant
+    profile, _ = UserProfile.objects.get_or_create(user=applicant)
+
+    if action == "approve":
+        mode = request.POST.get("mode", "create")
+        with transaction.atomic():
+            if mode == "link":
+                speaker_id = request.POST.get("speaker_id")
+                if not speaker_id:
+                    messages.error(request, "Выберите спикерскую карточку для привязки.")
+                    return redirect(reverse("accounts:speaker_application_detail", args=[app.pk]))
+                try:
+                    speaker = Speaker.objects.select_for_update().get(pk=speaker_id)
+                except Speaker.DoesNotExist:
+                    messages.error(request, "Спикер не найден.")
+                    return redirect(reverse("accounts:speaker_application_detail", args=[app.pk]))
+                if speaker.user_id and speaker.user_id != applicant.pk:
+                    messages.error(request, f"Эта карточка уже привязана к {speaker.user.username}.")
+                    return redirect(reverse("accounts:speaker_application_detail", args=[app.pk]))
+                speaker.user = applicant
+                speaker.save(update_fields=["user"])
+                seed_user_profile_avatar_from_linked_speaker(speaker, applicant)
+                resulting_speaker = speaker
+            else:
+                full_name = f"{applicant.first_name} {applicant.last_name}".strip() or applicant.username
+                resulting_speaker = Speaker.objects.create(
+                    name=full_name,
+                    sub=app.company,
+                    stack=app.stack,
+                    city=app.city,
+                    bio=app.description,
+                    user=applicant,
+                )
+
+            old_role = profile.role
+            profile.role = UserProfile.ROLE_SPEAKER
+            profile.save(update_fields=["role", "updated_at"])
+
+            app.status = SpeakerApplication.STATUS_APPROVED
+            app.reviewed_at = timezone.now()
+            app.reviewed_by = request.user
+            app.resulting_speaker = resulting_speaker
+            app.save(update_fields=["status", "reviewed_at", "reviewed_by", "resulting_speaker"])
+
+            audit.log(
+                action=AuditLog.ACTION_SPEAKER_APPLICATION_APPROVED,
+                actor=request.user,
+                request=request,
+                target=applicant,
+                metadata={
+                    "application_id": app.pk,
+                    "speaker_id": resulting_speaker.pk,
+                    "mode": mode,
+                },
+            )
+            audit.log(
+                action=AuditLog.ACTION_ROLE_CHANGED,
+                actor=request.user,
+                request=request,
+                target=applicant,
+                metadata={"from": old_role, "to": UserProfile.ROLE_SPEAKER},
+            )
+            audit.log(
+                action=AuditLog.ACTION_SPEAKER_LINKED,
+                actor=request.user,
+                request=request,
+                target=applicant,
+                metadata={
+                    "speaker_id": resulting_speaker.pk,
+                    "speaker_name": resulting_speaker.name,
+                    "mode": "application_" + mode,
+                },
+            )
+        messages.success(request, f"Заявка одобрена. {applicant.username} теперь спикер.")
+
+    elif action == "reject":
+        reason = (request.POST.get("rejection_reason") or "").strip()
+        if not reason:
+            messages.error(request, "Укажите причину отклонения.")
+            return redirect(reverse("accounts:speaker_application_detail", args=[app.pk]))
+        app.status = SpeakerApplication.STATUS_REJECTED
+        app.rejection_reason = reason
+        app.reviewed_at = timezone.now()
+        app.reviewed_by = request.user
+        app.save(update_fields=["status", "rejection_reason", "reviewed_at", "reviewed_by"])
+        audit.log(
+            action=AuditLog.ACTION_SPEAKER_APPLICATION_REJECTED,
+            actor=request.user,
+            request=request,
+            target=applicant,
+            metadata={"application_id": app.pk, "reason": reason},
+        )
+        messages.success(request, "Заявка отклонена.")
+    else:
+        messages.error(request, "Неизвестное действие.")
+
+    return redirect(reverse("accounts:event_requests"))

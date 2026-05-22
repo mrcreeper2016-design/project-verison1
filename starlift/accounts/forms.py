@@ -91,6 +91,28 @@ class InviteCreateForm(forms.ModelForm):
             "speaker": forms.Select(attrs={"class": "select-compact"}),
         }
 
+    def __init__(self, *args, actor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._actor = actor
+        # DevRel may invite only speakers/guests; admin may invite any role.
+        if actor is not None and not actor.is_superuser:
+            profile = getattr(actor, "profile", None)
+            if profile is not None and profile.role == UserProfile.ROLE_DEVREL:
+                self.fields["role"].choices = [
+                    (UserProfile.ROLE_SPEAKER, "Спикер"),
+                    (UserProfile.ROLE_GUEST, "Гость"),
+                ]
+
+    def clean_role(self):
+        role = self.cleaned_data.get("role")
+        actor = getattr(self, "_actor", None)
+        if actor is not None and not actor.is_superuser:
+            profile = getattr(actor, "profile", None)
+            if profile is not None and profile.role == UserProfile.ROLE_DEVREL:
+                if role not in (UserProfile.ROLE_SPEAKER, UserProfile.ROLE_GUEST):
+                    raise ValidationError("DevRel может приглашать только спикеров и гостей.")
+        return role
+
     def clean_email(self):
         email = (self.cleaned_data.get("email") or "").strip().lower()
         if not email:
@@ -358,6 +380,56 @@ class SpeakerProfileForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs=_field_attrs()),
     )
+
+
+class SpeakerApplicationForm(forms.Form):
+    """Форма заявки на статус спикера, заполняется гостем после email-верификации."""
+
+    company = forms.CharField(
+        label="Компания",
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs=_field_attrs(placeholder="Сбербанк, СберТех... (опционально)")),
+    )
+    city = forms.CharField(
+        label="Город",
+        max_length=100,
+        required=True,
+        widget=forms.TextInput(attrs=_field_attrs(placeholder="Москва")),
+    )
+    stack = forms.CharField(
+        label="Стек / темы",
+        max_length=200,
+        required=True,
+        widget=forms.TextInput(attrs=_field_attrs(placeholder="Python, Django, ML")),
+    )
+    description = forms.CharField(
+        label="О себе",
+        required=True,
+        widget=forms.Textarea(attrs={**_field_attrs(placeholder="Чем занимаетесь, опыт выступлений, темы..."), "rows": 5, "style": "width:100%; min-height:140px;"}),
+    )
+    avatar = forms.ImageField(
+        label="Аватар",
+        required=False,
+        widget=forms.FileInput(attrs={
+            "class": "avatar-file-input",
+            "accept": "image/jpeg,image/png,image/webp",
+        }),
+    )
+
+    def clean_company(self):
+        return (self.cleaned_data.get("company") or "").strip()
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get("avatar")
+        if not avatar:
+            return avatar
+        if avatar.size > 10 * 1024 * 1024:
+            raise ValidationError("Размер файла не должен превышать 10 МБ.")
+        allowed_types = {"image/jpeg", "image/png", "image/webp"}
+        if avatar.content_type not in allowed_types:
+            raise ValidationError("Допустимые форматы: JPEG, PNG, WebP.")
+        return avatar
 
 
 class EmailChangeForm(forms.Form):

@@ -47,6 +47,48 @@ class ConsoleAccessTests(TestCase):
         self.assertIn("/auth/login/", resp.url)
 
 
+class DevRelAccessTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.devrel = User.objects.create_user(
+            username="dr", email="dr@example.com", password="DevRel!234"
+        )
+        cls.devrel.profile.role = UserProfile.ROLE_DEVREL
+        cls.devrel.profile.save()
+
+    def setUp(self):
+        self.client.login(username="dr", password="DevRel!234")
+
+    def test_devrel_blocked_from_admin_only_console(self):
+        for name in ("accounts:users", "accounts:audit"):
+            resp = self.client.get(reverse(name))
+            self.assertEqual(resp.status_code, 403, name)
+
+    def test_devrel_allowed_in_shared_console(self):
+        for name in ("accounts:invites", "accounts:event_requests"):
+            resp = self.client.get(reverse(name))
+            self.assertEqual(resp.status_code, 200, name)
+
+    def test_devrel_invite_form_rejects_admin_role(self):
+        from accounts.forms import InviteCreateForm
+
+        form = InviteCreateForm(
+            data={"email": "new@example.com", "role": "admin", "send_email": "on"},
+            actor=self.devrel,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("role", form.errors)
+
+    def test_devrel_invite_form_accepts_speaker(self):
+        from accounts.forms import InviteCreateForm
+
+        form = InviteCreateForm(
+            data={"email": "new@example.com", "role": "speaker", "send_email": "on"},
+            actor=self.devrel,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+
 class ConsoleOperationsTests(TestCase):
     @classmethod
     def setUpTestData(cls):

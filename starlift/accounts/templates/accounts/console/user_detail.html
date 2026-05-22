@@ -23,6 +23,7 @@
                 <h2 style="margin:0; font-size:20px; font-weight:800;">{{ target.get_full_name|default:target.username }}</h2>
                 <div style="display:flex; gap:6px;">
                     {% if profile.role == 'admin' %}<span class="chip chip-green">Админ</span>
+                    {% elif profile.role == 'devrel' %}<span class="chip chip-green">DevRel</span>
                     {% elif profile.role == 'speaker' %}<span class="chip chip-gray">Спикер</span>
                     {% else %}<span class="chip chip-red" title="Ожидает подтверждения">Гость</span>{% endif %}
                     {% if target.is_active %}<span class="chip chip-green">Активен</span>{% else %}<span class="chip chip-red">Отключён</span>{% endif %}
@@ -65,9 +66,17 @@
                 <select name="role" class="select-compact">
                     <option value="guest" {% if profile.role == 'guest' %}selected{% endif %}>Гость</option>
                     <option value="speaker" {% if profile.role == 'speaker' %}selected{% endif %}>Спикер</option>
+                    <option value="devrel" {% if profile.role == 'devrel' %}selected{% endif %}>DevRel</option>
                     <option value="admin" {% if profile.role == 'admin' %}selected{% endif %}>Админ</option>
                 </select>
                 <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-user-shield"></i> Сменить роль</button>
+            </form>
+
+            <form method="post" style="display:flex; gap:8px; align-items:center;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="set_company">
+                <input type="text" name="company" class="input-compact" value="{{ profile.company }}" placeholder="Компания (для DevRel — зона ответственности; для спикеров — место работы)" style="flex:1;">
+                <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-building"></i> Сохранить компанию</button>
             </form>
 
             <form method="post" onsubmit="return confirm('{% if target.is_active %}Отключить{% else %}Включить{% endif %} аккаунт {{ target.username }}?');">
