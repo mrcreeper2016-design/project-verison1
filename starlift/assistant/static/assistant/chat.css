@@ -452,7 +452,7 @@
 .chat-composer-row {
     display: flex;
     gap: 10px;
-    align-items: flex-end;
+    align-items: center;
     background: transparent;
     border: 1px solid var(--border-color);
     border-radius: 16px;

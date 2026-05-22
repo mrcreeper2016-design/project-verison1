@@ -8,16 +8,23 @@
 
     // Pick up every chat root on the page and spin up an instance. Both the
     // home-page embedded chat and the FAB drawer use `.assistant-chat-root`.
+    // `root.__widget` is set in the widget ctor; we use that to avoid double-
+    // wiring on SPA re-runs.
     const widgets = [];
-    document.querySelectorAll('.assistant-chat-root').forEach((root) => {
-        const w = new window.AssistantChatWidget(root);
-        if (w.thread) {
-            widgets.push({ root, widget: w });
-            // Inline (home) widgets hydrate immediately so they're usable on
-            // first load. Drawer widgets hydrate lazily on open.
-            if (root.dataset.hydrate === 'eager') w.hydrate();
-        }
-    });
+    function initWidgets() {
+        document.querySelectorAll('.assistant-chat-root').forEach((root) => {
+            if (root.__widget) return; // already wired
+            const w = new window.AssistantChatWidget(root);
+            if (w.thread) {
+                widgets.push({ root, widget: w });
+                if (root.dataset.hydrate === 'eager') w.hydrate();
+            }
+        });
+    }
+    initWidgets();
+    // SPA navigation re-renders #page-content — inline scripts run again, but
+    // this file is loaded once. Re-init when the SPA finishes a swap.
+    document.addEventListener('spa-page-loaded', initWidgets);
 
     const fabBtn = document.getElementById('assistant-fab');
     const drawer = document.getElementById('assistant-drawer');

@@ -404,10 +404,12 @@
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
         }
 
-        .theme-toggle i {
+        /* Ротация иконки на тёмной теме — только для самого тумблера темы,
+           не для колокольчика и других кнопок, шарящих класс .theme-toggle. */
+        #themeToggle i {
             transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        [data-theme="dark"] .theme-toggle i {
+        [data-theme="dark"] #themeToggle i {
             transform: rotate(45deg);
         }
         .theme-toggle:hover { transform: translateY(-2px); box-shadow: 0 6px 16px 0 rgba(31, 38, 135, 0.1), inset 0 2px 2px rgba(255, 255, 255, 0.3); }
@@ -2254,6 +2256,9 @@
                             <div class="su-thread-menu" data-thread-menu hidden>
                                 <button type="button" class="is-danger" data-action="close-ticket">
                                     <i class="fa-solid fa-circle-xmark"></i> Закрыть тикет
+                                </button>
+                                <button type="button" class="is-danger" data-action="delete-ticket" hidden>
+                                    <i class="fa-solid fa-trash"></i> Удалить тикет
                                 </button>
                             </div>
                         </div>

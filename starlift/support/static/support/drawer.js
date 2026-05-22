@@ -217,7 +217,7 @@
                     else SU.renderMessage(threadList, m, {viewerKind: viewerKind, mineAvatarUrl: userAvatar, mineInitial: userInitial});
                 });
                 SU.applyClosed(pane, d.status === 'closed');
-                if (menuWrap) menuWrap.hidden = !(d.can_close && d.status !== 'closed');
+                updateAdminMenu(d.status);
                 scrollBottom();
                 if (d.status !== 'closed') startStream(d.id);
                 loadList();
@@ -268,7 +268,7 @@
                 if (d.status === 'closed' && currentTicket) {
                     currentTicket.status = 'closed';
                     SU.applyClosed(pane, true);
-                    if (menuWrap) menuWrap.hidden = true;
+                    updateAdminMenu('closed');
                     threadSub.textContent = (currentTicket.author || '') + ' · закрыт';
                 }
             } catch (e) { /* ignore */ }
@@ -396,7 +396,20 @@
         }
     });
 
-    pane.querySelector('[data-action="close-ticket"]')?.addEventListener('click', function () {
+    // Меню справа от заголовка: видно только админу; кнопки внутри
+    // переключаются в зависимости от статуса (Закрыть → Удалить).
+    var closeBtnAdm = pane.querySelector('[data-action="close-ticket"]');
+    var deleteBtnAdm = pane.querySelector('[data-action="delete-ticket"]');
+    function updateAdminMenu(status) {
+        var isAdmin = (viewerKind === 'admin');
+        if (menuWrap) menuWrap.hidden = !isAdmin;
+        if (!isAdmin) return;
+        var closed = status === 'closed';
+        if (closeBtnAdm) closeBtnAdm.hidden = closed;
+        if (deleteBtnAdm) deleteBtnAdm.hidden = !closed;
+    }
+
+    closeBtnAdm?.addEventListener('click', function () {
         if (!currentTicket) return;
         if (!confirm('Закрыть тикет? Пользователь не сможет писать.')) return;
         fetch('/assistant/support/t/' + currentTicket.id + '/close/', {
@@ -404,6 +417,31 @@
             headers: { 'X-CSRFToken': csrf },
         }).then(function () {
             openTicket(currentTicket.id);
+        });
+    });
+
+    deleteBtnAdm?.addEventListener('click', function () {
+        if (!currentTicket) return;
+        if (!confirm('Удалить обращение безвозвратно? Все сообщения будут стёрты.')) return;
+        deleteBtnAdm.disabled = true;
+        fetch('/assistant/support/t/' + currentTicket.id + '/delete/', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'X-CSRFToken': csrf },
+        }).then(function (r) {
+            deleteBtnAdm.disabled = false;
+            if (!r.ok) { alert('Не удалось удалить тикет'); return; }
+            // Закрываем меню, возвращаемся к списку, обновляем его.
+            if (menuEl) menuEl.hidden = true;
+            closeStream();
+            stopTyping();
+            SU.setTyping(pane, null);
+            currentTicket = null;
+            showView('list');
+            loadList();
+            loadUnreadBadge();
+        }).catch(function () {
+            deleteBtnAdm.disabled = false;
+            alert('Сеть недоступна');
         });
     });
 

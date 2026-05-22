@@ -65,6 +65,9 @@
     var closeUrl = isAdmin && !isGuest
         ? '/assistant/support/t/' + ticketId + '/close/'
         : null;
+    var deleteUrl = isAdmin && !isGuest
+        ? '/assistant/support/t/' + ticketId + '/delete/'
+        : null;
 
     // ── SSE
     function startSSE() {
@@ -221,6 +224,16 @@
         });
     }
     var closeBtn = root.querySelector('[data-action="close-ticket"]');
+    var deleteBtn = root.querySelector('[data-action="delete-ticket"]');
+
+    function syncAdminMenu() {
+        if (!isAdmin || isGuest) return;
+        var closed = status === 'closed';
+        if (closeBtn) closeBtn.hidden = closed;
+        if (deleteBtn) deleteBtn.hidden = !closed;
+    }
+    syncAdminMenu();
+
     if (closeBtn && closeUrl) {
         closeBtn.addEventListener('click', function () {
             if (!confirm('Закрыть тикет?')) return;
@@ -228,6 +241,28 @@
                 method: 'POST', credentials: 'same-origin',
                 headers: { 'X-CSRFToken': csrf },
             }).then(function () { location.reload(); });
+        });
+    }
+
+    if (deleteBtn && deleteUrl) {
+        deleteBtn.addEventListener('click', function () {
+            if (!confirm('Удалить обращение безвозвратно? Все сообщения будут стёрты.')) return;
+            deleteBtn.disabled = true;
+            fetch(deleteUrl, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'X-CSRFToken': csrf },
+            }).then(function (r) {
+                if (!r.ok) {
+                    deleteBtn.disabled = false;
+                    alert('Не удалось удалить тикет');
+                    return;
+                }
+                // После удаления возвращаемся к списку обращений админа.
+                window.location.href = '/assistant/support/';
+            }).catch(function () {
+                deleteBtn.disabled = false;
+                alert('Сеть недоступна');
+            });
         });
     }
 })();

@@ -9,6 +9,7 @@ urlpatterns = [
     path("t/<int:ticket_id>/typing/", tickets.typing_endpoint, name="typing"),
     path("t/<int:ticket_id>/stream/", stream.user_stream, name="ticket_stream"),
     path("t/<int:ticket_id>/close/", tickets.close_ticket, name="close_ticket"),
+    path("t/<int:ticket_id>/delete/", tickets.delete_ticket, name="delete_ticket"),
 
     # JSON API consumed by the drawer pane
     path("api/unread/", api.unread_api, name="api_unread"),

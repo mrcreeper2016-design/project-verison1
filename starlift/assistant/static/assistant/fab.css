@@ -25,7 +25,12 @@
     box-shadow: 0 14px 32px rgba(10, 128, 59, 0.45);
 }
 .assistant-fab:active { transform: scale(0.97); }
-.assistant-fab.open {
+/* Ротация только иконки, не всего круга — иначе точка-индикатор уезжает
+   по орбите вместе с кнопкой. */
+.assistant-fab > i {
+    transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+}
+.assistant-fab.open > i {
     transform: rotate(180deg);
 }
 .assistant-fab-dot {
@@ -39,6 +44,17 @@
     border: 2px solid var(--sber-green);
     box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6);
     animation: fab-pulse 2.4s infinite;
+    transition: opacity 0.18s ease;
+}
+/* Когда чат открыт — точку-индикатор полностью убираем из потока и стопаем
+   её пульс-анимацию (иначе box-shadow продолжает расходиться кольцом
+   вокруг места, где была точка, и это выглядит как «крутится»). */
+.assistant-fab.open .assistant-fab-dot {
+    opacity: 0;
+    visibility: hidden;
+    animation: none;
+    box-shadow: none;
+    pointer-events: none;
 }
 @keyframes fab-pulse {
     0%   { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6); }

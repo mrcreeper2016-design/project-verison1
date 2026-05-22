@@ -120,3 +120,25 @@ def close_ticket(request: HttpRequest, ticket_id: int) -> JsonResponse:
         audit.log(action="support_ticket_closed", actor=request.user,
                   request=request, target=ticket)
     return JsonResponse({"ok": True})
+
+
+@login_required
+@member_required
+@csrf_protect
+@require_http_methods(["POST"])
+def delete_ticket(request: HttpRequest, ticket_id: int) -> JsonResponse:
+    """Полное удаление обращения. Только для админов и только закрытых тикетов."""
+    if not _is_admin(request.user):
+        return JsonResponse({"error": "forbidden"}, status=403)
+    ticket = get_object_or_404(SupportTicket, pk=ticket_id)
+    if ticket.status != SupportTicket.STATUS_CLOSED:
+        return JsonResponse({"error": "not_closed"}, status=400)
+    audit.log(
+        action="support_ticket_deleted",
+        actor=request.user,
+        request=request,
+        target=ticket,
+        metadata={"ticket_id": ticket.id, "subject": ticket.subject[:200]},
+    )
+    ticket.delete()  # cascade удалит сообщения и read-метки
+    return JsonResponse({"ok": True})
