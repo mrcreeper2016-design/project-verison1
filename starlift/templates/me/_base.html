@@ -51,6 +51,7 @@
         <a href="{% url 'me_events' %}" class="{% if active == 'events' %}active{% endif %}"><i class="fa-regular fa-calendar"></i> Мероприятия</a>
         <a href="{% url 'me_feedback' %}" class="{% if active == 'feedback' %}active{% endif %}"><i class="fa-solid fa-comments"></i> Отзывы</a>
         <a href="{% url 'me_requests' %}" class="{% if active == 'requests' %}active{% endif %}"><i class="fa-solid fa-paper-plane"></i> Заявки</a>
+        <a href="{% url 'me_invitations' %}" class="{% if active == 'invitations' %}active{% endif %}"><i class="fa-solid fa-envelope-open-text"></i> Приглашения</a>
         {% endif %}
         <a href="{% url 'me_favorites' %}" class="{% if active == 'favorites' %}active{% endif %}"><i class="fa-solid fa-heart"></i> Избранные</a>
         <a href="{% url 'accounts:profile' %}" class="{% if active == 'settings' %}active{% endif %}"><i class="fa-solid fa-gear"></i> Настройки</a>

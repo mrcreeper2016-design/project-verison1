@@ -13,6 +13,7 @@ from datetime import timedelta
 from functools import wraps
 
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Avg, Count
 from django.db.models.functions import TruncMonth
 from django.http import HttpResponse, JsonResponse
@@ -22,7 +23,7 @@ from django.views.decorators.http import require_POST
 
 from accounts.decorators import member_required
 
-from .models import Event, EventRequest, Feedback, Speaker, SpeakerEventRating, SpeakerLike
+from .models import Event, EventInvitation, EventRequest, Feedback, Speaker, SpeakerEventRating, SpeakerLike
 
 
 def _get_speaker(user):
@@ -420,3 +421,85 @@ def feedback_csv_export(request):
             ]
         )
     return response
+
+
+@speaker_required
+def invitations_view(request):
+    speaker = request.my_speaker
+    qs = (
+        EventInvitation.objects.filter(speaker=speaker)
+        .select_related("event", "invited_by")
+        .order_by("-created_at")
+    )
+    pending = [inv for inv in qs if inv.status == EventInvitation.STATUS_PENDING]
+    history = [inv for inv in qs if inv.status != EventInvitation.STATUS_PENDING]
+    context = {
+        "active": "invitations",
+        "speaker": speaker,
+        "pending": pending,
+        "history": history,
+    }
+    return render(request, "me/invitations.html", context)
+
+
+@require_POST
+@speaker_required
+def invitation_accept_view(request, invitation_id):
+    from accounts.models import AuditLog
+    from accounts.services import audit
+
+    speaker = request.my_speaker
+    inv = get_object_or_404(EventInvitation.objects.select_related("event"), pk=invitation_id)
+    if inv.speaker_id != speaker.pk:
+        return redirect("me_invitations")
+    if inv.status != EventInvitation.STATUS_PENDING:
+        messages.error(request, "Это приглашение уже не активно.")
+        return redirect("me_invitations")
+    if inv.event.status == "past":
+        messages.error(request, "Событие уже прошло.")
+        return redirect("me_invitations")
+
+    with transaction.atomic():
+        inv.event.speakers.add(speaker)
+        inv.status = EventInvitation.STATUS_ACCEPTED
+        inv.responded_at = timezone.now()
+        inv.save(update_fields=["status", "responded_at"])
+        audit.log(
+            action=AuditLog.ACTION_EVENT_INVITATION_ACCEPTED,
+            actor=request.user,
+            request=request,
+            target=request.user,
+            metadata={"invitation_id": inv.pk, "event_id": inv.event_id},
+        )
+    messages.success(request, f"Вы приняли приглашение на «{inv.event.title}».")
+    return redirect("me_invitations")
+
+
+@require_POST
+@speaker_required
+def invitation_decline_view(request, invitation_id):
+    from accounts.models import AuditLog
+    from accounts.services import audit
+
+    speaker = request.my_speaker
+    inv = get_object_or_404(EventInvitation.objects.select_related("event"), pk=invitation_id)
+    if inv.speaker_id != speaker.pk:
+        return redirect("me_invitations")
+    if inv.status != EventInvitation.STATUS_PENDING:
+        messages.error(request, "Это приглашение уже не активно.")
+        return redirect("me_invitations")
+
+    reason = (request.POST.get("decline_reason") or "").strip()
+    inv.status = EventInvitation.STATUS_DECLINED
+    inv.decline_reason = reason
+    inv.responded_at = timezone.now()
+    inv.save(update_fields=["status", "decline_reason", "responded_at"])
+    audit.log(
+        action=AuditLog.ACTION_EVENT_INVITATION_DECLINED,
+        actor=request.user,
+        request=request,
+        target=request.user,
+        metadata={"invitation_id": inv.pk, "event_id": inv.event_id, "reason": reason},
+    )
+    messages.success(request, "Приглашение отклонено.")
+    return redirect("me_invitations")

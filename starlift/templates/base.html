@@ -1455,6 +1455,7 @@
                                 <a href="{% url 'me_events' %}" class="nav-subitem"><i class="fa-regular fa-calendar"></i> <span>Мои мероприятия</span></a>
                                 <a href="{% url 'me_feedback' %}" class="nav-subitem"><i class="fa-solid fa-comments"></i> <span>Мои отзывы</span></a>
                                 <a href="{% url 'me_requests' %}" class="nav-subitem"><i class="fa-solid fa-paper-plane"></i> <span>Мои заявки</span></a>
+                                <a href="{% url 'me_invitations' %}" class="nav-subitem"><i class="fa-solid fa-envelope-open-text"></i> <span>Приглашения</span></a>
                                 {% endif %}
                                 <a href="{% url 'me_favorites' %}" class="nav-subitem"><i class="fa-solid fa-heart"></i> <span>Избранные</span></a>
                                 <a href="{% url 'accounts:profile' %}" class="nav-subitem"><i class="fa-solid fa-gear"></i> <span>Настройки</span></a>
@@ -1673,6 +1674,17 @@
                 </div>`;
             }
 
+            function renderInvitation(it) {
+                const when = it.event_date || '';
+                return `<div class="notif-item">
+                    <p class="notif-item-title">Приглашение на «${escapeHtml(it.event_title)}»</p>
+                    <div class="notif-item-meta">${escapeHtml(when)} · от ${escapeHtml(it.invited_by_name)}</div>
+                    <div class="notif-actions">
+                        <a class="notif-open" href="${escapeHtml(it.url)}"><i class="fa-solid fa-envelope-open-text"></i> Открыть</a>
+                    </div>
+                </div>`;
+            }
+
             async function loadNotifs() {
                 try {
                     const r = await fetch('/api/notifications/', { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
@@ -1697,6 +1709,11 @@
                     if (sup.items && sup.items.length) {
                         blocks.push('<div class="notif-dropdown-header"><span>Поддержка</span><a href="/assistant/support/" class="nav-item" style="font-size:12px;color:var(--sber-green);text-decoration:none;padding:0;">Все →</a></div>');
                         blocks.push(sup.items.map(renderSupportItem).join(''));
+                    }
+                    const inv = data.event_invitations || {count:0, items:[]};
+                    if (inv.items && inv.items.length) {
+                        blocks.push('<div class="notif-dropdown-header"><span>Приглашения</span><a href="/me/invitations/" class="nav-item" style="font-size:12px;color:var(--sber-green);text-decoration:none;padding:0;">Все →</a></div>');
+                        blocks.push(inv.items.map(renderInvitation).join(''));
                     }
                     if (!blocks.length) {
                         list.innerHTML = '<div class="notif-empty">Новых уведомлений нет</div>';

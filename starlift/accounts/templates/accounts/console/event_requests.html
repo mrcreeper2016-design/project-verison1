@@ -133,6 +133,9 @@
                 <textarea name="rejection_reason" placeholder="Причина отклонения (видна спикеру)" required></textarea>
                 <button type="submit" class="btn-sm btn-reject">Отправить отказ</button>
             </form>
+            {% if req.event %}
+            <a class="btn-sm" href="{% url 'accounts:event_invite' req.event.id %}" style="background:rgba(10,128,59,0.1); color:var(--sber-green); text-decoration:none;"><i class="fa-solid fa-paper-plane"></i> Пригласить спикеров</a>
+            {% endif %}
         </div>
         {% endif %}
     </div>

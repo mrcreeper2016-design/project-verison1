@@ -150,6 +150,12 @@ class Event(models.Model):
         verbose_name="Дата события (машиночитаемая)",
         help_text="Используется для расчётов периода. Если не заполнено — берётся дата отзывов.",
     )
+    application_deadline = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Дедлайн подачи заявок",
+        help_text="Если задан и не прошёл — спикеры могут подавать заявки сами. Иначе только через приглашение DevRel.",
+    )
     location = models.CharField(max_length=200, null=True, blank=True)
     link = models.CharField(max_length=500, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
@@ -184,6 +190,13 @@ class Event(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.status})"
+
+    def can_self_submit(self) -> bool:
+        """Спикер может сам подать заявку, только если дедлайн задан и не прошёл."""
+        if self.application_deadline is None:
+            return False
+        from django.utils import timezone
+        return self.application_deadline >= timezone.localdate()
 
 
 class Feedback(models.Model):
@@ -265,6 +278,48 @@ class EventRequest(models.Model):
 
     def __str__(self):
         return f"{self.get_kind_display()} от {self.speaker.name} ({self.status})"
+
+
+class EventInvitation(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_ACCEPTED = 'accepted'
+    STATUS_DECLINED = 'declined'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Ожидает ответа'),
+        (STATUS_ACCEPTED, 'Принято'),
+        (STATUS_DECLINED, 'Отклонено'),
+        (STATUS_CANCELLED, 'Отменено DevRel'),
+    ]
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='invitations')
+    speaker = models.ForeignKey(Speaker, on_delete=models.CASCADE, related_name='invitations')
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='sent_event_invitations',
+    )
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    message = models.TextField(blank=True, default='')
+    decline_reason = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'starlift_event_invitation'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['status', '-created_at'])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['event', 'speaker'],
+                condition=models.Q(status='pending'),
+                name='uniq_pending_event_invitation',
+            ),
+        ]
+
+    def __str__(self):
+        return f"EventInvitation<{self.event_id}/{self.speaker_id}/{self.status}>"
 
 
 class SpeakerApplication(models.Model):

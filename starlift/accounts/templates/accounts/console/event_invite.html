@@ -1,0 +1,122 @@
+{% extends 'accounts/console/_base.html' %}
+
+{% block title %}Пригласить спикера — StarLift{% endblock %}
+
+{% block console_content %}
+<style>
+    .req-card { padding: 16px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--white); margin-bottom: 12px; display: grid; gap: 10px; }
+    .req-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+    .req-meta { font-size: 12px; color: var(--text-muted); }
+    .req-title { font-weight: 700; font-size: 15px; color: var(--text-main); margin: 0; }
+    .req-body { font-size: 13px; color: var(--text-main); line-height: 1.5; }
+    .invite-form { display: grid; gap: 10px; }
+    .invite-form select, .invite-form textarea {
+        padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-color);
+        font-family: inherit; font-size: 13px; background: var(--white); color: var(--text-main);
+    }
+    .invite-form textarea { min-height: 90px; resize: vertical; }
+    .btn-sm { padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; }
+</style>
+
+<div class="content-block" style="padding:22px; display:grid; gap:16px;">
+    <div style="display:flex; gap:8px; align-items:center;">
+        <a href="{% url 'accounts:event_requests' %}" style="color:var(--text-muted); text-decoration:none; font-size:13px;"><i class="fa-solid fa-arrow-left"></i> К списку заявок</a>
+    </div>
+
+    {% if messages %}
+        {% for msg in messages %}
+        <div style="padding:10px 12px; border-radius:10px; font-size:13px;
+            {% if msg.tags == 'error' %}background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3);
+            {% else %}background:var(--light-green); color:var(--sber-green); border:1px solid rgba(10,128,59,0.25);{% endif %}">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <h2 style="margin:0; font-size:20px; font-weight:800;">
+        <i class="fa-solid fa-paper-plane" style="color: var(--sber-green);"></i>
+        Пригласить спикера: {{ event.title }}
+    </h2>
+
+    <div style="display:grid; gap:6px; padding:14px; background:var(--white); border:1px solid var(--border-color); border-radius:12px; font-size:13px;">
+        {% if event.event_date %}<div><span style="color:var(--text-muted);">Дата события:</span> {{ event.event_date|date:"d.m.Y" }}</div>{% endif %}
+        {% if event.location %}<div><span style="color:var(--text-muted);">Место:</span> {{ event.location }}</div>{% endif %}
+        <div>
+            <span style="color:var(--text-muted);">Дедлайн заявок:</span>
+            {% if event.application_deadline %}
+                {{ event.application_deadline|date:"d.m.Y" }}
+            {% else %}
+                <span style="color:var(--text-muted);">не задан — попасть в событие можно только по приглашению DevRel</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="content-block" style="padding:18px; display:grid; gap:14px; background:var(--white);">
+        <h3 style="margin:0; font-size:15px; font-weight:700;"><i class="fa-solid fa-user-plus"></i> Новое приглашение</h3>
+        {% if not speakers %}
+            <div class="empty-state">Нет спикеров вашей компании, доступных для приглашения.</div>
+        {% else %}
+            <form method="post" action="{% url 'accounts:event_invite' event.id %}" class="invite-form">
+                {% csrf_token %}
+                <label style="font-size:13px; color:var(--text-muted);">Спикер
+                    <select name="speaker_id" required>
+                        <option value="">— выберите спикера —</option>
+                        {% for s in speakers %}
+                        <option value="{{ s.pk }}">{{ s.name }}{% if s.user %} @{{ s.user.username }}{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label style="font-size:13px; color:var(--text-muted);">Сообщение спикеру (необязательно)
+                    <textarea name="message" placeholder="Почему вы хотите видеть этого спикера на событии..."></textarea>
+                </label>
+                <div>
+                    <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-paper-plane"></i> Отправить приглашение</button>
+                </div>
+            </form>
+        {% endif %}
+    </div>
+
+    <div style="display:grid; gap:10px;">
+        <h3 style="margin:0; font-size:15px; font-weight:700;"><i class="fa-solid fa-clock-rotate-left"></i> Уже отправленные</h3>
+        {% if not invitations %}
+            <div class="empty-state">Пока нет отправленных приглашений на это событие.</div>
+        {% else %}
+            {% for inv in invitations %}
+            <div class="req-card">
+                <div class="req-head">
+                    <div>
+                        <h3 class="req-title">{{ inv.speaker.name }}</h3>
+                        <div class="req-meta">
+                            Отправил: {% if inv.invited_by %}{{ inv.invited_by.username }}{% else %}—{% endif %}
+                            · {{ inv.created_at|date:"d.m.Y H:i" }}
+                            {% if inv.responded_at %} · ответ: {{ inv.responded_at|date:"d.m.Y H:i" }}{% endif %}
+                        </div>
+                    </div>
+                    <span class="chip {% if inv.status == 'pending' %}chip-amber{% elif inv.status == 'accepted' %}chip-green{% else %}chip-red{% endif %}">
+                        {{ inv.get_status_display }}
+                    </span>
+                </div>
+                {% if inv.message %}
+                <div class="req-body">
+                    <div style="color:var(--text-muted); font-size:12px; margin-bottom:4px;">Сообщение:</div>
+                    <div>{{ inv.message|linebreaksbr }}</div>
+                </div>
+                {% endif %}
+                {% if inv.decline_reason %}
+                <div class="req-body">
+                    <div style="color:var(--text-muted); font-size:12px; margin-bottom:4px;">Причина отказа:</div>
+                    <div style="color:#D93E4E;">{{ inv.decline_reason|linebreaksbr }}</div>
+                </div>
+                {% endif %}
+                {% if inv.status == 'pending' %}
+                <div class="req-actions" style="display:flex; gap:8px;">
+                    <form method="post" action="{% url 'accounts:event_invitation_cancel' inv.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-sm" style="background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3);"><i class="fa-solid fa-xmark"></i> Отменить</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

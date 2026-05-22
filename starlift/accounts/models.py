@@ -200,6 +200,10 @@ class AuditLog(models.Model):
     ACTION_SPEAKER_APPLICATION_SUBMITTED = "speaker_application_submitted"
     ACTION_SPEAKER_APPLICATION_APPROVED = "speaker_application_approved"
     ACTION_SPEAKER_APPLICATION_REJECTED = "speaker_application_rejected"
+    ACTION_EVENT_INVITATION_SENT = "event_invitation_sent"
+    ACTION_EVENT_INVITATION_ACCEPTED = "event_invitation_accepted"
+    ACTION_EVENT_INVITATION_DECLINED = "event_invitation_declined"
+    ACTION_EVENT_INVITATION_CANCELLED = "event_invitation_cancelled"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

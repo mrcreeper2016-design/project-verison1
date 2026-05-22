@@ -19,7 +19,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 
-from starlift.models import Event, EventRequest, Speaker, SpeakerApplication
+from starlift.models import Event, EventInvitation, EventRequest, Speaker, SpeakerApplication
 
 from ..decorators import role_required
 from ..models import AuditLog, LoginAttempt, UserProfile
@@ -615,3 +615,144 @@ def speaker_application_action_view(request: HttpRequest, application_id: int, a
         messages.error(request, "Неизвестное действие.")
 
     return redirect(reverse("accounts:event_requests"))
+
+
+def _devrel_visible_speakers(actor):
+    """Спикеры, которых актор может пригласить.
+
+    DevRel → только linked-user с UserProfile.company == actor.profile.company.
+    Admin/superuser → любой спикер с linked user.
+    """
+    qs = Speaker.objects.filter(user__isnull=False).select_related("user", "user__profile")
+    if actor.is_superuser:
+        return qs
+    profile = getattr(actor, "profile", None)
+    if profile is None:
+        return Speaker.objects.none()
+    if profile.role == UserProfile.ROLE_ADMIN:
+        return qs
+    if profile.role == UserProfile.ROLE_DEVREL:
+        actor_company = (profile.company or "").strip()
+        if not actor_company:
+            return Speaker.objects.none()
+        return qs.filter(user__profile__company__iexact=actor_company)
+    return Speaker.objects.none()
+
+
+@role_required("admin", "devrel")
+@never_cache
+@require_http_methods(["GET", "POST"])
+@csrf_protect
+def event_invite_view(request, event_id):
+    """Страница «Пригласить спикера» для конкретного события."""
+    event = get_object_or_404(Event, pk=event_id)
+    today = timezone.localdate()
+
+    if event.status == "past":
+        messages.error(request, "Событие уже прошло.")
+        return redirect(reverse("accounts:event_requests"))
+    if event.application_deadline and event.application_deadline < today:
+        messages.error(request, "Дедлайн подачи заявок на это событие прошёл.")
+        return redirect(reverse("accounts:event_requests"))
+
+    visible_speakers_qs = _devrel_visible_speakers(request.user)
+    visible_speakers = list(
+        visible_speakers_qs.exclude(events=event).order_by("name")
+    )
+
+    if request.method == "POST":
+        speaker_id = request.POST.get("speaker_id")
+        message_text = (request.POST.get("message") or "").strip()
+
+        try:
+            speaker = visible_speakers_qs.get(pk=speaker_id)
+        except Speaker.DoesNotExist:
+            messages.error(request, "Выбранный спикер недоступен.")
+            return redirect(reverse("accounts:event_invite", args=[event.pk]))
+
+        if event.speakers.filter(pk=speaker.pk).exists():
+            messages.error(request, "Спикер уже участвует в событии.")
+            return redirect(reverse("accounts:event_invite", args=[event.pk]))
+
+        if EventInvitation.objects.filter(
+            event=event, speaker=speaker, status=EventInvitation.STATUS_PENDING,
+        ).exists():
+            messages.error(request, "Активное приглашение уже отправлено этому спикеру.")
+            return redirect(reverse("accounts:event_invite", args=[event.pk]))
+
+        with transaction.atomic():
+            inv = EventInvitation.objects.create(
+                event=event,
+                speaker=speaker,
+                invited_by=request.user,
+                message=message_text,
+            )
+            audit.log(
+                action=AuditLog.ACTION_EVENT_INVITATION_SENT,
+                actor=request.user,
+                request=request,
+                target=speaker.user if speaker.user_id else None,
+                metadata={
+                    "invitation_id": inv.pk,
+                    "event_id": event.pk,
+                    "speaker_id": speaker.pk,
+                },
+            )
+        messages.success(request, f"Приглашение отправлено: {speaker.name}.")
+        return redirect(reverse("accounts:event_invite", args=[event.pk]))
+
+    sent_invitations = (
+        EventInvitation.objects.filter(event=event)
+        .select_related("speaker", "invited_by")
+        .order_by("-created_at")[:50]
+    )
+
+    return render(
+        request,
+        "accounts/console/event_invite.html",
+        {
+            "active": "event_requests",
+            "event": event,
+            "speakers": visible_speakers,
+            "invitations": sent_invitations,
+        },
+    )
+
+
+@role_required("admin", "devrel")
+@never_cache
+@csrf_protect
+@require_http_methods(["POST"])
+def event_invitation_cancel_view(request, invitation_id):
+    inv = get_object_or_404(EventInvitation.objects.select_related("event", "speaker", "speaker__user"), pk=invitation_id)
+    if inv.status != EventInvitation.STATUS_PENDING:
+        messages.error(request, "Это приглашение уже не активно.")
+        return redirect(reverse("accounts:event_invite", args=[inv.event_id]))
+
+    # DevRel может отменять только свои + только в рамках своей зоны спикеров.
+    profile = getattr(request.user, "profile", None)
+    actor_company = (profile.company or "").strip() if profile else ""
+    is_admin = request.user.is_superuser or (profile and profile.role == UserProfile.ROLE_ADMIN)
+    if not is_admin:
+        speaker_company = ""
+        if inv.speaker.user_id:
+            try:
+                speaker_company = (inv.speaker.user.profile.company or "").strip()
+            except UserProfile.DoesNotExist:
+                speaker_company = ""
+        if not actor_company or actor_company.lower() != speaker_company.lower():
+            messages.error(request, "Нет прав отменять это приглашение.")
+            return redirect(reverse("accounts:event_invite", args=[inv.event_id]))
+
+    inv.status = EventInvitation.STATUS_CANCELLED
+    inv.responded_at = timezone.now()
+    inv.save(update_fields=["status", "responded_at"])
+    audit.log(
+        action=AuditLog.ACTION_EVENT_INVITATION_CANCELLED,
+        actor=request.user,
+        request=request,
+        target=inv.speaker.user if inv.speaker.user_id else None,
+        metadata={"invitation_id": inv.pk, "event_id": inv.event_id},
+    )
+    messages.success(request, "Приглашение отменено.")
+    return redirect(reverse("accounts:event_invite", args=[inv.event_id]))

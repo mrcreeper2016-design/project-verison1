@@ -21,7 +21,7 @@ from accounts.services.speaker_avatar import mirror_speaker_uploaded_avatar_to_p
 from . import analytics as analytics_lib
 from . import home_metrics
 from .forms import FeedbackForm, SpeakerForm, SpeakerSelfEditForm
-from .models import Event, EventRequest, Feedback, Speaker, SpeakerApplication, SpeakerEventRating, SpeakerLike
+from .models import Event, EventInvitation, EventRequest, Feedback, Speaker, SpeakerApplication, SpeakerEventRating, SpeakerLike
 
 RU_MONTHS_GEN = {
     "января": 1,
@@ -556,6 +556,8 @@ def events_api(request):
                         "count": len(ratings),
                         "items": rating_items,
                     },
+                    "application_deadline": event.application_deadline.isoformat() if event.application_deadline else None,
+                    "can_self_submit": event.can_self_submit(),
                 }
             )
 
@@ -963,6 +965,9 @@ def submit_join_request_view(request, event_id):
     ).exists():
         return JsonResponse({'error': 'already_pending'}, status=400)
 
+    if not event.can_self_submit():
+        return JsonResponse({'error': 'submissions_closed'}, status=400)
+
     topic = (request.POST.get('topic') or '').strip()
     if not topic:
         return JsonResponse({'error': 'topic_required'}, status=400)
@@ -998,6 +1003,13 @@ def _parse_event_post(request):
             human_date = f"{parsed_date.day} {_RU_MONTHS_GEN_BY_NUM[parsed_date.month]} {parsed_date.year}"
         except (ValueError, KeyError):
             raise ValueError('bad_date')
+    raw_deadline = (request.POST.get('application_deadline') or '').strip()
+    parsed_deadline = None
+    if raw_deadline:
+        try:
+            parsed_deadline = datetime.strptime(raw_deadline, '%Y-%m-%d').date()
+        except ValueError:
+            raise ValueError('bad_deadline')
     return {
         'title': title,
         'description': (request.POST.get('description') or '').strip() or None,
@@ -1007,6 +1019,7 @@ def _parse_event_post(request):
         'link': (request.POST.get('link') or '').strip() or None,
         'topic': (request.POST.get('topic') or '').strip() or None,
         'schedule': (request.POST.get('schedule') or '').strip() or None,
+        'application_deadline': parsed_deadline,
     }
 
 
@@ -1179,11 +1192,36 @@ def notifications_api(request):
         })
     support_count = support_notif.unread_count(user)
 
+    invitation_items = []
+    invitation_count = 0
+    if profile and profile.role == 'speaker':
+        speaker = Speaker.objects.filter(user=user).first()
+        if speaker:
+            inv_qs = (
+                EventInvitation.objects.filter(speaker=speaker, status=EventInvitation.STATUS_PENDING)
+                .select_related("event", "invited_by")
+                .order_by("-created_at")[:10]
+            )
+            for inv in inv_qs:
+                invited_by_name = inv.invited_by.get_full_name() if inv.invited_by else "DevRel"
+                invitation_items.append({
+                    'id': inv.id,
+                    'event_title': inv.event.title,
+                    'event_date': inv.event.event_date.isoformat() if inv.event.event_date else (inv.event.date or ''),
+                    'invited_by_name': invited_by_name or (inv.invited_by.username if inv.invited_by else "DevRel"),
+                    'created_at': inv.created_at.isoformat(),
+                    'url': '/me/invitations/',
+                })
+            invitation_count = EventInvitation.objects.filter(
+                speaker=speaker, status=EventInvitation.STATUS_PENDING,
+            ).count()
+
     return JsonResponse({
-        'total': event_count + support_count + application_count,
+        'total': event_count + support_count + application_count + invitation_count,
         'event_requests': {'count': event_count, 'items': event_items},
         'speaker_applications': {'count': application_count, 'items': application_items},
         'support': {'count': support_count, 'items': support_items},
+        'event_invitations': {'count': invitation_count, 'items': invitation_items},
     })
 
 
