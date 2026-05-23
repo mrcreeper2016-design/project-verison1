@@ -44,6 +44,7 @@ class SpeakerForm(forms.ModelForm):
             'stack': forms.TextInput(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border);'}),
             'city': forms.TextInput(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border);'}),
             'img': forms.HiddenInput(),
+            'recommended': forms.CheckboxInput(attrs={'class': 'sl-checkbox'}),
         }
 
     def clean(self):
@@ -57,13 +58,13 @@ class SpeakerForm(forms.ModelForm):
         if upload_image:
             if upload_image.size > 10 * 1024 * 1024:
                 raise ValidationError("Размер файла не должен превышать 10 МБ.")
-            
+
             ext = upload_image.name.split('.')[-1].lower()
             if ext not in ['jpg', 'jpeg', 'png', 'webp']:
                 raise ValidationError("Допустимые форматы: JPG, PNG, WEBP.")
-            
+
             image_data = upload_image.read()
-        
+
         elif image_url:
             try:
                 response = requests.get(image_url, timeout=10)
@@ -77,7 +78,7 @@ class SpeakerForm(forms.ModelForm):
         if image_data:
             try:
                 img = Image.open(BytesIO(image_data))
-                
+
                 # Обрезка до квадрата (aspect fill)
                 width, height = img.size
                 min_dim = min(width, height)
@@ -86,10 +87,10 @@ class SpeakerForm(forms.ModelForm):
                 right = (width + min_dim) / 2
                 bottom = (height + min_dim) / 2
                 img = img.crop((left, top, right, bottom))
-                
+
                 # Ресайз до 800x800
                 img = img.resize((800, 800), Image.Resampling.LANCZOS)
-                
+
                 # Сохранение в webp
                 import uuid
                 filename = f"avatar_{uuid.uuid4().hex[:8]}.webp"

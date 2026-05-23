@@ -825,6 +825,49 @@
             box-shadow: 0 0 0 4px var(--light-green);
         }
 
+        .date-compact {
+            caret-color: var(--sber-green);
+        }
+
+        .date-compact::selection {
+            background: rgba(10, 128, 59, 0.42);
+            color: #ffffff;
+        }
+
+        .date-compact::-webkit-datetime-edit {
+            color: inherit;
+        }
+
+        .date-compact::-webkit-calendar-picker-indicator {
+            opacity: 0;
+            width: 0;
+            margin: 0;
+            padding: 0;
+            pointer-events: none;
+        }
+
+        .date-compact::-webkit-inner-spin-button,
+        .date-compact::-webkit-clear-button {
+            display: none;
+        }
+
+        .date-compact {
+            -moz-appearance: textfield;
+        }
+
+        [data-theme="dark"] .date-compact {
+            background: rgba(255,255,255,0.04);
+        }
+
+        [data-theme="dark"] .date-compact:focus {
+            background: rgba(255,255,255,0.07);
+        }
+
+        .date-compact::-moz-selection {
+            background: rgba(10, 128, 59, 0.42);
+            color: #ffffff;
+        }
+
         .custom-select {
             position: relative;
             width: 100%;
@@ -850,7 +893,7 @@
             padding: 9px 38px 9px 12px;
             border-radius: 16px;
             border: 1px solid var(--border-color);
-            background: rgba(255, 255, 255, 0.98);
+            background: var(--white);
             color: var(--text-main);
             font: inherit;
             font-size: 12px;
@@ -866,10 +909,6 @@
             box-shadow: none;
             min-width: 0;
             overflow: hidden;
-        }
-
-        [data-theme="dark"] .custom-select-trigger {
-            background: rgba(20, 29, 25, 0.9);
         }
 
         .custom-select-trigger:hover {
@@ -929,10 +968,10 @@
             margin: 0;
             padding: 6px;
             list-style: none;
-            background: rgba(255, 255, 255, 0.98);
-            border: 1px solid rgba(20, 44, 30, 0.12);
+            background: #edf7ef;
+            border: 1px solid rgba(10, 128, 59, 0.16);
             border-radius: 16px;
-            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.14);
             max-height: 280px;
             overflow: auto;
         }
@@ -940,7 +979,7 @@
         [data-theme="dark"] .custom-select-menu {
             background: #101b14;
             border-color: rgba(54, 120, 73, 0.35);
-            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.38);
+            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
         }
 
         .custom-select.is-open .custom-select-menu {
@@ -964,13 +1003,13 @@
         }
 
         [data-theme="dark"] .custom-select-option {
-            color: #e8f1e7;
+            color: var(--text-main);
         }
 
         .custom-select-option:hover,
         .custom-select-option:focus-visible,
         .custom-select-option[aria-selected="true"] {
-            background: #1f683a;
+            background: var(--sber-green);
             color: #ffffff;
             outline: none;
         }
@@ -1912,8 +1951,8 @@
                     const menuHeight = Math.min(menu.scrollHeight || 0, 280);
                     const openAbove = spaceBelow < Math.min(menuHeight, 220) && rect.top > spaceBelow;
 
-                    menu.style.minWidth = `${desiredWidth}px`;
-                    menu.style.maxWidth = `min(${desiredWidth}px, calc(100vw - ${viewportPadding * 2}px))`;
+                    menu.style.boxSizing = 'border-box';
+                    menu.style.width = `${desiredWidth}px`;
                     menu.style.left = `${Math.max(viewportPadding, Math.min(rect.left, window.innerWidth - desiredWidth - viewportPadding))}px`;
                     menu.style.top = openAbove
                         ? `${Math.max(viewportPadding, rect.top - menuHeight - 8)}px`
