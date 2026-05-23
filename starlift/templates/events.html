@@ -13,25 +13,29 @@
         padding: 9px 12px; font-size: 13px; font-family: inherit; outline: none;
         transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
     }
+    .ev-form input[type="text"].date-compact {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: textfield;
+        letter-spacing: 0.02em;
+    }
     .ev-form input:hover, .ev-form textarea:hover { border-color: rgba(10,128,59,0.45); }
     .ev-form input:focus, .ev-form textarea:focus {
         border-color: var(--sber-green); box-shadow: 0 0 0 4px var(--light-green);
     }
     .ev-form textarea { min-height: 70px; resize: vertical; line-height: 1.45; }
     .ev-form input::placeholder, .ev-form textarea::placeholder { color: var(--text-muted); opacity: 0.6; }
+    .ev-form input[type="text"].date-compact::placeholder { letter-spacing: 0; }
     [data-theme="dark"] .ev-form input, [data-theme="dark"] .ev-form textarea {
         background: rgba(255,255,255,0.04);
         border-color: rgba(255,255,255,0.12);
     }
+    [data-theme="dark"] .ev-form input[type="text"].date-compact {
+        background: rgba(255,255,255,0.04);
+    }
     [data-theme="dark"] .ev-form input:focus, [data-theme="dark"] .ev-form textarea:focus {
         background: rgba(255,255,255,0.07);
         box-shadow: 0 0 0 4px rgba(10,128,59,0.18);
-    }
-    .ev-form input[type="date"]::-webkit-calendar-picker-indicator {
-        filter: invert(0.4); cursor: pointer;
-    }
-    [data-theme="dark"] .ev-form input[type="date"]::-webkit-calendar-picker-indicator {
-        filter: invert(0.85);
     }
     .ev-form-submit {
         padding: 12px 16px; border-radius: 12px; background: var(--sber-green); color: #fff;
@@ -246,7 +250,7 @@
         border: 1px solid var(--border-color);
         transition: var(--transition);
     }
-    
+
     .schedule-item:active {
         transform: scale(0.98);
         backdrop-filter: blur(12px);
@@ -1258,7 +1262,7 @@ if (document.readyState === 'loading') {
                 </label>
                 <div class="ev-form-grid">
                     <label>Дата
-                        <input type="date" name="event_date">
+                        <input type="text" name="event_date" class="date-compact" placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" maxlength="10" data-date-input>
                     </label>
                     <label>Место
                         <input type="text" name="location" maxlength="200" placeholder="Москва, Сколково">
@@ -1379,7 +1383,7 @@ if (document.readyState === 'loading') {
                 </label>
                 <div class="ev-form-grid">
                     <label>Дата
-                        <input type="date" name="proposed_event_date">
+                        <input type="text" name="proposed_event_date" class="date-compact" placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" maxlength="10" data-date-input>
                     </label>
                     <label>Место
                         <input type="text" name="proposed_location" maxlength="200">

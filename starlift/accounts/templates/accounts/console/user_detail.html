@@ -122,7 +122,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="action" value="link_speaker">
                 <select name="speaker_id" class="select-compact" style="flex:1;">
-                    <option value="">— Выберите спикера —</option>
+                    <option value="">Выберите спикера</option>
                     {% for s in available_speakers %}
                     <option value="{{ s.pk }}">{{ s.name }} ({{ s.city }})</option>
                     {% endfor %}

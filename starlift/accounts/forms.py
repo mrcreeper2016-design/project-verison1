@@ -62,7 +62,18 @@ class LoginForm(forms.Form):
 
 
 class InviteCreateForm(forms.ModelForm):
-    send_email = forms.BooleanField(required=False, initial=True, label="Отправить письмо с приглашением")
+    send_email = forms.BooleanField(
+        required=False,
+        initial=True,
+        label="Отправить письмо с приглашением",
+        widget=forms.CheckboxInput(attrs={"class": "sl-checkbox"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        speaker_field = self.fields.get("speaker")
+        if speaker_field is not None and hasattr(speaker_field, "empty_label"):
+            speaker_field.empty_label = "Выберите вариант"
 
     class Meta:
         model = Invite
@@ -125,11 +136,13 @@ class RegisterForm(forms.Form):
     consent_pdn = forms.BooleanField(
         required=True,
         label=_CONSENT_PDN_LABEL,
+        widget=forms.CheckboxInput(attrs={"class": "sl-checkbox"}),
         error_messages={"required": _CONSENT_PDN_REQUIRED_MSG},
     )
     accept_policy = forms.BooleanField(
         required=True,
         label=_ACCEPT_POLICY_LABEL,
+        widget=forms.CheckboxInput(attrs={"class": "sl-checkbox"}),
         error_messages={"required": _ACCEPT_POLICY_REQUIRED_MSG},
     )
 
@@ -211,11 +224,13 @@ class InviteSignupForm(forms.Form):
     consent_pdn = forms.BooleanField(
         required=True,
         label=_CONSENT_PDN_LABEL,
+        widget=forms.CheckboxInput(attrs={"class": "sl-checkbox"}),
         error_messages={"required": _CONSENT_PDN_REQUIRED_MSG},
     )
     accept_policy = forms.BooleanField(
         required=True,
         label=_ACCEPT_POLICY_LABEL,
+        widget=forms.CheckboxInput(attrs={"class": "sl-checkbox"}),
         error_messages={"required": _ACCEPT_POLICY_REQUIRED_MSG},
     )
 

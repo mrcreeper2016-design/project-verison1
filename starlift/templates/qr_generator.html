@@ -47,20 +47,41 @@
     .form-select {
         width: 100%;
         padding: 14px 20px;
-        border-radius: 12px;
+        border-radius: 16px;
         border: 2px solid var(--border-color);
         background-color: var(--bg-color);
         color: var(--text-main);
         font-size: 16px;
         appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
         outline: none;
         transition: var(--transition);
         cursor: pointer;
+        padding-right: 46px;
+        background-image:
+            linear-gradient(45deg, transparent 50%, var(--sber-green) 50%),
+            linear-gradient(135deg, var(--sber-green) 50%, transparent 50%);
+        background-position: calc(100% - 24px) calc(50% - 2px), calc(100% - 18px) calc(50% - 2px);
+        background-size: 6px 6px, 6px 6px;
+        background-repeat: no-repeat;
     }
 
     .form-select:focus {
         border-color: var(--sber-green);
         box-shadow: 0 0 0 4px var(--light-green);
+    }
+
+    .form-select option {
+        background-color: #0d2a19;
+        color: #edf5e9;
+    }
+
+    .form-select option:checked,
+    .form-select option:hover,
+    .form-select option:focus {
+        background-color: #1f683a;
+        color: #ffffff;
     }
 
     .btn-generate {
