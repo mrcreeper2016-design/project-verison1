@@ -29,7 +29,7 @@
             --white: rgba(230, 240, 235, 0.5);
             --text-main: #142C1E;
             --border-color: rgba(168, 204, 183, 0.6);
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);            
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             --text-muted: #5B7565;
             --nav-hover: rgba(216, 232, 223, 0.5);
             --dropdown-hover: rgba(216, 232, 223, 0.8);
@@ -56,7 +56,7 @@
             --white: rgba(20, 29, 25, 0.5);
             --text-main: #E8E8E8;
             --border-color: rgba(42, 59, 50, 0.6);
-            
+
             --text-muted: #A0A5AA;
             --nav-hover: rgba(42, 42, 42, 0.5);
             --dropdown-hover: rgba(42, 42, 42, 0.8);
@@ -89,20 +89,20 @@
             width: 8px;
             height: 8px;
         }
-        
+
         ::-webkit-scrollbar-track {
             background: transparent;
         }
-        
+
         ::-webkit-scrollbar-thumb {
             background-color: var(--border-color);
             border-radius: 10px;
         }
-        
+
         ::-webkit-scrollbar-thumb:hover {
             background-color: var(--sber-green);
         }
-        
+
         * {
             scrollbar-width: thin;
             scrollbar-color: var(--border-color) transparent;
@@ -185,8 +185,8 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
-        .animate-fade { 
-            animation: fadeInUp 0.3s ease both; 
+        .animate-fade {
+            animation: fadeInUp 0.3s ease both;
         }
 
         /* Page Transitions */
@@ -220,7 +220,7 @@
             padding: 24px 10px;
         }
 
-        aside.collapsed .logo-text, 
+        aside.collapsed .logo-text,
         aside.collapsed .nav-item span {
             display: none;
         }
@@ -258,7 +258,7 @@
         .sidebar-toggle-btn:hover {
             transform: scale(1.1);
         }
-        
+
         aside.collapsed .sidebar-toggle-btn i {
             transform: rotate(180deg);
         }
@@ -304,13 +304,13 @@
             -webkit-backdrop-filter: blur(20px) saturate(180%);
             border: 1px solid rgba(255, 255, 255, 0.4);
             box-shadow: 0 4px 16px 0 rgba(31, 38, 135, 0.05), inset 0 2px 2px rgba(255, 255, 255, 0.2);
-            font-size: 20px; 
-            color: var(--sber-green); cursor: pointer; 
+            font-size: 20px;
+            color: var(--sber-green); cursor: pointer;
             width: 42px; height: 42px; border-radius: 50px;
             display: flex; align-items: center; justify-content: center;
             transition: var(--transition);
         }
-        
+
         [data-theme="dark"] .theme-toggle {
             background: linear-gradient(135deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.05) 100%);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -367,23 +367,23 @@
         .notif-empty { padding: 24px 12px; text-align: center; color: var(--text-muted); font-size: 13px; }
 
         .admin-profile-container { position: relative; }
-        .admin-profile { 
-            display: flex; align-items: center; gap: 12px; cursor: pointer; 
-            padding: 6px 16px 6px 20px; border-radius: 50px; 
+        .admin-profile {
+            display: flex; align-items: center; gap: 12px; cursor: pointer;
+            padding: 6px 16px 6px 20px; border-radius: 50px;
             background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%);
             backdrop-filter: blur(20px) saturate(180%);
             -webkit-backdrop-filter: blur(20px) saturate(180%);
             border: 1px solid rgba(255, 255, 255, 0.4);
             box-shadow: 0 4px 16px 0 rgba(31, 38, 135, 0.05), inset 0 2px 2px rgba(255, 255, 255, 0.2);
-            transition: var(--transition); 
+            transition: var(--transition);
         }
-        
+
         [data-theme="dark"] .admin-profile {
             background: linear-gradient(135deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.05) 100%);
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.2), inset 0 2px 2px rgba(255, 255, 255, 0.05);
         }
-        
+
         .admin-profile:hover { transform: translateY(-2px); box-shadow: 0 6px 16px 0 rgba(31, 38, 135, 0.1), inset 0 2px 2px rgba(255, 255, 255, 0.3); }
         [data-theme="dark"] .admin-profile:hover { box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.3), inset 0 2px 2px rgba(255, 255, 255, 0.1); }
 
@@ -403,7 +403,7 @@
             opacity: 0; visibility: hidden; transform: translateY(-10px);
             transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s, border-color 0.3s;
         }
-        .dropdown-menu.show { 
+        .dropdown-menu.show {
             opacity: 1; visibility: visible; transform: translateY(0);
         }
         .dropdown-item {
@@ -438,7 +438,7 @@
         .content-block { padding: 24px; }
         .table-toolbar { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; margin-bottom: 24px; }
         .table-title { margin: 0; font-size: 22px; color: var(--text-main); }
-        
+
         .search-box {
             background-color: var(--white); border-radius: 16px; border: 2px solid var(--border-color);
             backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -586,7 +586,7 @@
         .table-row-selected {
             background: rgba(10, 128, 59, 0.08) !important;
         }
-        
+
         th {
             background-color: var(--th-bg); padding: 14px 16px; font-size: 13px; font-weight: 600;
             border-bottom: 1px solid var(--border-color); cursor: pointer; text-align: left;
@@ -770,13 +770,31 @@
             -webkit-backdrop-filter: blur(10px);
             color: var(--text-main);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
+            border-radius: 16px;
             padding: 10px 12px;
             font-size: 13px;
             outline: none;
             transition: var(--transition);
             height: 42px;
             box-sizing: border-box;
+        }
+
+        .select-compact {
+            border-radius: 16px;
+            overflow: hidden;
+            background-clip: padding-box;
+        }
+
+        .select-compact option {
+            background-color: #0d2a19;
+            color: #edf5e9;
+        }
+
+        .select-compact option:checked,
+        .select-compact option:hover,
+        .select-compact option:focus {
+            background-color: #1f683a;
+            color: #ffffff;
         }
 
         .filters-panel .input-compact,
@@ -807,6 +825,143 @@
             box-shadow: 0 0 0 4px var(--light-green);
         }
 
+        .custom-select {
+            position: relative;
+            width: 100%;
+        }
+
+        .custom-select-native {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: 0 !important;
+            overflow: hidden !important;
+            clip: rect(0 0 0 0) !important;
+            clip-path: inset(50%) !important;
+            white-space: nowrap !important;
+        }
+
+        .custom-select-trigger {
+            width: 100%;
+            min-height: 42px;
+            padding: 10px 42px 10px 12px;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            background: var(--white);
+            color: var(--text-main);
+            font: inherit;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            box-sizing: border-box;
+            box-shadow: none;
+        }
+
+        .custom-select-trigger:hover {
+            border-color: rgba(10, 128, 59, 0.45);
+            box-shadow: 0 0 0 3px rgba(10, 128, 59, 0.08);
+        }
+
+        .custom-select-trigger:focus-visible,
+        .custom-select.is-open .custom-select-trigger {
+            outline: none;
+            border-color: var(--sber-green);
+            box-shadow: 0 0 0 4px var(--light-green);
+        }
+
+        .custom-select.is-disabled {
+            opacity: 0.65;
+        }
+
+        .custom-select-trigger-text {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .custom-select-trigger-icon {
+            position: relative;
+            width: 12px;
+            height: 12px;
+            flex: 0 0 auto;
+            transition: transform 0.18s ease;
+        }
+
+        .custom-select-trigger-icon::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            margin: auto;
+            width: 8px;
+            height: 8px;
+            border-right: 2px solid var(--sber-green);
+            border-bottom: 2px solid var(--sber-green);
+            transform: translateY(-2px) rotate(45deg);
+            transform-origin: center;
+        }
+
+        .custom-select.is-open .custom-select-trigger-icon {
+            transform: rotate(180deg);
+        }
+
+        .custom-select-menu {
+            display: none;
+            position: fixed;
+            z-index: 1400;
+            margin: 0;
+            padding: 6px;
+            list-style: none;
+            background: #101b14;
+            border: 1px solid rgba(54, 120, 73, 0.35);
+            border-radius: 16px;
+            box-shadow: 0 18px 42px rgba(0, 0, 0, 0.38);
+            max-height: 280px;
+            overflow: auto;
+        }
+
+        .custom-select.is-open .custom-select-menu {
+            display: block;
+        }
+
+        .custom-select-option {
+            display: block;
+            width: 100%;
+            border: 0;
+            border-radius: 12px;
+            padding: 10px 12px;
+            text-align: left;
+            background: transparent;
+            color: #e8f1e7;
+            font: inherit;
+            cursor: pointer;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .custom-select-option:hover,
+        .custom-select-option:focus-visible,
+        .custom-select-option[aria-selected="true"] {
+            background: #1f683a;
+            color: #ffffff;
+            outline: none;
+        }
+
+        .custom-select-option.is-placeholder {
+            color: #b5c4b7;
+        }
+
+        .custom-select-option:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
 
 
         .modal-overlay {
@@ -835,7 +990,7 @@
         }
         .modal-close { position: absolute; top: 20px; right: 20px; cursor: pointer; font-size: 20px; color: var(--text-muted); transition: var(--transition); z-index: 10; }
         .modal-close:hover { color: var(--sber-green); transform: scale(1.1); }
-        
+
         .modal-overlay.closing {
             animation: fadeOutOverlay 0.4s cubic-bezier(0.4, 0, 1, 1) forwards;
         }
@@ -850,7 +1005,7 @@
             width: 250px; flex-shrink: 0; display: flex; flex-direction: column; gap: 15px;
         }
         .modal-avatar-wrapper {
-            position: relative; width: 100%; height: 300px; border-radius: 20px; 
+            position: relative; width: 100%; height: 300px; border-radius: 20px;
             overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.1); background: var(--border-color);
         }
         .modal-avatar-wrapper img {
@@ -892,9 +1047,9 @@
         }
         .sd-label { font-size: 12px; color: var(--text-muted); font-weight: 600; }
         .sd-value { font-size: 14px; font-weight: 700; color: var(--text-main); }
-        
-        .event-item { 
-            padding: 12px 0; border-bottom: 1px solid var(--border-color); 
+
+        .event-item {
+            padding: 12px 0; border-bottom: 1px solid var(--border-color);
             display: flex; justify-content: space-between; align-items: center;
         }
         .status-pill { font-size: 11px; padding: 4px 10px; border-radius: 12px; font-weight: 600; }
@@ -916,7 +1071,7 @@
             z-index: -1;
             overflow: hidden;
         }
-        
+
         .particle {
             position: absolute;
             border-radius: 50%;
@@ -1276,10 +1431,10 @@
     <script>
         const themeToggle = document.getElementById('themeToggle');
         const themeIcon = themeToggle.querySelector('i');
-        
+
         const sidebar = document.getElementById('sidebar');
         const sidebarToggle = document.getElementById('sidebarToggle');
-        
+
         sidebarToggle.addEventListener('click', () => {
             sidebar.classList.toggle('collapsed');
         });
@@ -1322,7 +1477,7 @@
                 setDrawerOpen(false);
             }
         });
-        
+
         function setTheme(theme) {
             document.documentElement.setAttribute('data-theme', theme);
             if (theme === 'dark') {
@@ -1431,7 +1586,7 @@
 
         const trigger = document.getElementById('profileTrigger');
         const menu = document.getElementById('dropdownMenu');
-        
+
         if (trigger && menu) {
             trigger.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1479,40 +1634,40 @@
         // Генерация частиц для фона
         const particlesContainer = document.getElementById('particlesContainer');
         const particleCount = 50; // Количество частиц
-        
+
         for (let i = 0; i < particleCount; i++) {
             const particle = document.createElement('div');
             particle.classList.add('particle');
-            
+
             // Случайные размеры: от 2px до 8px
-            const size = Math.random() * 6 + 2; 
+            const size = Math.random() * 6 + 2;
             // Случайная начальная позиция: случайные координаты по всей странице
             const startX = Math.random() * 100;
             const startY = Math.random() * 100;
-            
+
             // Векторы движения: от -100px до 100px
-            const tx = (Math.random() - 0.5) * 200; 
+            const tx = (Math.random() - 0.5) * 200;
             const ty = (Math.random() - 0.5) * 200;
-            
+
             // Продолжительность анимации и задержка
             const duration = Math.random() * 15 + 10; // 10s до 25s
             const delay = Math.random() * 5;
-            
+
             // Прозрачность
             const opacity = Math.random() * 0.3 + 0.05; // 0.05 до 0.35
-            
+
             particle.style.width = `${size}px`;
             particle.style.height = `${size}px`;
             particle.style.left = `${startX}vw`;
             particle.style.top = `${startY}vh`;
-            
+
             particle.style.setProperty('--p-tx', `${tx}px`);
             particle.style.setProperty('--p-ty', `${ty}px`);
             particle.style.setProperty('--p-opacity', opacity);
-            
+
             particle.style.animationDuration = `${duration}s`;
             particle.style.animationDelay = `${delay}s`;
-            
+
             particlesContainer.appendChild(particle);
         }
 
@@ -1543,11 +1698,11 @@
         // --- SPA Navigation ---
         document.addEventListener('DOMContentLoaded', () => {
             const pageContent = document.getElementById('page-content');
-            
+
             // Обработка кликов по ссылкам в навигации
             document.body.addEventListener('click', async (e) => {
                 const link = e.target.closest('a.nav-item');
-                
+
                 if (link && link.href && link.href.startsWith(window.location.origin)) {
                     e.preventDefault();
                     const url = link.href;
@@ -1573,7 +1728,7 @@
 
                 try {
                     // Ждем завершения анимации исчезновения
-                    await new Promise(resolve => setTimeout(resolve, 300)); 
+                    await new Promise(resolve => setTimeout(resolve, 300));
 
                     // 2. Загрузка новой страницы
                     const response = await fetch(url, { redirect: 'follow', credentials: 'same-origin' });
@@ -1596,7 +1751,7 @@
                     if (newContent) {
                         // Заменяем заголовок документа (title)
                         document.title = doc.title;
-                        
+
                         // Вставляем новый контент
                         pageContent.innerHTML = newContent.innerHTML;
 
@@ -1682,6 +1837,279 @@
                     oldScript.parentNode.replaceChild(newScript, oldScript);
                 });
             }
+
+            function enhanceSelect(select) {
+                if (!select || select.dataset.customSelectEnhanced === '1') return;
+                if (select.multiple || Number(select.size || 0) > 1) return;
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'custom-select';
+                if (select.disabled) {
+                    wrapper.classList.add('is-disabled');
+                }
+
+                const parent = select.parentNode;
+                parent.insertBefore(wrapper, select);
+                wrapper.appendChild(select);
+
+                select.classList.add('custom-select-native');
+                select.dataset.customSelectEnhanced = '1';
+
+                const trigger = document.createElement('button');
+                trigger.type = 'button';
+                trigger.className = 'custom-select-trigger';
+                trigger.setAttribute('aria-haspopup', 'listbox');
+                trigger.setAttribute('aria-expanded', 'false');
+
+                const triggerText = document.createElement('span');
+                triggerText.className = 'custom-select-trigger-text';
+
+                const triggerIcon = document.createElement('span');
+                triggerIcon.className = 'custom-select-trigger-icon';
+                triggerIcon.setAttribute('aria-hidden', 'true');
+
+                trigger.append(triggerText, triggerIcon);
+
+                const menu = document.createElement('ul');
+                menu.className = 'custom-select-menu';
+                menu.setAttribute('role', 'listbox');
+
+                const menuId = select.id ? `${select.id}__menu` : `custom-select-${Math.random().toString(36).slice(2)}__menu`;
+                menu.id = menuId;
+                trigger.setAttribute('aria-controls', menuId);
+
+                const selectOptions = Array.from(select.options);
+                const optionButtons = [];
+                let menuIsOpen = false;
+
+                function positionMenu() {
+                    const rect = trigger.getBoundingClientRect();
+                    const viewportPadding = 8;
+                    const desiredWidth = rect.width;
+                    const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
+                    const menuHeight = Math.min(menu.scrollHeight || 0, 280);
+                    const openAbove = spaceBelow < Math.min(menuHeight, 220) && rect.top > spaceBelow;
+
+                    menu.style.minWidth = `${desiredWidth}px`;
+                    menu.style.maxWidth = `min(${desiredWidth}px, calc(100vw - ${viewportPadding * 2}px))`;
+                    menu.style.left = `${Math.max(viewportPadding, Math.min(rect.left, window.innerWidth - desiredWidth - viewportPadding))}px`;
+                    menu.style.top = openAbove
+                        ? `${Math.max(viewportPadding, rect.top - menuHeight - 8)}px`
+                        : `${Math.min(window.innerHeight - menuHeight - viewportPadding, rect.bottom + 8)}px`;
+                }
+
+                function handleViewportChange() {
+                    if (!menuIsOpen) return;
+                    positionMenu();
+                }
+
+                function syncSelection() {
+                    const selectedOption = select.options[select.selectedIndex] || select.options[0];
+                    triggerText.textContent = selectedOption ? selectedOption.textContent.trim() : 'Выберите значение';
+
+                    optionButtons.forEach((button) => {
+                        const isSelected = button.dataset.value === select.value;
+                        button.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+                    });
+                }
+
+                function closeMenu() {
+                    wrapper.classList.remove('is-open');
+                    trigger.setAttribute('aria-expanded', 'false');
+                    menu.style.display = 'none';
+                    menu.style.visibility = 'hidden';
+                    menuIsOpen = false;
+                    window.removeEventListener('scroll', handleViewportChange, true);
+                    window.removeEventListener('resize', handleViewportChange);
+                }
+
+                function openMenu() {
+                    if (select.disabled) return;
+                    wrapper.classList.add('is-open');
+                    trigger.setAttribute('aria-expanded', 'true');
+                    menu.style.display = 'block';
+                    menu.style.visibility = 'hidden';
+                    menu.style.opacity = '1';
+                    menu.style.zIndex = '3000';
+                    menuIsOpen = true;
+                    positionMenu();
+                    menu.style.visibility = 'visible';
+                    window.addEventListener('scroll', handleViewportChange, true);
+                    window.addEventListener('resize', handleViewportChange);
+                }
+
+                function toggleMenu() {
+                    if (wrapper.classList.contains('is-open')) {
+                        closeMenu();
+                    } else {
+                        openMenu();
+                    }
+                }
+
+                function setValue(value, emitChange = true) {
+                    if (select.value === value) {
+                        syncSelection();
+                        closeMenu();
+                        return;
+                    }
+
+                    select.value = value;
+                    syncSelection();
+
+                    if (emitChange) {
+                        select.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+
+                    closeMenu();
+                }
+
+                selectOptions.forEach((option, index) => {
+                    const item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'custom-select-option';
+                    item.setAttribute('role', 'option');
+                    item.dataset.value = option.value;
+                    item.textContent = option.textContent.trim();
+
+                    if (option.disabled) {
+                        item.disabled = true;
+                    }
+
+                    if (option.value === '' && option.disabled) {
+                        item.classList.add('is-placeholder');
+                    }
+
+                    if (option.selected) {
+                        item.setAttribute('aria-selected', 'true');
+                    } else {
+                        item.setAttribute('aria-selected', 'false');
+                    }
+
+                    item.addEventListener('click', () => setValue(option.value));
+                    item.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setValue(option.value);
+                        }
+                    });
+
+                    optionButtons.push(item);
+                    const listItem = document.createElement('li');
+                    listItem.appendChild(item);
+                    menu.appendChild(listItem);
+                });
+
+                select.insertAdjacentElement('afterend', trigger);
+                document.body.appendChild(menu);
+
+                trigger.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    toggleMenu();
+                });
+
+                trigger.addEventListener('keydown', (event) => {
+                    const enabledButtons = optionButtons.filter((button) => !button.disabled);
+                    const currentIndex = enabledButtons.findIndex((button) => button.dataset.value === select.value);
+
+                    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        if (!wrapper.classList.contains('is-open')) {
+                            openMenu();
+                        }
+
+                        if (!enabledButtons.length) return;
+
+                        let nextIndex = currentIndex;
+                        if (event.key === 'ArrowDown') {
+                            nextIndex = currentIndex < enabledButtons.length - 1 ? currentIndex + 1 : 0;
+                        } else if (event.key === 'ArrowUp') {
+                            nextIndex = currentIndex > 0 ? currentIndex - 1 : enabledButtons.length - 1;
+                        }
+
+                        const nextButton = enabledButtons[nextIndex] || enabledButtons[0];
+                        nextButton.focus();
+                    }
+
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        toggleMenu();
+                    }
+
+                    if (event.key === 'Escape') {
+                        closeMenu();
+                    }
+                });
+
+                menu.addEventListener('keydown', (event) => {
+                    const enabledButtons = optionButtons.filter((button) => !button.disabled);
+                    const activeButton = document.activeElement && document.activeElement.classList.contains('custom-select-option')
+                        ? document.activeElement
+                        : null;
+                    const currentIndex = activeButton ? enabledButtons.indexOf(activeButton) : -1;
+
+                    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        if (!enabledButtons.length) return;
+
+                        let nextIndex = currentIndex;
+                        if (event.key === 'ArrowDown') {
+                            nextIndex = currentIndex >= 0 && currentIndex < enabledButtons.length - 1 ? currentIndex + 1 : 0;
+                        } else if (event.key === 'ArrowUp') {
+                            nextIndex = currentIndex > 0 ? currentIndex - 1 : enabledButtons.length - 1;
+                        }
+
+                        enabledButtons[nextIndex].focus();
+                    }
+
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        if (activeButton) {
+                            activeButton.click();
+                        }
+                    }
+
+                    if (event.key === 'Escape') {
+                        closeMenu();
+                        trigger.focus();
+                    }
+                });
+
+                const label = select.id
+                    ? Array.from(document.querySelectorAll('label[for]')).find((el) => el.htmlFor === select.id)
+                    : null;
+
+                if (label) {
+                    label.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        openMenu();
+                        trigger.focus();
+                    });
+                }
+
+                select.addEventListener('change', syncSelection);
+
+                if (select.form) {
+                    select.form.addEventListener('reset', () => {
+                        window.setTimeout(() => syncSelection(), 0);
+                    });
+                }
+
+                document.addEventListener('click', (event) => {
+                    if (!wrapper.contains(event.target) && !menu.contains(event.target)) {
+                        closeMenu();
+                    }
+                });
+
+                syncSelection();
+            }
+
+            function enhanceSelects(root = document) {
+                root.querySelectorAll('select:not([multiple]):not([size]):not([data-custom-select-enhanced="1"])').forEach(enhanceSelect);
+            }
+
+            enhanceSelects();
+            document.addEventListener('spa-page-loaded', () => enhanceSelects());
         });
 
     </script>
