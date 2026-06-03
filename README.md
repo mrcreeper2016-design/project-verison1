@@ -1,245 +1,181 @@
-﻿# StarLift
+# StarLift
 
-**StarLift** — это платформа (MVP) для учёта, оценки и управления корпоративными спикерами. Проект автоматизирует сбор данных об участии сотрудников в конференциях, анализирует их активность (формируя скоринг) и предоставляет удобный дашборд для HR-специалистов и DevRel-менеджеров.
+**StarLift** — платформа для учёта, оценки и продвижения корпоративных спикеров. Система собирает в едином окне данные о выступлениях сотрудников (внутренние отчёты, самовыдвижение и автоматический парсинг внешних площадок), считает по ним метрики качества и помогает HR-бренду и DevRel объективно выбирать кандидатов на федеральные конференции.
+
+Технически это **монолит на Django** с серверным рендерингом шаблонов и лёгкой SPA-навигацией, PostgreSQL, парсером Highload++, AI-ассистентом на GigaChat и встроенным чатом поддержки.
+
+---
+
+## 📚 Документация
+
+Подробная документация вынесена в каталог [`docs/`](docs/):
+
+| Документ | О чём |
+|----------|-------|
+| [docs/architecture.md](docs/architecture.md) | Архитектура: приложения, потоки данных, фронтенд, технологии |
+| [docs/setup.md](docs/setup.md) | Установка локально, запуск через Docker, production-чеклист |
+| [docs/data-model.md](docs/data-model.md) | Модели БД, связи, расчёт NPS, миграции |
+| [docs/api.md](docs/api.md) | HTTP-маршруты: страницы, JSON API, SSE-эндпоинты |
+| [docs/auth-roles.md](docs/auth-roles.md) | Аутентификация, роли, инвайты, заявки, аудит, политика паролей |
+| [docs/parser.md](docs/parser.md) | Парсер Highload++ и команда `sync_highload` |
+| [docs/assistant.md](docs/assistant.md) | AI-ассистент на GigaChat (tool-calling, бюджеты, SSE) |
+| [docs/support.md](docs/support.md) | Чат поддержки (пользователи и гости) |
+
+---
 
 ## ✨ Ключевые возможности
 
-*   **Центлизованная база спикеров и мероприятий:** Единое хранилище всех выступлений и спикеров компании, их специализаций (stack), статусов и других метрик.
-*   **Автоматический парсинг конференций:** Встроенные скрипты скрапинга (playwright и др.) собирают информацию о предстоящих и прошедших IT-конференциях с внешних площадок (таких как Ontico, HighLoad++ и др.).
-*   **Дашборд и Аналитика:** Удобный веб-интерфейс на базе Django templates для просмотра списка спикеров, оценки NPS, фильтрации и мониторинга событий.
-*   **Скоринг и шорт-листы кандидатов:** Анализ текущей активности спикеров для выбора наиболее подходящих кандидатов на федеральные и профильные конференции.
+- **Единая база спикеров и мероприятий.** Карточки спикеров (специализация, город, NPS, фото, привязка к аккаунту) и события с M2M-связью «спикер ↔ мероприятие».
+- **Три контура ввода данных.** Внутренние отчёты (админ/DevRel), самовыдвижение спикера (загрузка прошедших мероприятий с верификацией DevRel) и автоматический парсинг Highload++.
+- **Дашборд и аналитика.** Главный «оперативный центр» (KPI, ближайшие события, топ спикеров, лента активности), страница аналитики с графиками (Chart.js), фильтры по NPS, городу, теме, периоду.
+- **Скоринг и кандидаты на выдвижение.** Автоотбор по порогам: средний балл ≥ 9.4, частота ≥ 2 событий за полгода, учёт флага «Рекомендую» от DevRel.
+- **Личный кабинет спикера (`/me/`).** Свои мероприятия, отзывы (с экспортом в CSV), приглашения от DevRel, заявки, избранное.
+- **Сбор отзывов через QR.** Печатный постер с QR ведёт на публичную форму оценки выступления (0–10).
+- **AI-ассистент на GigaChat.** Чат-виджет с tool-calling по данным платформы (только чтение), бюджетами токенов и rate-limit.
+- **Чат поддержки.** Виджет для авторизованных пользователей и гостей с real-time доставкой через SSE.
+- **Ролевой доступ.** Четыре роли (`admin`, `devrel`, `speaker`, `guest`), регистрация по инвайту, аудит действий, блокировка при брутфорсе.
 
 ---
 
 ## 🛠 Технологический стек
 
-*   **Backend:** Python 3.10+, Django
-*   **База данных:** PostgreSQL 
-*   **Скрапинг и парсинг:** playwright, модули для интеграции с внешними API (например, Tavily).
-*   **Frontend-шаблонизация:** Django Templates (HTML, CSS, JS), базовая аналитика и дашборды.
-*   **Архитектурный подход:** Модульный монолит с перспективой выделения сервисов.
+- **Backend:** Python 3.12, Django 6.0
+- **База данных:** PostgreSQL (16 в Docker)
+- **Фронтенд:** Django Templates + ванильный JS, лёгкая SPA-навигация, Chart.js, тёмная/светлая тема
+- **AI:** GigaChat (SberDevices) через пакет `gigachat`
+- **Парсинг:** `requests` + `beautifulsoup4` (Highload++)
+- **Хранилище медиа:** локальное `MEDIA_ROOT` или S3-совместимое (Cloudflare R2) через `django-storages`
+- **Статика:** WhiteNoise
+- **Деплой:** Docker + docker-compose, Gunicorn
+- **Архитектура:** модульный монолит (4 Django-приложения)
+
+Полный список — в [`requirements.txt`](requirements.txt).
 
 ---
 
-## 📂 Структура проекта
+## 🧩 Приложения
 
-Ниже представлено описание ключевых компонентов и файлов, входящих в MVP:
+| Приложение | Назначение |
+|------------|------------|
+| **`starlift`** | Домен: модели Speaker / Event / Feedback и сопутствующие, страницы и JSON API, аналитика, метрики главной, QR, кабинет спикера (`views_me`) |
+| **`accounts`** | Аутентификация: роли, инвайты, верификация email, блокировки, аудит, профиль, консоль администратора/DevRel, заявки спикеров |
+| **`assistant`** | AI-чат на GigaChat: agent-loop с tool-calling, SSE-стрим, бюджеты токенов, rate-limit |
+| **`support`** | Чат поддержки: тикеты, сообщения, real-time через SSE; отдельный контур для гостей по токену |
 
-- 📄 **`README.md`** — Эта документация.
-- 📄 **`requirements.txt`** — Список Python-зависимостей проекта.
-- 📁 **`docs/`** — Архитектура проекта и спецификации (например, `architecture.md`).
-- 📁 **`starlift/`** — Основная рабочая директория Django-приложения:
-  - 📄 **`manage.py`** — Утилита командной строки и точка управления Django.
-  - 📁 **`starlift/`** — Ядро приложения (backend):
-    - `settings.py` — Глобальные настройки (подключение БД, middleware).
-    - `models.py` — Описание структуры базы данных (сущности Speaker, Event).
-    - `urls.py` — Маршрутизация роутов API и страниц сайта.
-    - `views.py` — Основная бизнес-логика (работа с данными и рендер шаблонов).
-  - 📁 **`parser/`** — Модули для автоматизированного сбора данных о конференциях:
-    - `highload.py`, `highload_importer.py` — разбор страниц Highload++ и импорт в БД через `sync_highload`;
-    - `parser_ontico.py`, `ontico_scraper_db.py` — скраперы для других IT-мероприятий.
-    - `tavily_parser.py` — Интеграция с внешним API Tavily.
-  - 📁 **`templates/`** — Графический интерфейс, HTML-шаблоны страниц:
-    - Дашборд (`index.html`), аналитика (`analytics.html`), списки и профили (`speakers.html`, `profile.html`, `events.html`).
-  - 📁 **`media/`** — Директория загружаемых пользовательских файлов и фотографий спикеров.
-  - 📁 **`static/`** — Директория статических файлов (темы оформления CSS, скрипты).
+Детали — в [docs/architecture.md](docs/architecture.md).
 
 ---
 
-## ⚙️ Как работает система
+## 🚀 Быстрый старт
 
-1. **Сбор данных:** Автономные скрипты в папке parser/ анализируют сайты ключевых IT-конференций (Ontico, HighLoad) и собирают данные через веб-скрапинг. Полученные данные (спикеры, доклады) подготавливаются и заносятся в основную базу.
-2. **Управление и хранение (Backend):** В models.py приложения описаны базовые сущности:
-   * **Speaker** — содержит специализацию (stack), город, статус, метрику NPS, фотографию и т.д.
-   * **Event** — содержит описание мероприятий, даты, статусы (past / uture) и данные о расписаниях докладов.
-3. **Отображение (Frontend):** Итоговые данные маршрутизируются через iews.py в шаблоны директории 	emplates/. Пользователям (как правило HR/DevRel) предоставляется консоль в виде аналитических графиков (nalytics.html), каталога корпоративных спикеров (speakers.html) и списков конференций.
+### Вариант A — Docker (рекомендуется)
 
----
-
-## 🚀 Установка и запуск (локально)
-
-### Требования
-* Python 3.10+
-* PostgreSQL
-* Python benv
-
-### Шаги установки:
-
-> в разработке...
-
-## 🔐 Аутентификация и роли
-
-StarLift использует кастомное приложение `accounts` поверх стандартного `django.contrib.auth`.
-
-**Роли:**
-- `admin` — полный доступ к CRUD спикеров, invite-ам, console, аудиту.
-- `speaker` — доступ к дашборду, списку спикеров/событий и личному кабинету.
-
-**Основные потоки:**
-- **Регистрация только по приглашению.** Админ создаёт инвайт в `/console/invites/`; токен доставляется письмом (ссылка `/auth/invite/<token>/`) и одноразовый.
-- **Логин** по `username` или `email` на `/auth/login/`. Блокировка после 6 неудач подряд в течение 60 секунд (`ACCOUNTS_LOCKOUT_THRESHOLD` / `ACCOUNTS_LOCKOUT_WINDOW_SECONDS`).
-- **Восстановление пароля** через `/auth/password-reset/` (email со ссылкой, действительной 1 час).
-- **Смена email** в профиле требует подтверждения по ссылке; до подтверждения хранится в `UserProfile.pending_email`.
-- **Связка `User ↔ Speaker`** выполняется вручную администратором из карточки пользователя (`/console/users/<id>/`).
-
-**Политика паролей:** минимум 8 символов; не только цифры; не только спецсимволы; валидация по общим словарям + сходству с атрибутами пользователя.
-
-**Аудит:** все значимые события (логины, сбросы, изменения ролей, инвайты, связки) пишутся в `accounts_audit_log` и просматриваются в `/console/audit/`.
-
-**Очистка устаревших записей:**
 ```bash
-python manage.py cleanup_stale_auth --dry-run          # показать
-python manage.py cleanup_stale_auth                     # применить
-python manage.py cleanup_stale_auth --login-attempt-days 30
+# 1. Подготовьте production-окружение
+cp starlift/.env.example starlift/.env.production
+# отредактируйте DB_*, SECRET_KEY, GIGACHAT_* и т.д.
+
+# 2. Поднимите стек (Postgres + web + парсер)
+docker compose up -d --build
+
+# 3. Создайте администратора
+docker compose exec web python manage.py createsuperuser
 ```
-Запускать раз в сутки по расписанию.
 
-### Highload++ (`sync_highload`)
+Веб доступен на `http://127.0.0.1:8000`. Контейнер `web` сам прогоняет миграции и `collectstatic` (см. `entrypoint.sh`, переменная `RUN_MIGRATIONS=true`).
 
-Доклады с `highload.ru` сохраняются **напрямую в PostgreSQL** (модели `Speaker`, `Event`, связь M2M). **CSV не используется.**
-
-Разовый проход:
+### Вариант B — локально
 
 ```bash
 cd starlift
-python manage.py sync_highload --once
-```
+python -m venv ../.venv && ../.venv/Scripts/activate   # Windows
+# source ../.venv/bin/activate                          # Linux/macOS
+pip install -r ../requirements.txt
 
-Цикл с паузой между проходами (интервал по умолчанию 30 минут — задайте флагом или `HIGHLOAD_INTERVAL_MINUTES` в `.env`):
-
-```bash
-python manage.py sync_highload --interval-minutes 30
-```
-
-`--max-cycles N` ограничивает число итераций (удобно для отладки). Список URL — `HIGHLOAD_URLS` в `.env`, пример в `starlift/.env.example`.
-
----
-
-## ⚙️ Переменные окружения
-
-Положите файл `.env` в `starlift/` (рядом с `manage.py`). Пример:
-
-```dotenv
-# Database (Postgres)
-DB_ENGINE=django.db.backends.postgresql
-DB_NAME=starlift_db
-DB_USER=starlift
-DB_PASSWORD=change-me
-DB_HOST=localhost
-DB_PORT=5432
-
-# Email (console backend for dev, SMTP for prod)
-EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
-# EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-EMAIL_HOST=smtp.example.com
-EMAIL_PORT=587
-EMAIL_HOST_USER=no-reply@starlift.local
-EMAIL_HOST_PASSWORD=change-me
-EMAIL_USE_TLS=true
-DEFAULT_FROM_EMAIL=no-reply@starlift.local
-SITE_URL=https://starlift.example.com
-
-# Auth tuning (defaults shown)
-ACCOUNTS_LOCKOUT_THRESHOLD=6
-ACCOUNTS_LOCKOUT_WINDOW_SECONDS=60
-ACCOUNTS_INVITE_TTL_DAYS=7
-ACCOUNTS_EMAIL_CHANGE_TTL_HOURS=24
-ACCOUNTS_RESET_EMAIL_MIN_INTERVAL_SECONDS=300
-
-# Highload++ parser (`python manage.py sync_highload`)
-HIGHLOAD_URLS=https://highload.ru/moscow/2025/abstracts,https://highload.ru/spb/2026/abstracts
-HIGHLOAD_INTERVAL_MINUTES=30
-HIGHLOAD_REQUEST_TIMEOUT=20
-HIGHLOAD_MAX_RETRIES=3
-
-# Object storage (S3-compatible, recommended free option: Cloudflare R2)
-USE_OBJECT_STORAGE=false
-STORAGE_ENDPOINT_URL=https://<accountid>.r2.cloudflarestorage.com
-STORAGE_BUCKET_NAME=starlift-media
-STORAGE_ACCESS_KEY=<r2-access-key-id>
-STORAGE_SECRET_KEY=<r2-secret-access-key>
-STORAGE_REGION=auto
-# Public base URL for serving media files (R2 custom domain or CDN)
-STORAGE_PUBLIC_BASE_URL=https://media.example.com
-# Optional: auto | virtual | path
-STORAGE_ADDRESSING_STYLE=auto
-```
-
-В продакшене также выставьте `DEBUG=False`, `SECRET_KEY`, `ALLOWED_HOSTS`, включите HTTPS (`SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS`).
-
----
-
-## 🗂 Object Storage и миграция аватаров
-
-Для хранения аватаров в bucket включите:
-
-```dotenv
-USE_OBJECT_STORAGE=true
-```
-
-После настройки переменных storage выполните миграции и перенос legacy-файлов:
-
-```bash
-cd starlift
+cp .env.example .env          # пропишите DB_* и при необходимости GIGACHAT_*
 python manage.py migrate
-python manage.py migrate_avatars_to_object_storage --dry-run
-python manage.py migrate_avatars_to_object_storage
+python manage.py createsuperuser
+python manage.py runserver
 ```
 
-`migrate_avatars_to_object_storage` переносит legacy-аватары спикеров из путей вида `/media/...` в новое поле `Speaker.avatar`.
+Полная инструкция (требования, переменные окружения, object storage, production-чеклист) — в [docs/setup.md](docs/setup.md).
+
+---
+
+## ⚙️ Частые команды
+
+Все команды выполняются из каталога `starlift/`.
+
+```bash
+# Разработка
+python manage.py runserver
+python manage.py makemigrations && python manage.py migrate
+
+# Парсер Highload++
+python manage.py sync_highload --once                  # один проход
+python manage.py sync_highload --interval-minutes 30   # цикл
+
+# Обслуживание
+python manage.py cleanup_stale_auth --dry-run          # очистка устаревших токенов/попыток
+python manage.py seed_demo_feedbacks                   # демо-отзывы
+python manage.py migrate_avatars_to_object_storage --dry-run
+
+# Тесты
+python manage.py test accounts     # auth, инвайты, lockout, профиль
+python manage.py test starlift     # модели, парсер, NPS, кабинет, дедлайны
+python manage.py test assistant    # AI-ассистент
+python manage.py test              # всё
+```
 
 ---
 
 ## 🧪 Тесты
 
+Покрытие включает: валидаторы и политику паролей, backend логина, блокировку при брутфорсе, токены и аудит, flow логина / сброса / смены пароля, инвайты (создание / отзыв / приём), профиль и смену email, консоль (привязка спикера, разблокировка, смена роли); парсинг Highload++ и импорт без дублей, команду `sync_highload`; модели и расчёт NPS, кабинет спикера, дедлайны и self-submission мероприятий, дашборд главной; инструменты и agent-loop AI-ассистента.
+
 ```bash
 cd starlift
-python manage.py test accounts
-python manage.py test starlift
+python manage.py test
 ```
-
-Покрывают: валидаторы паролей, backend логина, lockout, токены, аудит, login-flow, password reset/change, invite flow (create/revoke/accept), профиль, email change, admin console (link-speaker, unlock, role change); парсинг Highload, импорт в БД без дубликатов, management-команда `sync_highload`.
-
-### Smoke-checklist после включения object storage
-
-1. Войти под администратором и загрузить аватар в личном кабинете (`/profile/`).
-2. Убедиться, что аватар отображается в header (правый верхний блок профиля).
-3. Создать/изменить спикера с новым изображением и проверить карточки в `/speakers/`, `/analytics/`, `/`.
-4. Запустить `python manage.py migrate_avatars_to_object_storage --dry-run` и проверить отчёт без ошибок.
-5. Запустить `python manage.py migrate_avatars_to_object_storage` и убедиться, что legacy `/media/...` аватары доступны из bucket URL.
 
 ---
 
-## 🔄 Rollback миграций accounts + starlift
+## 📂 Структура репозитория (кратко)
 
-Миграции, добавленные в этой итерации:
-
-| app        | migration                               | смысл                                            |
-|------------|-----------------------------------------|--------------------------------------------------|
-| accounts   | `0001_initial`                          | UserProfile, Invite, EmailVerification, LoginAttempt, AuditLog |
-| accounts   | `0002_auth_user_email_lower_index`      | Postgres: уникальный индекс `LOWER(email)`       |
-| accounts   | `0003_backfill_profiles`                | Бэкфилл UserProfile для существующих User        |
-| starlift   | `0009_speaker_bio_speaker_user`         | Добавляет `Speaker.bio` и `Speaker.user` (O2O)   |
-
-Откат полной итерации:
-
-```bash
-# 1) Откатить код до предыдущего коммита (accounts app отсутствует).
-git revert <merge-commit>
-
-# 2) Откатить миграции в обратном порядке:
-python manage.py migrate starlift 0008_home_timestamps
-python manage.py migrate accounts zero
-
-# 3) Удалить каталог accounts/ из кода (если остался), рестартнуть процесс.
+```
+project-verison1/
+├── README.md                # этот файл
+├── CLAUDE.md                # заметки для AI-ассистента разработки
+├── requirements.txt
+├── Dockerfile / docker-compose.yml / entrypoint.sh
+├── docs/                    # подробная документация (см. таблицу выше)
+└── starlift/                # корень Django (рядом manage.py)
+    ├── manage.py
+    ├── starlift/            # конфиг + домен (settings, urls, models, views, analytics…)
+    ├── accounts/            # аутентификация, консоль, профиль
+    ├── assistant/           # AI-ассистент (GigaChat)
+    ├── support/             # чат поддержки
+    ├── parser/              # Highload++ парсер
+    ├── templates/           # общие HTML-шаблоны
+    ├── static/ media/       # статика и загружаемые файлы
+    └── */management/commands/   # sync_highload, cleanup_stale_auth, …
 ```
 
-Важное:
-- `accounts.0002_auth_user_email_lower_index` безопасно откатывается — индекс удаляется.
-- `accounts.0003_backfill_profiles` при откате чистит `accounts_userprofile`; данные без миграций не теряются, роли можно восстановить повторным бэкфиллом.
-- `starlift.0009` удаляет `Speaker.bio` и `Speaker.user`, что может потерять ручные привязки спикеров к пользователям — перед откатом сделайте дамп.
+Подробная карта каталогов — в [docs/architecture.md](docs/architecture.md).
 
 ---
 
-## 📖 Архитектура
-Дополнительная документация и схема архитектуры находятся в docs/architecture.md.
+## 🔐 Безопасность
+
+- Регистрация **только по приглашению** (или через заявку гостя на роль спикера с одобрением DevRel).
+- Блокировка после 6 неудачных логинов за 60 секунд (настраивается).
+- Аудит всех значимых действий в `AuditLog` (`/console/audit/`).
+- Стандартные механизмы Django: CSRF, сессии, хеширование паролей, расширенная политика паролей.
+
+Перед продакшеном обязательно: задайте свой `SECRET_KEY`, `DEBUG=False`, корректные `ALLOWED_HOSTS` / `CSRF_TRUSTED_ORIGINS`, включите HTTPS. См. [docs/setup.md](docs/setup.md) и [docs/auth-roles.md](docs/auth-roles.md).
+
+---
+
+## 📄 Лицензия
+
+Внутренний проект (MVP). Условия использования уточняйте у владельца репозитория.

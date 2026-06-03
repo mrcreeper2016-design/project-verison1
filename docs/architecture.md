@@ -1,36 +1,41 @@
-# StarLift — архитектура проекта (как реализовано)
+# StarLift — архитектура
 
-> Актуальное описание кодовой базы.  
-> **Стек:** Django (монолит), PostgreSQL, шаблоны Django + клиентский JS.  
-> Обновлено: 2026-05-06
+> Актуальное описание кодовой базы (как реализовано).
+> **Стек:** Django 6 (монолит), PostgreSQL, серверные шаблоны + клиентский JS, GigaChat.
+> Обновлено: 2026-06-03
 
-Документ **не** описывает целевой FastAPI/React-план из ранних черновиков — только то, что есть в репозитории.
+Документ описывает **то, что есть в репозитории**, а не ранние черновики целевой архитектуры (FastAPI/React/Telegram-бот в коде отсутствуют).
 
 ---
 
 ## 1. Общий вид
 
 ```
-┌──────────────┐     HTTP (HTML + JSON)      ┌─────────────────────────────────────┐
-│   Браузер    │ ──────────────────────────► │  Django (проект ``starlift``)        │
-│              │                             │  • Приложение ``starlift`` (домен)   │
-│              │ ◄────────────────────────── │  • Приложение ``accounts`` (auth)   │
-└──────────────┘                             └──────────────┬──────────────────────┘
-                                                            │
-                              ┌─────────────────────────────┼─────────────────────────────┐
-                              ▼                             ▼                             ▼
-                     ┌───────────────┐             ┌───────────────┐             ┌───────────────┐
-                     │  PostgreSQL   │             │  MEDIA / S3   │             │  parser/      │
-                     │  (ORM модели) │             │  (аватары)    │             │  Highload++   │
-                     └───────────────┘             └───────────────┘             └───────┬───────┘
-                                                                                        │
-                                                                                        ▼
-                                                                               ``manage.py sync_highload``
+┌──────────────┐   HTTP (HTML + JSON + SSE)   ┌──────────────────────────────────────────┐
+│   Браузер    │ ───────────────────────────► │  Django (проект ``starlift``)             │
+│  + лёгкий JS │                              │  • starlift   — домен (спикеры, события)  │
+│  (SPA-нав.)  │ ◄─────────────────────────── │  • accounts   — auth, роли, консоль       │
+└──────────────┘                              │  • assistant  — AI-чат (GigaChat)         │
+                                              │  • support    — чат поддержки             │
+                                              └───────┬───────────────┬───────────┬───────┘
+                                                      │               │           │
+                              ┌───────────────────────┘               │           └─────────────┐
+                              ▼                                        ▼                         ▼
+                     ┌───────────────┐                        ┌───────────────┐         ┌───────────────┐
+                     │  PostgreSQL   │                        │ MEDIA / S3-R2 │         │  GigaChat API │
+                     │  (ORM модели) │                        │  (аватары,    │         │  (внешний LLM)│
+                     └───────────────┘                        │   фото, файлы)│         └───────────────┘
+                              ▲                                └───────────────┘
+                              │
+                     ┌────────┴────────┐
+                     │   parser/       │  ← `manage.py sync_highload` (отдельный контейнер/процесс)
+                     │   Highload++    │
+                     └─────────────────┘
 ```
 
-- **Один процесс веб-приложения** — Django (views, ORM, шаблоны).
-- **Импорт внешних докладов** — не отдельный микросервис, а пакет `parser/` и management-команда `sync_highload` (пишет в те же таблицы, что и админка).
-- **Отдельного Telegram-бота, Redis, Celery, FastAPI** в репозитории нет.
+- **Один web-процесс** Django (views + ORM + шаблоны), запускается под Gunicorn.
+- **Импорт внешних докладов** — не микросервис, а пакет `parser/` + management-команда `sync_highload`, пишущая в те же таблицы.
+- **AI-ассистент и поддержка** — внутренние Django-приложения, отдающие данные через SSE-стрим в виджеты на `base.html`.
 
 ---
 
@@ -38,173 +43,178 @@
 
 ```
 project-verison1/
-├── docs/
-│   └── architecture.md          # этот файл
+├── docs/                          # документация (этот каталог)
 ├── README.md
+├── CLAUDE.md                      # заметки для AI-ассистента разработки
 ├── requirements.txt
-└── starlift/                    # корень Django (рядом manage.py)
+├── Dockerfile, docker-compose.yml, entrypoint.sh, .dockerignore
+└── starlift/                      # корень Django (рядом manage.py)
     ├── manage.py
-    ├── starlift/                # конфиг + «ядро» продукта
-    │   ├── settings.py
-    │   ├── urls.py
-    │   ├── models.py            # Speaker, Event, Feedback
-    │   ├── views.py             # страницы и JSON API
-    │   ├── forms.py
-    │   ├── analytics.py         # дашборд аналитики, фильтры, кандидаты
-    │   ├── home_metrics.py      # KPI и блоки главной (/api/home/)
-    │   └── management/commands/
-    │       ├── sync_highload.py
-    │       └── seed_demo_feedbacks.py
-    ├── accounts/                # аутентификация, консоль, инвайты, профиль
-    │   ├── models.py            # UserProfile, Invite, AuditLog, …
-    │   ├── decorators.py        # member_required, role_required
-    │   ├── views/
-    │   ├── services/
-    │   └── management/commands/
-    ├── parser/                  # разбор HTML Highload++, импорт в ORM
-    │   ├── highload.py
-    │   └── highload_importer.py
-    ├── templates/               # общие страницы (base.html, speakers, events, …)
-    └── accounts/templates/      # auth + console + profile (кабинет)
+    ├── starlift/                  # конфиг + домен
+    │   ├── settings.py            # один файл настроек, читает .env
+    │   ├── urls.py                # корневой роутер
+    │   ├── models.py              # Speaker, Event, Feedback, EventRequest, …
+    │   ├── views.py               # страницы + JSON API (домен)
+    │   ├── views_me.py            # личный кабинет спикера (/me/…)
+    │   ├── forms.py               # SpeakerForm, FeedbackForm, загрузка событий
+    │   ├── analytics.py           # NPS, распределения, кандидаты на выдвижение
+    │   ├── home_metrics.py        # KPI и блоки главной (/api/home/)
+    │   ├── admin.py
+    │   └── management/commands/   # sync_highload, seed_demo_feedbacks
+    ├── accounts/                  # аутентификация и консоль
+    │   ├── models.py              # UserProfile, Invite, EmailVerification, LoginAttempt, AuditLog
+    │   ├── decorators.py          # member_required, role_required, anonymous_required
+    │   ├── middleware.py          # GuestApplicationRedirectMiddleware
+    │   ├── auth_backends.py       # вход по username ИЛИ email
+    │   ├── password_validators.py # доп. валидатор пароля
+    │   ├── context_processors.py  # header_avatar_url
+    │   ├── views/                 # auth, register, invite, password, email, profile, console, speaker_application
+    │   ├── services/              # speaker_avatar и пр.
+    │   ├── templates/accounts/    # auth + console + profile
+    │   └── management/commands/   # cleanup_stale_auth, migrate_avatars_to_object_storage
+    ├── assistant/                 # AI-чат на GigaChat
+    │   ├── models.py              # Conversation, Message
+    │   ├── agent/                 # loop.py, gigachat_client.py, budget.py, tools/
+    │   ├── services/              # rate_limit и пр.
+    │   └── views/                 # chat (SSE), conversations
+    ├── support/                   # чат поддержки
+    │   ├── models.py              # SupportTicket, SupportMessage, SupportRead
+    │   ├── urls.py, urls_guest.py
+    │   └── views/                 # tickets, stream (SSE), api, guest
+    ├── parser/                    # импорт внешних докладов
+    │   ├── highload.py            # разбор HTML Highload++
+    │   ├── highload_importer.py   # запись в ORM (Speaker/Event, M2M)
+    │   └── tavily_parser.py       # вспомогательная интеграция (необязательный контур)
+    ├── templates/                 # base.html, index, speakers, events, analytics, qr_*, me/…
+    ├── static/                    # CSS/JS/ассеты
+    └── media/                     # загружаемые файлы (если не object storage)
 ```
-
-Дополнительные скрипты в корне `starlift/` (`compute_nps.py`, `update_nps.py`, и т.д.) — вспомогательные, не обязательный контур рантайма.
 
 ---
 
 ## 3. Приложение `starlift` (домен)
 
-### 3.1 Модели (`starlift/models.py`)
+### 3.1 Модели
+
+Полное описание полей и связей — в [data-model.md](data-model.md). Кратко:
 
 | Модель | Назначение |
 |--------|------------|
-| **Speaker** | Карточка спикера: имя, `sub`, `stack`, город, био, NPS (агрегат), фото (`img` / `avatar`), флаг `recommended`, связь `User` (опционально), статус привязки через `user` → `authorized`/`unauthorized`. |
-| **Event** | Мероприятие: название, статус (`past`/`future`), даты, место, описание, флаг внешнего события, `source` (internal/self/external/parser), **M2M `speakers`**. |
-| **Feedback** | Оценка выступления: FK на `Speaker` и `Event`, балл **0–10**, комментарий, служебные поля. При сохранении пересчитывается **NPS спикера** (доля 9–10 минус доля 0–6, в процентах −100…100). |
+| **Speaker** | Карточка спикера. Опциональная O2O-связь с `User`; `status` авто-выставляется в `authorized`/`unauthorized` в `save()`. Поле `nps` — кэш среднего балла. |
+| **Event** | Мероприятие. M2M `speakers`. Поля `source` (internal/self/external/parser), `status` (past/future), `verification_status` (для self-submit), `application_deadline`. |
+| **EventPhoto** | Фотоотчёт события (загружается спикером при self-submit). |
+| **Feedback** | Оценка выступления зрителем (0–10). В `save()` пересчитывает `Speaker.nps`. |
+| **SpeakerEventRating** | Самооценка спикера за событие (0–10), одна на пару (speaker, event). Тоже влияет на `Speaker.nps`. |
+| **EventRequest** | Заявка спикера: создать событие (`create`) или присоединиться (`join`). |
+| **EventInvitation** | Приглашение DevRel спикеру на событие. |
+| **SpeakerApplication** | Заявка гостя на получение роли спикера (одобряет DevRel по `company`). |
+| **SpeakerLike** | Лайк/избранное спикера от пользователя. |
 
-Связь «спикер выступал на событии» отражается **M2M** `Event.speakers` (и обратно `speaker.events`). Отзыв (`Feedback`) привязан к паре спикер + событие.
+Доменное ядро: **Speaker ↔ Event (M2M)** + оценки (`Feedback`, `SpeakerEventRating`).
 
-### 3.2 Основные HTTP-маршруты (`starlift/urls.py`)
+### 3.2 Расчёт NPS (важный нюанс)
 
-- **Страницы (HTML):** `/`, `/explore/`, `/speakers/`, `/events/`, `/analytics/`, формы спикера, страница оценки, thanks, генератор QR.
-- **JSON API:**  
-  - `GET /api/speakers/` — список спикеров с событиями и отзывами (для таблицы на фронте).  
-  - `GET /api/events/` — события со спикерами (лента мероприятий).  
-  - `GET /api/home/` — агрегаты для главного дашборда (KPI, топы, активность).
+В коде есть **две разные величины**, обе исторически называются «NPS»:
 
-Доступ к разделам для участников ограничен декораторами **`member_required`** (роли `admin` или `speaker`) или **`role_required('admin')`** где нужен только админ.
+1. **`Speaker.nps`** — это **средний балл (0–10)** по всем отзывам зрителей и самооценкам спикера. Считается в `Speaker.calculate_nps()` как `round(sum(scores)/len(scores), 1)` и кэшируется в поле при каждом `Feedback.save()` / `SpeakerEventRating.save()`.
+2. **Классический NPS** `(promoters% − detractors%)` (промоутеры: балл ≥ 9, детракторы: ≤ 6) — считается **на лету** в `analytics.compute_nps()` для распределений, а в `home_metrics.top_speakers()` промоутеры/детракторы используются как вторичный ключ сортировки лидерборда.
 
-### 3.3 Аналитика и метрики
+То есть на карточках и в KPI обычно показывается **средний балл**, а проценты промоутеров/детракторов — вспомогательная аналитика. Поле `Speaker.nps` — кэш, не источник истины (источник — отзывы).
 
-- **`starlift/analytics.py`** — разбор query-параметров периода, расчёт NPS/распределений, **отбор кандидатов на выдвижение** по порогам (средний балл, число событий, окно по датам, флаг `recommended`).
-- **`starlift/home_metrics.py`** — данные для главной: KPI, предстоящие события, топ спикеров, лента активности, версия кэша для поллинга.
+### 3.3 Страницы и API
 
-### 3.4 QR-коды
+См. [api.md](api.md). Кратко:
 
-- Страница выбора: `/qr-generator/` (участник).
-- Генерация изображения: `/speaker/<id>/event/<id>/qr/`.
-- **Админ** — любой спикер и любое событие; **спикер** — только своя карточка и только события из своего M2M-набора (см. `views.qr_generator_view`, `views.generate_qr_view`).
+- **HTML-страницы:** `/` (главная), `/explore/` (гостевой лендинг), `/speakers/`, `/events/`, `/analytics/`, формы спикера, `/qr-generator/`, публичная оценка `/rate/<event>/<speaker>/`, кабинет `/me/…`.
+- **JSON API:** `/api/speakers/`, `/api/events/`, `/api/home/`, `/api/notifications/`, лайки/рекомендации, заявки и быстрые одобрения.
+- **Доступ** ограничен декораторами `member_required` (admin/devrel/speaker) и `role_required('admin')`; кабинет `/me/` — `speaker_required`.
+
+### 3.4 Аналитика и метрики
+
+- **`analytics.py`** — разбор фильтров (период, город, тема, порог NPS), распределения оценок, **отбор кандидатов на выдвижение** (средний балл ≥ порог, частота событий за окно, флаг `recommended`).
+- **`home_metrics.py`** — данные главного дашборда: KPI, ближайшие события, топ спикеров (для admin/devrel), лента активности (admin/devrel), «Ваши мероприятия» (для спикера), плюс `version`-хэш для лёгкого поллинга `/api/home/`.
+
+### 3.5 Личный кабинет спикера (`views_me.py`)
+
+Маршруты `/me/…` под декоратором `speaker_required` (роль `speaker` + привязанная карточка `Speaker`). Разделы: дашборд, свои мероприятия (с загрузкой прошедших и самооценкой), отзывы (+ экспорт CSV), приглашения от DevRel (принять/отклонить), заявки, избранное.
+
+### 3.6 QR-коды
+
+- `/qr-generator/` — выбор пары спикер↔событие (комбобоксы взаимно фильтруются по M2M).
+- `/speaker/<id>/event/<id>/qr/` — страница с QR; `/…/qr/poster.png` — печатный PNG-постер (шрифт DejaVu из `starlift/assets/fonts/`, чтобы кириллица рендерилась на любом сервере).
+- Админ/DevRel — любая валидная пара; спикер — только своя карточка и только события из своего M2M-набора.
 
 ---
 
 ## 4. Приложение `accounts`
 
-### 4.1 Роли (`UserProfile.role`)
+Полное описание — в [auth-roles.md](auth-roles.md). Кратко:
 
-- **`admin`** — консоль пользователей, инвайты, аудит, полный CRUD спикеров (где не ограничено отдельно).
-- **`speaker`** — доступ к витрине (дашборд, спикеры, события, аналитика, QR и т.д. по `member_required`).
-- **`guest`** — по умолчанию после саморегистрации; витрина закрыта, доступна заявочная/landing-логика (`explore` и т.п.).
-
-Суперпользователь Django трактуется как администратор на уровне проверок ролей там, где это учтено в коде.
-
-### 4.2 Ключевые сущности
-
-- **UserProfile** — роль, верификация email, `avatar`, связь с `User`.
-- **Invite** — регистрация по приглашению; может указывать целевую роль и связку с `Speaker`.
-- **AuditLog**, **EmailVerification**, **LoginAttempt** — аудит, верификация почты, защита от брутфорса (настройки в `settings`).
-
-### 4.3 Маршруты
-
-Префиксы вида `/auth/...`, `/profile/`, `/console/...` — см. `accounts/urls.py` (логин, сброс пароля, инвайт, профиль, смена email, консоль пользователей и инвайтов, аудит).
-
-### 4.4 Профиль спикера
-
-Личный кабинет (`accounts/views/profile.py`, шаблон `accounts/profile.html`): редактирование имени, аватара и **описания карточки** для привязанного спикера (синхрон с `Speaker.stack` / био), отдельная карточка «профиль спикера» на фронте убрана в пользу одного блока «Основное».
+- **Роли (`UserProfile.role`):** `admin`, `devrel`, `speaker`, `guest`. `admin`+`devrel` — «staff» (управление контентом). Связка `User ↔ Speaker` — вручную из консоли.
+- **Вход** по `username` **или** `email` (`auth_backends.UsernameOrEmailBackend`).
+- **Регистрация** только по инвайту; гость может подать `SpeakerApplication` на роль спикера.
+- **Защита:** блокировка при брутфорсе (`LoginAttempt`), верификация email (`EmailVerification`), аудит (`AuditLog`).
+- **Консоль** `/console/…` для admin/devrel: пользователи, инвайты, аудит, заявки на события, приглашения, заявки спикеров, верификация self-submitted событий.
+- **Middleware** `GuestApplicationRedirectMiddleware` направляет гостя в заявочный/landing-контур.
 
 ---
 
-## 5. Фронтенд (как устроен)
+## 5. Приложения `assistant` и `support`
 
-- **Рендер:** серверные шаблоны Django, общая оболочка **`templates/base.html`** (навигация, тема, частицы фона).
-- **«SPA»-навигация:** перехват кликов по `.nav-item`, `fetch` полной страницы, извлечение `#page-content` и `#page-modals`, подстановка в DOM и **повторное выполнение** встроенных `<script>` (функция `executeInlineScripts`). Событие `spa-page-loaded` для инициализации страниц.
-- **Интерактив:** отдельные скрипты в шаблонах (`speakers.html`, `events.html`, `index.html`, `analytics.html`) — загрузка JSON с API, фильтры, модалки.
-- **Стили:** в основном в `<style>` внутри шаблонов + CSS-переменные для светлой/тёмной темы (`data-theme`).
+Оба — **drawer-виджеты** (без отдельных страниц), подключаются в `templates/base.html` и общаются с бэкендом через JSON + **SSE** (Server-Sent Events).
 
-Отдельного бандла React/Next.js в проекте **нет**.
+- **`assistant`** — AI-чат на GigaChat. Agent-loop с tool-calling (read-only инструменты по данным платформы), бюджеты токенов и rate-limit. См. [assistant.md](assistant.md).
+- **`support`** — чат поддержки: тикеты и сообщения, real-time через SSE; отдельный контур для гостей по токену (`/support/…`). См. [support.md](support.md).
 
 ---
 
-## 6. Потоки данных
+## 6. Фронтенд
 
-### 6.1 Ручной и админский ввод
-
-Администратор / уполномоченный пользователь создаёт и правит **Speaker** и **Event** через Django views и админку (`/admin/`), связывает спикеров с событиями (M2M), при необходимости привязывает `Speaker.user` в консоли.
-
-### 6.2 Highload++
-
-1. URL-ы задаются в окружении (`HIGHLOAD_URLS` и т.д., см. `.env.example`).
-2. `python manage.py sync_highload --once` (или цикл с интервалом) дергает **`parser.highload_importer`**.
-3. Импортёр создаёт/обновляет **Speaker** и **Event**, выставляет `source=parser`, связывает M2M; дубликаты по логике импортёра отсекаются.
-
-### 6.3 Оценки аудитории
-
-Публичная форма по маршруте **оценки** (`rate/...`) создаёт **Feedback**; NPS на карточке спикера обновляется в **`Feedback.save`**.
-
-### 6.4 Демо-данные
-
-`python manage.py seed_demo_feedbacks [--clear]` — массовая генерация отзывов для разработки/демо (не часть продакшн-контура).
+- **Рендер:** серверные Django-шаблоны, общая оболочка `templates/base.html` (навигация, тема, фон, FAB-виджеты ассистента и поддержки).
+- **«SPA»-навигация:** перехват кликов по `.nav-item`, `fetch` целой страницы, извлечение `#page-content` и `#page-modals`, подстановка в DOM и **повторное выполнение** встроенных `<script>`. Событие `spa-page-loaded` инициализирует страницу.
+- **Данные:** страницы тянут JSON с `/api/...`, рендерят таблицы/карточки/модалки на ванильном JS; главная поллит `/api/home/` каждые 15 c и перерисовывается только при смене `version`.
+- **Стили:** в основном `<style>` внутри шаблонов + CSS-переменные для светлой/тёмной темы (`data-theme`). Графики аналитики — Chart.js. Бандлера/Node-сборки нет.
 
 ---
 
-## 7. Технологии (фактические)
+## 7. Потоки данных
+
+1. **Ручной/админский ввод.** admin/DevRel создают и правят `Speaker`/`Event` через views и `/admin/`, связывают M2M, привязывают `Speaker.user`.
+2. **Самовыдвижение.** Спикер из кабинета загружает прошедшее мероприятие (`source=self`, `verification_status=pending`) → DevRel его компании подтверждает/отклоняет. Также: заявки на создание/участие (`EventRequest`) и ответы на приглашения (`EventInvitation`).
+3. **Парсинг Highload++.** `sync_highload` дёргает `parser.highload_importer`, создаёт/обновляет `Speaker`/`Event` с `source=parser`, ставит M2M, отсекает дубли. См. [parser.md](parser.md).
+4. **Оценки аудитории.** Публичная форма `/rate/<event>/<speaker>/` создаёт `Feedback`; `Speaker.nps` обновляется в `Feedback.save()`.
+5. **Демо-данные.** `seed_demo_feedbacks [--clear]` — массовая генерация отзывов для разработки.
+
+---
+
+## 8. Технологии (фактические)
 
 | Компонент | Реализация |
 |-----------|------------|
-| Web framework | **Django 6.x** (см. `settings.py`) |
-| ORM / миграции | **Django ORM** (`starlift/migrations`, `accounts/migrations`) |
-| БД | **PostgreSQL** (целевая; см. README) |
-| Шаблоны | **Django Templates** |
-| Графики на аналитике | **Chart.js** (подключается в шаблоне аналитики) |
-| QR | Библиотека **qrcode** (PNG в ответе) |
-| Конфиг окружения | **python-dotenv**, `.env` в `starlift/` |
-| Статика медиа | `MEDIA_ROOT`; опционально **django-storages** (`USE_OBJECT_STORAGE`) |
-
----
-
-## 8. Что намеренно не описывается старым документом
-
-Следующие элементы **отсутствуют в текущей кодовой базе** (или не являются частью описанного MVP):
-
-- отдельный backend на **FastAPI**, схемы **talks** / **scores** / **candidate_lists** как отдельные таблицы;
-- **Next.js** / **shadcn** фронт;
-- **Telegram-бот** как процесс;
-- **Redis**, очереди задач, **Celery**;
-- REST **`/api/v1/...`** в стиле OpenAPI-черновика — вместо этого узкий набор **`/api/speakers|events|home/`**;
-- таблица **`scoring_weights`** и материализованная **`scores`** — агрегаты считаются **на лету** в Python (`analytics`, `home_metrics`, поле `Speaker.nps` из отзывов).
-
-При развитии продукта архитектурный документ стоит дополнять **изменениями в моделях и URL**, а не переносить сюда старые спецификации без реализации.
+| Web-фреймворк | **Django 6.0** (`requirements.txt`) |
+| ORM / миграции | Django ORM (`starlift/migrations`, `accounts/migrations`, `assistant/migrations`) |
+| БД | **PostgreSQL** (16-alpine в docker-compose) |
+| Шаблоны | Django Templates + ванильный JS |
+| Графики | **Chart.js** (в шаблоне аналитики) |
+| QR | библиотека **qrcode** + **Pillow** (PNG-постер) |
+| AI | **GigaChat** через пакет `gigachat` |
+| Парсинг | **requests** + **beautifulsoup4** |
+| Статика | **WhiteNoise** (`CompressedManifestStaticFilesStorage`) |
+| Медиа | `MEDIA_ROOT` или **django-storages** (S3/R2) при `USE_OBJECT_STORAGE=true` |
+| Сервер | **Gunicorn** (3 воркера в Docker) |
+| Конфиг | **python-dotenv**, `.env` в `starlift/` |
 
 ---
 
 ## 9. Безопасность и эксплуатация (кратко)
 
-- Включены стандартные механизмы Django: CSRF на формах, сессии, хеширование паролей.
-- Политика паролей и блокировки — `accounts/password_validators.py`, настройки локаута в `settings`.
-- Аудит административных действий — **`AuditLog`**, просмотр в консоли.
-- Перед продакшеном: убрать небезопасный `SECRET_KEY` из репозитория, `DEBUG=False`, `ALLOWED_HOSTS`, HTTPS, резервное копирование БД.
+- Стандартный Django: CSRF на формах, сессии, хеширование паролей; расширенная политика паролей (`accounts/password_validators.py`).
+- Блокировка при брутфорсе и аудит административных действий (`AuditLog`, просмотр в консоли).
+- Доверие заголовку `X-Forwarded-Proto` (за nginx/прокси), безопасные cookie при `DEBUG=False`.
+- Перед продакшеном: свой `SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS`, HTTPS, резервное копирование БД. См. [setup.md](setup.md).
 
 ---
 
 ## 10. Резюме
 
-**StarLift** сейчас — это **монолитный Django-проект** с двумя приложениями (**`starlift`**, **`accounts`**), HTML-интерфейсом с лёгкой SPA-навигацией и JSON-эндпоинтами для таблиц и дашбордов. Доменная модель строится вокруг **Speaker ↔ Event (M2M)** и **Feedback**; отдельного сервиса скоринга как БД-слоя нет — аналитика и отбор кандидатов реализованы в **Python-модулях** поверх ORM. Внешний контент Highload++ подтягивается **парсером и management-командой**, а не отдельным воркером в другом стеке.
+**StarLift** — монолитный Django-проект из четырёх приложений (`starlift`, `accounts`, `assistant`, `support`) с серверным HTML-интерфейсом и лёгкой SPA-навигацией. Доменная модель строится вокруг **Speaker ↔ Event (M2M)** и оценок; отдельного сервиса скоринга нет — аналитика и отбор кандидатов реализованы в Python поверх ORM. Внешний контент Highload++ подтягивается парсером и management-командой. AI-ассистент и поддержка встроены как SSE-виджеты, изолируя внешний LLM (GigaChat) в одном клиентском модуле.
