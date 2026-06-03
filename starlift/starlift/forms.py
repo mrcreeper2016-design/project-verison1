@@ -107,9 +107,9 @@ class SpeakerForm(forms.ModelForm):
 
             except Exception as e:
                 raise ValidationError(f"Ошибка при обработке изображения: {str(e)}")
-        elif not img_field and not getattr(self.instance, "img", "") and not getattr(self.instance, "avatar", None):
-            import random
-            cleaned_data['img'] = str(random.randint(1, 70))
+        # No image supplied → leave ``img`` empty. The card then has no avatar
+        # and the frontend renders an initials placeholder. We must NOT invent a
+        # random i.pravatar.cc id here.
 
         return cleaned_data
 

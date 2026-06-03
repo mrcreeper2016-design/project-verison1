@@ -191,6 +191,28 @@ def _make_event(title: str = "Event", is_external: bool = False) -> Event:
     return Event.objects.create(title=title, status="past", is_external=is_external)
 
 
+class SpeakerFormAvatarTests(TestCase):
+    """Creating a speaker without an image must not invent a random avatar."""
+
+    def test_no_image_means_no_avatar(self):
+        from .forms import SpeakerForm
+
+        form = SpeakerForm(data={
+            "name": "Без Аватара",
+            "stack": "Python",
+            "city": "Moscow",
+            "img": "",
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+        speaker = form.save()
+        # img stays empty — no random pravatar id is injected.
+        self.assertEqual(speaker.img, "")
+        # And the derived URL is empty (placeholder/initials on the frontend),
+        # never a random i.pravatar.cc image.
+        self.assertEqual(speaker.card_avatar_url, "")
+        self.assertNotIn("pravatar", speaker.card_avatar_url)
+
+
 def _add_feedback(speaker: Speaker, event: Event, score: int, when=None) -> Feedback:
     fb = Feedback(speaker=speaker, event=event, score=score)
     fb.save()
