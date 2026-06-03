@@ -550,6 +550,7 @@
             <div id="home-upcoming" class="home-event-grid"></div>
         </section>
 
+        {% if show_top_speakers %}
         <section class="home-panel" aria-live="polite">
             <div class="home-panel-header">
                 <div>
@@ -560,6 +561,7 @@
             </div>
             <div id="home-top-speakers" class="home-speaker-list"></div>
         </section>
+        {% endif %}
 
         <section class="home-panel home-panel-wide" aria-live="polite">
             <div class="home-panel-header">
@@ -764,6 +766,7 @@
     }
 
     function renderTopSpeakers(speakers) {
+        if (!els.top) return;  // panel hidden for non-admin/devrel roles
         if (!speakers || !speakers.length) {
             els.top.innerHTML = `
                 <div class="home-empty">
@@ -852,7 +855,8 @@
                 <div class="skeleton skeleton-row" style="width:80%;">.</div>
                 <div class="skeleton skeleton-row" style="width:55%;">.</div>
             </div>`).join('');
-        els.top.innerHTML = Array.from({ length: 4 }).map(() => `
+        if (els.top) {
+            els.top.innerHTML = Array.from({ length: 4 }).map(() => `
             <div class="home-speaker-row">
                 <div class="skeleton" style="width:44px; height:44px; border-radius:50%;">.</div>
                 <div style="display:flex; flex-direction:column; gap:6px;">
@@ -861,6 +865,7 @@
                 </div>
                 <div class="skeleton" style="width:60px; height:26px; border-radius:999px;">.</div>
             </div>`).join('');
+        }
         els.activity.classList.remove('home-timeline');
         els.activity.innerHTML = Array.from({ length: 5 }).map(() => `
             <div style="padding:6px 0;">

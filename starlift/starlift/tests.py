@@ -397,6 +397,8 @@ class HomeDashboardTests(TestCase):
         self.assertEqual(data["activity"], [])
 
     def test_home_api_reflects_filters_and_activity(self):
+        # Top speakers leaderboard is admin/devrel-only, so authenticate as admin.
+        _login_admin(self.client)
         alice = _make_speaker("Alice", city="Moscow", stack="Python")
         bob = _make_speaker("Bob", city="Kazan", stack="Frontend")
         event = _make_event("MeetupA")
@@ -414,6 +416,31 @@ class HomeDashboardTests(TestCase):
         self.assertEqual(data["kpis"]["active_speakers"], 1)
         # Activity feed should contain the recent feedback entries.
         self.assertTrue(any(it["type"] == "feedback" for it in data["activity"]))
+
+    def test_top_speakers_hidden_for_speaker_role(self):
+        """Speakers must not receive the top-speakers leaderboard."""
+        alice = _make_speaker("Alice", city="Moscow", stack="Python")
+        event = _make_event("MeetupA")
+        now = timezone.now()
+        for s in [10, 10, 9, 10]:
+            _add_feedback(alice, event, s, when=now - timedelta(days=2))
+
+        # Default setUp logged us in as a speaker.
+        resp = self.client.get("/api/home/?period=30")
+        data = json.loads(resp.content)
+        self.assertEqual(data["top_speakers"], [])
+
+    def test_top_speakers_visible_for_admin_role(self):
+        _login_admin(self.client)
+        alice = _make_speaker("Alice", city="Moscow", stack="Python")
+        event = _make_event("MeetupA")
+        now = timezone.now()
+        for s in [10, 10, 9, 10]:
+            _add_feedback(alice, event, s, when=now - timedelta(days=2))
+
+        resp = self.client.get("/api/home/?period=30")
+        data = json.loads(resp.content)
+        self.assertIn("Alice", [sp["name"] for sp in data["top_speakers"]])
 
     def test_data_version_changes_on_new_feedback(self):
         alice = _make_speaker("Alice")

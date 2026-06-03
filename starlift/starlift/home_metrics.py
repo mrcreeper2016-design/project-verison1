@@ -86,7 +86,7 @@ ALLOWED_PERIODS = (30, 90, 180)
 NEW_SPEAKER_WINDOW_DAYS = 30
 
 UPCOMING_LIMIT = 6
-TOP_SPEAKERS_LIMIT = 5
+TOP_SPEAKERS_LIMIT = 9
 ACTIVITY_LIMIT = 10
 ACTIVITY_WINDOW_DAYS = 60
 
@@ -426,7 +426,13 @@ def data_version() -> str:
 # Top-level builder
 # ---------------------------------------------------------------------------
 
-def build_home(filters: HomeFilters) -> dict[str, Any]:
+def build_home(filters: HomeFilters, include_top_speakers: bool = True) -> dict[str, Any]:
+    """Assemble the home dashboard payload.
+
+    ``include_top_speakers`` is gated by role at the view layer — the top
+    speakers leaderboard is meant for admin/devrel only, so for speakers it
+    is omitted entirely (empty list) rather than just hidden client-side.
+    """
     return {
         "version": data_version(),
         "generated_at": timezone.now().isoformat(),
@@ -439,6 +445,6 @@ def build_home(filters: HomeFilters) -> dict[str, Any]:
         "options": filter_options(),
         "kpis": compute_kpis(filters),
         "upcoming_events": upcoming_events(filters),
-        "top_speakers": top_speakers(filters),
+        "top_speakers": top_speakers(filters) if include_top_speakers else [],
         "activity": activity_feed(),
     }

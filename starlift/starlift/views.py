@@ -274,6 +274,7 @@ def index_view(request):
         "home_cities": options["cities"],
         "home_topics": options["topics"],
         "home_poll_interval_ms": 15000,
+        "show_top_speakers": _is_platform_admin(request.user),
     }
     return render(request, 'index.html', context)
 
@@ -289,7 +290,9 @@ def home_api(request):
     re-rendering when the version hasn't changed.
     """
     filters = home_metrics.parse_filters(request.GET)
-    payload = home_metrics.build_home(filters)
+    payload = home_metrics.build_home(
+        filters, include_top_speakers=_is_platform_admin(request.user)
+    )
     response = JsonResponse(payload)
     response["Cache-Control"] = "no-store"
     return response
