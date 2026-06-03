@@ -1,6 +1,7 @@
 ﻿import base64
 import json
 import logging
+import os
 import re
 from datetime import date
 from io import BytesIO
@@ -747,6 +748,12 @@ def generate_qr_view(request, speaker_id, event_id):
 
 # --- Poster download (print-ready PNG) -------------------------------------
 
+# Fonts bundled with the repo so the poster always has Cyrillic glyphs,
+# regardless of OS / container (system fonts are an unreliable fallback).
+_BUNDLED_FONTS_DIR = os.path.join(os.path.dirname(__file__), "assets", "fonts")
+_BUNDLED_FONT_REGULAR = os.path.join(_BUNDLED_FONTS_DIR, "DejaVuSans.ttf")
+_BUNDLED_FONT_BOLD = os.path.join(_BUNDLED_FONTS_DIR, "DejaVuSans-Bold.ttf")
+
 _POSTER_FONT_CANDIDATES = (
     # Windows
     r"C:\Windows\Fonts\segoeuib.ttf",  # Segoe UI Bold
@@ -798,20 +805,23 @@ def _load_font(size: int, bold_only: bool = False):
     Honors ``QR_POSTER_FONT_PATH`` / ``QR_POSTER_FONT_BOLD_PATH`` env vars
     for explicit overrides in deployments without standard system fonts.
     """
-    import os
     from PIL import ImageFont
 
     env_path = os.environ.get(
         "QR_POSTER_FONT_BOLD_PATH" if bold_only else "QR_POSTER_FONT_PATH"
     )
     candidates = list(_POSTER_FONT_CANDIDATES)
-    if env_path:
-        candidates.insert(0, env_path)
     if bold_only:
         candidates = [
             p for p in candidates
-            if p == env_path or "bd" in p.lower() or "bold" in p.lower()
+            if "bd" in p.lower() or "bold" in p.lower()
         ]
+
+    # Bundled DejaVu always carries Cyrillic — try it before system fonts so
+    # the poster renders correctly even in minimal containers. An explicit env
+    # override wins over everything.
+    bundled = _BUNDLED_FONT_BOLD if bold_only else _BUNDLED_FONT_REGULAR
+    candidates = [p for p in (env_path, bundled) if p] + candidates
 
     for path in candidates:
         if not path or not os.path.exists(path):
