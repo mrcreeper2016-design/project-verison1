@@ -381,13 +381,13 @@ class HomeDashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="home-dashboard"')
         self.assertContains(response, "/api/home/")
-        self.assertContains(response, "Оперативный центр")
+        self.assertContains(response, "Единая система скаутинга спикерских талантов")
 
     def test_home_api_returns_required_sections_with_empty_db(self):
         response = self.client.get("/api/home/")
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
-        for key in ("version", "kpis", "upcoming_events", "top_speakers", "activity", "options"):
+        for key in ("version", "kpis", "upcoming_events", "top_speakers", "your_events", "activity", "options"):
             self.assertIn(key, data)
         self.assertEqual(data["kpis"]["total_speakers"], 0)
         self.assertEqual(data["kpis"]["active_speakers"], 0)
@@ -441,6 +441,50 @@ class HomeDashboardTests(TestCase):
         resp = self.client.get("/api/home/?period=30")
         data = json.loads(resp.content)
         self.assertIn("Alice", [sp["name"] for sp in data["top_speakers"]])
+
+    def test_your_events_for_linked_speaker(self):
+        """A speaker with a linked card sees their own events, but no activity."""
+        User = get_user_model()
+        user = User.objects.get(username="dashtester")  # logged in via setUp
+        card = _make_speaker("DashSpeaker")
+        card.user = user
+        card.save()
+
+        today = timezone.now().date()
+        upcoming = _make_event("FutureTalk")
+        upcoming.status = "future"
+        upcoming.event_date = today + timedelta(days=10)
+        upcoming.save()
+        past = _make_event("PastTalk")
+        past.event_date = today - timedelta(days=10)
+        past.save()
+        card.events.add(upcoming, past)
+        # Some unrelated event the speaker is not part of.
+        _make_event("NotMine")
+
+        resp = self.client.get("/api/home/?period=30")
+        data = json.loads(resp.content)
+        titles = [e["title"] for e in data["your_events"]]
+        self.assertIn("FutureTalk", titles)
+        self.assertIn("PastTalk", titles)
+        self.assertNotIn("NotMine", titles)
+        # Upcoming should be ordered before past.
+        self.assertLess(titles.index("FutureTalk"), titles.index("PastTalk"))
+        # Activity feed is admin/devrel-only.
+        self.assertEqual(data["activity"], [])
+
+    def test_your_events_empty_for_admin(self):
+        _login_admin(self.client)
+        alice = _make_speaker("Alice")
+        event = _make_event("MeetupA")
+        alice.events.add(event)
+        _add_feedback(alice, event, 10, when=timezone.now() - timedelta(days=2))
+
+        resp = self.client.get("/api/home/?period=30")
+        data = json.loads(resp.content)
+        self.assertEqual(data["your_events"], [])
+        # Admin keeps the activity feed.
+        self.assertTrue(any(it["type"] == "feedback" for it in data["activity"]))
 
     def test_data_version_changes_on_new_feedback(self):
         alice = _make_speaker("Alice")

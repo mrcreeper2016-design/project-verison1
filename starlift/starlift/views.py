@@ -268,13 +268,16 @@ def index_view(request):
     chat (which also renders globally via base.html).
     """
     options = home_metrics.filter_options()
+    is_admin = _is_platform_admin(request.user)
     context = {
         "home_period_presets": home_metrics.ALLOWED_PERIODS,
         "home_default_period": home_metrics.DEFAULT_PERIOD_DAYS,
         "home_cities": options["cities"],
         "home_topics": options["topics"],
         "home_poll_interval_ms": 15000,
-        "show_top_speakers": _is_platform_admin(request.user),
+        "show_top_speakers": is_admin,
+        "show_activity": is_admin,
+        "show_your_events": (not is_admin) and _get_speaker_for_user(request.user) is not None,
     }
     return render(request, 'index.html', context)
 
@@ -290,8 +293,13 @@ def home_api(request):
     re-rendering when the version hasn't changed.
     """
     filters = home_metrics.parse_filters(request.GET)
+    is_admin = _is_platform_admin(request.user)
+    viewer_speaker = None if is_admin else _get_speaker_for_user(request.user)
     payload = home_metrics.build_home(
-        filters, include_top_speakers=_is_platform_admin(request.user)
+        filters,
+        include_top_speakers=is_admin,
+        include_activity=is_admin,
+        viewer_speaker=viewer_speaker,
     )
     response = JsonResponse(payload)
     response["Cache-Control"] = "no-store"

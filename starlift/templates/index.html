@@ -234,6 +234,7 @@
         min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .badge-future { background: var(--status-future-bg); color: var(--status-future-color); border: 1px solid var(--status-future-color); padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .badge-past { background: var(--status-past-bg); color: var(--status-past-color); border: 1px solid var(--status-past-color); padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
     .badge-external { background: var(--light-green); color: var(--sber-green-hover); border: 1px solid var(--sber-green); padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
 
     /* ---------- Speakers ---------- */
@@ -345,7 +346,7 @@
             <img class="hero-logo" src="data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='50,5 61,35 95,35 68,55 78,85 50,65 22,85 32,55 5,35 39,35' fill='%230A803B'/%3E%3Cpath d='M20,80 L55,45 L65,55 L90,20' fill='none' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E" alt="Starlift Logo">
             STARLIFT
         </h1>
-        <p class="hero-subtitle">Оперативный центр по спикерам, ближайшим мероприятиям и активности команды</p>
+        <p class="hero-subtitle">Единая система скаутинга спикерских талантов</p>
 
         {% if user.is_authenticated and user.profile.is_member %}
         <section class="home-chat-card home-chat-card--collapsed animate-fade" id="home-chat-card">
@@ -563,6 +564,20 @@
         </section>
         {% endif %}
 
+        {% if show_your_events %}
+        <section class="home-panel" aria-live="polite">
+            <div class="home-panel-header">
+                <div>
+                    <h2 class="home-panel-title"><i class="fa-regular fa-calendar-check"></i> Ваши мероприятия</h2>
+                    <p class="home-panel-sub">Ваши предстоящие и прошедшие выступления</p>
+                </div>
+                <span class="home-panel-tag" id="home-your-events-tag">—</span>
+            </div>
+            <div id="home-your-events" class="home-event-grid"></div>
+        </section>
+        {% endif %}
+
+        {% if show_activity %}
         <section class="home-panel home-panel-wide" aria-live="polite">
             <div class="home-panel-header">
                 <div>
@@ -573,6 +588,7 @@
             </div>
             <div id="home-activity" class="home-timeline"></div>
         </section>
+        {% endif %}
     </div>
 </div>
 
@@ -619,6 +635,8 @@
         upcomingTag: document.getElementById('home-upcoming-tag'),
         top: document.getElementById('home-top-speakers'),
         topTag: document.getElementById('home-top-tag'),
+        yourEvents: document.getElementById('home-your-events'),
+        yourEventsTag: document.getElementById('home-your-events-tag'),
         activity: document.getElementById('home-activity'),
         activityTag: document.getElementById('home-activity-tag'),
         live: document.getElementById('home-live'),
@@ -806,7 +824,56 @@
         els.topTag.textContent = `TOP ${speakers.length}`;
     }
 
+    function renderYourEvents(events) {
+        if (!els.yourEvents) return;  // panel shown only to speakers with a linked card
+        if (!events || !events.length) {
+            els.yourEvents.innerHTML = `
+                <div class="home-empty" style="grid-column: 1 / -1;">
+                    <i class="fa-regular fa-calendar"></i>
+                    У вас пока нет мероприятий.
+                    <div style="margin-top:4px; font-size:12px;">Подайте заявку или дождитесь, пока вас добавят к событию.</div>
+                </div>`;
+            els.yourEventsTag.textContent = '0 событий';
+            return;
+        }
+        els.yourEvents.innerHTML = events.map(ev => {
+            const title = escapeHtml(ev.title || 'Без названия');
+            const dateLabel = escapeHtml(fmtEventDate(ev.date_iso, ev.date_label));
+            const isPast = ev.status === 'past';
+            const statusBadge = isPast
+                ? '<span class="badge-past">Прошло</span>'
+                : '<span class="badge-future">Планируется</span>';
+            const location = ev.location
+                ? `<span class="loc"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(ev.location)}</span>`
+                : '<span class="loc"><i class="fa-solid fa-globe"></i> Онлайн / место уточняется</span>';
+            const externalBadge = ev.is_external
+                ? '<span class="badge-external"><i class="fa-solid fa-arrow-up-right-from-square"></i> Внешнее</span>'
+                : '';
+            const feedbacks = ev.fb_count
+                ? `<span><i class="fa-solid fa-comment-dots"></i> ${fmtCount(ev.fb_count)} ${plural(ev.fb_count, ['отзыв','отзыва','отзывов'])}</span>`
+                : '';
+            const href = ev.id ? `/events/#event-${ev.id}` : '/events/';
+            return `
+                <a class="home-event-card" href="${href}">
+                    <div class="home-event-meta">
+                        <span class="home-event-date"><i class="fa-regular fa-clock"></i> ${dateLabel}</span>
+                        ${statusBadge}
+                    </div>
+                    <h3 class="home-event-name">${title}</h3>
+                    <div class="home-event-footer">
+                        ${location}
+                        <span style="display:inline-flex; gap:10px; align-items:center;">
+                            ${feedbacks}
+                            ${externalBadge}
+                        </span>
+                    </div>
+                </a>`;
+        }).join('');
+        els.yourEventsTag.textContent = `${events.length} ${plural(events.length, ['событие', 'события', 'событий'])}`;
+    }
+
     function renderActivity(items) {
+        if (!els.activity) return;  // activity feed hidden for non-admin/devrel roles
         if (!items || !items.length) {
             els.activity.innerHTML = `
                 <div class="home-empty">
@@ -866,18 +933,29 @@
                 <div class="skeleton" style="width:60px; height:26px; border-radius:999px;">.</div>
             </div>`).join('');
         }
-        els.activity.classList.remove('home-timeline');
-        els.activity.innerHTML = Array.from({ length: 5 }).map(() => `
+        if (els.yourEvents) {
+            els.yourEvents.innerHTML = Array.from({ length: 4 }).map(() => `
+            <div class="home-event-card">
+                <div class="skeleton skeleton-row" style="width:40%;">.</div>
+                <div class="skeleton" style="height:20px; width:90%;">.</div>
+                <div class="skeleton skeleton-row" style="width:55%;">.</div>
+            </div>`).join('');
+        }
+        if (els.activity) {
+            els.activity.classList.remove('home-timeline');
+            els.activity.innerHTML = Array.from({ length: 5 }).map(() => `
             <div style="padding:6px 0;">
                 <div class="skeleton skeleton-row" style="width:25%; height:10px; margin-bottom:6px;">.</div>
                 <div class="skeleton skeleton-row" style="width:80%;">.</div>
             </div>`).join('');
+        }
     }
 
     function applyData(data) {
         renderKpis(data.kpis || {}, state.filters);
         renderUpcoming(data.upcoming_events || []);
         renderTopSpeakers(data.top_speakers || []);
+        renderYourEvents(data.your_events || []);
         renderActivity(data.activity || []);
         state.rendered = true;
     }

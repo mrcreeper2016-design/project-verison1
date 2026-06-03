@@ -87,6 +87,7 @@ NEW_SPEAKER_WINDOW_DAYS = 30
 
 UPCOMING_LIMIT = 6
 TOP_SPEAKERS_LIMIT = 9
+YOUR_EVENTS_LIMIT = 9
 ACTIVITY_LIMIT = 10
 ACTIVITY_WINDOW_DAYS = 60
 
@@ -319,6 +320,51 @@ def top_speakers(filters: HomeFilters, limit: int = TOP_SPEAKERS_LIMIT) -> list[
     return result
 
 
+def your_events(speaker, limit: int = YOUR_EVENTS_LIMIT) -> list[dict[str, Any]]:
+    """Speaker's own events for the home panel — upcoming first, then past.
+
+    Mirrors the date-resolution logic of ``upcoming_events`` (``event_date``
+    or a parsed human ``date`` string) so ordering is consistent across the
+    dashboard. Upcoming are sorted ascending (nearest first), past descending
+    (most recent first), then concatenated and capped at ``limit``.
+    """
+    today = timezone.now().date()
+
+    qs = speaker.events.all().annotate(fb_count=Count("feedbacks", distinct=True))
+
+    upcoming: list[tuple[date, Event]] = []
+    past: list[tuple[date | None, Event]] = []
+    for ev in qs:
+        resolved = ev.event_date or parse_event_date(ev.date, today=today)
+        is_upcoming = (resolved is not None and resolved >= today) or (
+            resolved is None and ev.status == "future"
+        )
+        if is_upcoming:
+            upcoming.append((resolved or date.max, ev))
+        else:
+            past.append((resolved, ev))
+
+    upcoming.sort(key=lambda pair: (pair[0], pair[1].id))
+    past.sort(key=lambda pair: (pair[0] or date.min, pair[1].id), reverse=True)
+
+    ordered = [ev for _, ev in upcoming] + [ev for _, ev in past]
+
+    items: list[dict[str, Any]] = []
+    for ev in ordered[:limit]:
+        resolved = ev.event_date or parse_event_date(ev.date, today=today)
+        items.append({
+            "id": ev.id,
+            "title": ev.title,
+            "date_iso": resolved.isoformat() if resolved else None,
+            "date_label": resolved.strftime("%d.%m.%Y") if resolved else (ev.date or ""),
+            "location": ev.location or "",
+            "status": ev.status or "future",
+            "is_external": bool(ev.is_external),
+            "fb_count": getattr(ev, "fb_count", 0) or 0,
+        })
+    return items
+
+
 def activity_feed(limit: int = ACTIVITY_LIMIT) -> list[dict[str, Any]]:
     """Unified activity stream aggregated from real entities.
 
@@ -426,12 +472,22 @@ def data_version() -> str:
 # Top-level builder
 # ---------------------------------------------------------------------------
 
-def build_home(filters: HomeFilters, include_top_speakers: bool = True) -> dict[str, Any]:
+def build_home(
+    filters: HomeFilters,
+    include_top_speakers: bool = True,
+    include_activity: bool = True,
+    viewer_speaker=None,
+) -> dict[str, Any]:
     """Assemble the home dashboard payload.
 
-    ``include_top_speakers`` is gated by role at the view layer — the top
-    speakers leaderboard is meant for admin/devrel only, so for speakers it
-    is omitted entirely (empty list) rather than just hidden client-side.
+    Role gating happens at the view layer and is passed in here:
+    - ``include_top_speakers`` / ``include_activity`` — admin/devrel only; for
+      speakers these are omitted entirely (empty list), not just hidden client-side.
+    - ``viewer_speaker`` — when set (a speaker viewing their own dashboard), the
+      ``your_events`` panel is populated with that speaker's events.
+
+    Keys are always present (empty list when gated off) so the frontend and
+    existing tests don't need to special-case their absence.
     """
     return {
         "version": data_version(),
@@ -446,5 +502,6 @@ def build_home(filters: HomeFilters, include_top_speakers: bool = True) -> dict[
         "kpis": compute_kpis(filters),
         "upcoming_events": upcoming_events(filters),
         "top_speakers": top_speakers(filters) if include_top_speakers else [],
-        "activity": activity_feed(),
+        "your_events": your_events(viewer_speaker) if viewer_speaker else [],
+        "activity": activity_feed() if include_activity else [],
     }
