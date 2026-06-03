@@ -352,13 +352,19 @@
         eventHint.className = 'qr-hint';
         hideSuggest(eventSug);
 
-        if (isAdmin && selectedSpeaker && !ev.speakers.some(s => s.id === selectedSpeaker.id)) {
+        // `ev` may come either from the global EVENTS list (has `speakers`) or
+        // from a speaker's own `events` array (no `speakers` field). Fall back
+        // to the global EVENTS entry so cross-checks below don't crash.
+        const fullEvent = ev.speakers ? ev : (EVENTS.find(e => e.id === ev.id) || ev);
+        const evSpeakers = Array.isArray(fullEvent.speakers) ? fullEvent.speakers : [];
+
+        if (isAdmin && selectedSpeaker && evSpeakers.length && !evSpeakers.some(s => s.id === selectedSpeaker.id)) {
             // shouldn't happen due to filter, but defensive
             selectedSpeaker = null;
             speakerInput.value = '';
         }
-        if (isAdmin && !selectedSpeaker && ev.speakers.length === 1) {
-            pickSpeaker(SPEAKERS.find(s => s.id === ev.speakers[0].id));
+        if (isAdmin && !selectedSpeaker && evSpeakers.length === 1) {
+            pickSpeaker(SPEAKERS.find(s => s.id === evSpeakers[0].id));
         }
         updateValidity();
     }

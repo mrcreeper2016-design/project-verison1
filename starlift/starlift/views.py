@@ -748,30 +748,90 @@ def generate_qr_view(request, speaker_id, event_id):
 # --- Poster download (print-ready PNG) -------------------------------------
 
 _POSTER_FONT_CANDIDATES = (
+    # Windows
     r"C:\Windows\Fonts\segoeuib.ttf",  # Segoe UI Bold
     r"C:\Windows\Fonts\segoeui.ttf",
     r"C:\Windows\Fonts\arialbd.ttf",
     r"C:\Windows\Fonts\arial.ttf",
+    # Debian/Ubuntu
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+    # Fedora / RHEL
+    "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/google-noto/NotoSans-Bold.ttf",
+    "/usr/share/fonts/google-noto/NotoSans-Regular.ttf",
+    # Alpine
+    "/usr/share/fonts/ttf-dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf",
+    # macOS
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
     "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/Library/Fonts/Arial Bold.ttf",
+    "/Library/Fonts/Arial.ttf",
 )
 
 
+def _font_supports_cyrillic(font) -> bool:
+    """Probe whether the font actually carries Cyrillic glyphs.
+
+    Pillow happily loads any TTF (and its built-in default) even when the
+    glyphs requested are missing — they then render as a .notdef box (▢).
+    Compare the rasterized mask of 'Я' against a PUA codepoint guaranteed
+    to fall back to .notdef: if they match, the font has no Cyrillic.
+    """
+    try:
+        cyr = bytes(font.getmask("Я"))
+        pua = bytes(font.getmask("\uE000"))
+        return bool(cyr) and cyr != pua
+    except Exception:
+        return False
+
+
 def _load_font(size: int, bold_only: bool = False):
-    """Best-effort TrueType loader with Cyrillic-capable fallbacks."""
+    """Best-effort TrueType loader with Cyrillic-capable fallbacks.
+
+    Honors ``QR_POSTER_FONT_PATH`` / ``QR_POSTER_FONT_BOLD_PATH`` env vars
+    for explicit overrides in deployments without standard system fonts.
+    """
     import os
     from PIL import ImageFont
 
-    candidates = _POSTER_FONT_CANDIDATES
+    env_path = os.environ.get(
+        "QR_POSTER_FONT_BOLD_PATH" if bold_only else "QR_POSTER_FONT_PATH"
+    )
+    candidates = list(_POSTER_FONT_CANDIDATES)
+    if env_path:
+        candidates.insert(0, env_path)
     if bold_only:
-        candidates = tuple(p for p in candidates if "bd" in p.lower() or "bold" in p.lower())
+        candidates = [
+            p for p in candidates
+            if p == env_path or "bd" in p.lower() or "bold" in p.lower()
+        ]
+
     for path in candidates:
-        if os.path.exists(path):
-            try:
-                return ImageFont.truetype(path, size)
-            except (OSError, IOError):
-                continue
+        if not path or not os.path.exists(path):
+            continue
+        try:
+            font = ImageFont.truetype(path, size)
+        except (OSError, IOError):
+            continue
+        if _font_supports_cyrillic(font):
+            return font
+
+    # Last resort: try Pillow's sized default (DejaVu subset on Pillow ≥ 10.1).
+    # Only used when nothing else worked — its glyph set is limited but it's
+    # better than the bitmap default.
+    try:
+        default = ImageFont.load_default(size=size)
+        if _font_supports_cyrillic(default):
+            return default
+    except TypeError:
+        pass
     return ImageFont.load_default()
 
 
