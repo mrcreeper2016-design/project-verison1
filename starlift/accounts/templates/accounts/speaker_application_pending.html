@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}Заявка на рассмотрении — StarLift{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper" style="max-width:680px; margin:40px auto; padding:0 20px;">
+    <div class="content-block animate-fade" style="padding:30px; display:grid; gap:18px;">
+        <div style="display:flex; gap:12px; align-items:center;">
+            <i class="fa-solid fa-hourglass-half" style="font-size:28px; color:var(--sber-green);"></i>
+            <div>
+                <h1 style="margin:0; font-size:22px; font-weight:800;">Заявка на рассмотрении</h1>
+                <p style="margin:4px 0 0; color:var(--text-muted); font-size:14px;">DevRel свяжется с вами после проверки.</p>
+            </div>
+        </div>
+
+        {% if messages %}
+            {% for msg in messages %}
+            <div style="padding:10px 12px; border-radius:10px; font-size:13px; background:var(--light-green); color:var(--sber-green); border:1px solid rgba(10,128,59,0.25);">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <div style="display:grid; gap:8px; padding:14px; background:var(--light-green); border-radius:12px; border:1px solid rgba(10,128,59,0.2);">
+            <div style="font-size:13px;"><span style="color:var(--text-muted);">Компания:</span> <strong>{{ application.company|default:"— не указано —" }}</strong></div>
+            <div style="font-size:13px;"><span style="color:var(--text-muted);">Город:</span> <strong>{{ application.city }}</strong></div>
+            <div style="font-size:13px;"><span style="color:var(--text-muted);">Стек:</span> <strong>{{ application.stack }}</strong></div>
+            <div style="font-size:13px;"><span style="color:var(--text-muted);">О себе:</span><br>{{ application.description|linebreaksbr }}</div>
+            <div style="font-size:12px; color:var(--text-muted);">Отправлено: {{ application.submitted_at|date:"d.m.Y H:i" }}</div>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+            <a href="{% url 'accounts:speaker_application_form' %}" class="btn-action"><i class="fa-solid fa-pen"></i> Изменить заявку</a>
+        </div>
+
+        <form method="post" action="{% url 'accounts:logout' %}" style="margin:0;">
+            {% csrf_token %}
+            <button type="submit" class="btn-action" style="background:transparent; color:var(--text-muted);"><i class="fa-solid fa-right-from-bracket"></i> Выйти</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

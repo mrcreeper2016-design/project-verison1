@@ -6,23 +6,85 @@
     .console-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
     .console-title { margin: 0; font-size: clamp(26px, 3vw, 36px); font-weight: 800; letter-spacing: -0.03em; color: var(--text-main); }
     .console-subtitle { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; line-height: 1.5; }
-    .console-nav { display: flex; gap: 8px; flex-wrap: wrap; padding: 6px; background: var(--white); border: 1px solid var(--border-color); border-radius: 14px; }
-    .console-nav a { padding: 8px 14px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 13px; color: var(--text-muted); transition: var(--transition); }
+    .console-nav { display: flex; gap: 8px; flex-wrap: wrap; padding: 6px; background: var(--white); border: 1px solid var(--border-color); border-radius: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    @media (max-width: 600px) {
+        .console-nav { flex-wrap: nowrap; }
+        .console-nav a { flex-shrink: 0; }
+    }
+    .console-nav a { padding: 8px 14px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 13px; color: var(--text-muted); transition: var(--transition); white-space: nowrap; }
     .console-nav a:hover { color: var(--text-main); background: var(--light-green); }
     .console-nav a.active { background: var(--sber-green); color: #fff; }
     .console-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
     .console-table th, .console-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
     .console-table th { font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; }
     .console-table tbody tr:hover { background: var(--light-green); }
-    .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; border: 1px solid var(--border-color); }
-    .chip-green { background: var(--light-green); color: var(--sber-green); }
-    .chip-amber { background: rgba(224,165,0,0.15); color: #B87C00; border-color: rgba(224,165,0,0.3); }
-    .chip-red { background: rgba(217,62,78,0.1); color: #D93E4E; border-color: rgba(217,62,78,0.3); }
-    .chip-gray { background: var(--white); color: var(--text-muted); }
     .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 14px; }
     .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    .filter-bar input, .filter-bar select { background: var(--white); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 12px; font-size: 13px; color: var(--text-main); }
+    .filter-bar input, .filter-bar select {
+        height: 40px;
+        background: var(--white);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 0 12px;
+        font-size: 13px;
+        color: var(--text-main);
+        outline: none;
+        font-family: inherit;
+        transition: var(--transition);
+        box-sizing: border-box;
+    }
+    .filter-bar input:focus, .filter-bar select:focus {
+        border-color: var(--sber-green);
+        box-shadow: 0 0 0 3px var(--light-green);
+    }
+    .filter-bar .btn-action { height: 40px; padding: 0 16px; font-size: 13px; }
     .inline-form { display: inline; }
+
+    /* Console-scoped overrides: slightly tighter buttons inside tables. */
+    .console-table .btn-action { padding: 6px 12px; font-size: 12px; border-radius: 10px; }
+
+    /* Compact role-change form rendered in the users-table actions cell. */
+    .role-change-form {
+        display: inline-flex;
+        align-items: stretch;
+        gap: 0;
+        margin: 0;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+        background: var(--white);
+        transition: var(--transition);
+    }
+    .role-change-form:focus-within { border-color: var(--sber-green); box-shadow: 0 0 0 3px var(--light-green); }
+    .role-change-form select {
+        height: 32px;
+        border: none;
+        background: transparent;
+        padding: 0 8px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-main);
+        outline: none;
+        font-family: inherit;
+        cursor: pointer;
+    }
+    .role-change-form button {
+        height: 32px;
+        width: 34px;
+        border: none;
+        border-left: 1px solid var(--border-color);
+        background: var(--light-green);
+        color: var(--sber-green);
+        cursor: pointer;
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition);
+    }
+    .role-change-form button:hover { background: var(--sber-green); color: #fff; }
+
+    [data-theme="dark"] .role-change-form { background: rgba(20,29,25,0.6); }
 </style>
 
 <div class="console-shell">
@@ -34,10 +96,14 @@
     </div>
 
     <nav class="console-nav animate-fade" style="animation-delay:0.04s;">
+        {% if user.is_superuser or user.profile.role == 'admin' %}
         <a href="{% url 'accounts:users' %}" class="{% if active == 'users' %}active{% endif %}"><i class="fa-solid fa-users"></i> Пользователи</a>
+        {% endif %}
         <a href="{% url 'accounts:invites' %}" class="{% if active == 'invites' %}active{% endif %}"><i class="fa-solid fa-envelope-circle-check"></i> Приглашения</a>
         <a href="{% url 'accounts:event_requests' %}" class="{% if active == 'event_requests' %}active{% endif %}"><i class="fa-solid fa-inbox"></i> Заявки</a>
+        {% if user.is_superuser or user.profile.role == 'admin' %}
         <a href="{% url 'accounts:audit' %}" class="{% if active == 'audit' %}active{% endif %}"><i class="fa-solid fa-clipboard-list"></i> Аудит</a>
+        {% endif %}
     </nav>
 
     <div class="animate-fade" style="animation-delay:0.08s;">

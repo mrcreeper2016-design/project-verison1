@@ -12,6 +12,7 @@ from django.db.models import Q
 from django.utils.safestring import mark_safe
 
 from .models import Invite, UserProfile
+from .services.companies import get_company_choices
 
 
 User = get_user_model()
@@ -32,17 +33,32 @@ def _field_attrs(extra: str = "", placeholder: str = "") -> dict:
     return attrs
 
 
+def _email_field_attrs(placeholder: str = "", autocomplete: str = "email") -> dict:
+    # Mobile keyboards (особенно iOS) по умолчанию обрабатывают input как предложение:
+    # автокапитализация и «умная» пунктуация после точки вставляют пробел.
+    # Эти атрибуты выключают авто-исправления и переводят клавиатуру в email-режим.
+    attrs = _field_attrs(placeholder=placeholder)
+    attrs.update({
+        "autocomplete": autocomplete,
+        "autocapitalize": "none",
+        "autocorrect": "off",
+        "spellcheck": "false",
+        "inputmode": "email",
+    })
+    return attrs
+
+
 _CONSENT_PDN_LABEL = mark_safe(
     'Я даю согласие на обработку моих персональных данных в соответствии с '
-    '<a href="/consent/" class="legal-link" data-legal="consent" target="_blank" rel="noopener">'
-    'Согласием на обработку ПДн</a> и ФЗ-152.'
+    '<button type="button" class="legal-link" data-legal="consent">'
+    'Согласием на обработку ПДн</button> и ФЗ-152.'
 )
 _ACCEPT_POLICY_LABEL = mark_safe(
     'Я ознакомлен и принимаю '
-    '<a href="/privacy/" class="legal-link" data-legal="privacy" target="_blank" rel="noopener">'
-    'Политику конфиденциальности</a> и '
-    '<a href="/terms/" class="legal-link" data-legal="terms" target="_blank" rel="noopener">'
-    'Пользовательское соглашение</a>.'
+    '<button type="button" class="legal-link" data-legal="privacy">'
+    'Политику конфиденциальности</button> и '
+    '<button type="button" class="legal-link" data-legal="terms">'
+    'Пользовательское соглашение</button>.'
 )
 _CONSENT_PDN_REQUIRED_MSG = "Для регистрации необходимо согласие на обработку персональных данных."
 _ACCEPT_POLICY_REQUIRED_MSG = "Необходимо принять Политику конфиденциальности и Пользовательское соглашение."
@@ -52,7 +68,10 @@ class LoginForm(forms.Form):
     username = forms.CharField(
         label="Имя пользователя или email",
         max_length=254,
-        widget=forms.TextInput(attrs=_field_attrs(placeholder="username или you@example.com")),
+        widget=forms.TextInput(attrs=_email_field_attrs(
+            placeholder="username или you@example.com",
+            autocomplete="username",
+        )),
     )
     password = forms.CharField(
         label="Пароль",
@@ -68,10 +87,32 @@ class InviteCreateForm(forms.ModelForm):
         model = Invite
         fields = ["email", "role", "speaker"]
         widgets = {
-            "email": forms.EmailInput(attrs=_field_attrs(placeholder="speaker@example.com")),
+            "email": forms.EmailInput(attrs=_email_field_attrs(placeholder="speaker@example.com")),
             "role": forms.Select(attrs={"class": "select-compact"}),
             "speaker": forms.Select(attrs={"class": "select-compact"}),
         }
+
+    def __init__(self, *args, actor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._actor = actor
+        # DevRel may invite only speakers/guests; admin may invite any role.
+        if actor is not None and not actor.is_superuser:
+            profile = getattr(actor, "profile", None)
+            if profile is not None and profile.role == UserProfile.ROLE_DEVREL:
+                self.fields["role"].choices = [
+                    (UserProfile.ROLE_SPEAKER, "Спикер"),
+                    (UserProfile.ROLE_GUEST, "Гость"),
+                ]
+
+    def clean_role(self):
+        role = self.cleaned_data.get("role")
+        actor = getattr(self, "_actor", None)
+        if actor is not None and not actor.is_superuser:
+            profile = getattr(actor, "profile", None)
+            if profile is not None and profile.role == UserProfile.ROLE_DEVREL:
+                if role not in (UserProfile.ROLE_SPEAKER, UserProfile.ROLE_GUEST):
+                    raise ValidationError("DevRel может приглашать только спикеров и гостей.")
+        return role
 
     def clean_email(self):
         email = (self.cleaned_data.get("email") or "").strip().lower()
@@ -110,7 +151,7 @@ class RegisterForm(forms.Form):
     )
     email = forms.EmailField(
         label="Email",
-        widget=forms.EmailInput(attrs=_field_attrs(placeholder="you@example.com")),
+        widget=forms.EmailInput(attrs=_email_field_attrs(placeholder="you@example.com")),
     )
     password1 = forms.CharField(
         label="Пароль",
@@ -251,12 +292,28 @@ class InviteSignupForm(forms.Form):
 class ProfileEditForm(forms.Form):
     first_name = forms.CharField(label="Имя", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
     last_name = forms.CharField(label="Фамилия", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
-    avatar = forms.ImageField(label="Аватар", required=False, widget=forms.FileInput(attrs={"class": _INPUT_CLASS}))
+    avatar = forms.ImageField(
+        label="Аватар",
+        required=False,
+        widget=forms.FileInput(attrs={
+            "class": "avatar-file-input",
+            "accept": "image/jpeg,image/png,image/webp",
+        }),
+    )
+    company = forms.ChoiceField(
+        label="Компания",
+        required=False,
+        choices=get_company_choices,
+        widget=forms.Select(attrs={"class": "select-compact", "style": "width:100%"}),
+    )
     bio = forms.CharField(
         label="О себе",
         required=False,
         widget=forms.Textarea(attrs={**_field_attrs(), "rows": 4, "style": "width:100%; min-height:120px;"}),
     )
+
+    def clean_company(self):
+        return (self.cleaned_data.get("company") or "").strip()
 
     def clean_avatar(self):
         avatar = self.cleaned_data.get("avatar")
@@ -275,12 +332,19 @@ class SpeakerProfileMainForm(forms.Form):
 
     first_name = forms.CharField(label="Имя", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
     last_name = forms.CharField(label="Фамилия", max_length=150, required=False, widget=forms.TextInput(attrs=_field_attrs()))
-    avatar = forms.ImageField(label="Аватар", required=False, widget=forms.FileInput(attrs={"class": _INPUT_CLASS}))
-    company = forms.CharField(
-        label="Компания",
-        max_length=200,
+    avatar = forms.ImageField(
+        label="Аватар",
         required=False,
-        widget=forms.TextInput(attrs=_field_attrs(placeholder="Сбербанк, СберТех...")),
+        widget=forms.FileInput(attrs={
+            "class": "avatar-file-input",
+            "accept": "image/jpeg,image/png,image/webp,image/gif",
+        }),
+    )
+    company = forms.ChoiceField(
+        label="Компания",
+        required=False,
+        choices=get_company_choices,
+        widget=forms.Select(attrs={"class": "select-compact", "style": "width:100%"}),
     )
     description = forms.CharField(
         label="Описание",
@@ -328,8 +392,58 @@ class SpeakerProfileForm(forms.Form):
     )
 
 
+class SpeakerApplicationForm(forms.Form):
+    """Форма заявки на статус спикера, заполняется гостем после email-верификации."""
+
+    company = forms.ChoiceField(
+        label="Компания",
+        required=False,
+        choices=get_company_choices,
+        widget=forms.Select(attrs={"class": "select-compact", "style": "width:100%"}),
+    )
+    city = forms.CharField(
+        label="Город",
+        max_length=100,
+        required=True,
+        widget=forms.TextInput(attrs=_field_attrs(placeholder="Москва")),
+    )
+    stack = forms.CharField(
+        label="Стек / темы",
+        max_length=200,
+        required=True,
+        widget=forms.TextInput(attrs=_field_attrs(placeholder="Python, Django, ML")),
+    )
+    description = forms.CharField(
+        label="О себе",
+        required=True,
+        widget=forms.Textarea(attrs={**_field_attrs(placeholder="Чем занимаетесь, опыт выступлений, темы..."), "rows": 5, "style": "width:100%; min-height:140px;"}),
+    )
+    avatar = forms.ImageField(
+        label="Аватар",
+        required=False,
+        widget=forms.FileInput(attrs={
+            "class": "avatar-file-input",
+            "accept": "image/jpeg,image/png,image/webp",
+        }),
+    )
+
+    def clean_company(self):
+        return (self.cleaned_data.get("company") or "").strip()
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get("avatar")
+        if not avatar:
+            return avatar
+        if avatar.size > 10 * 1024 * 1024:
+            raise ValidationError("Размер файла не должен превышать 10 МБ.")
+        allowed_types = {"image/jpeg", "image/png", "image/webp"}
+        if avatar.content_type not in allowed_types:
+            raise ValidationError("Допустимые форматы: JPEG, PNG, WebP.")
+        return avatar
+
+
 class EmailChangeForm(forms.Form):
-    new_email = forms.EmailField(label="Новый email", widget=forms.EmailInput(attrs=_field_attrs(placeholder="you@example.com")))
+    new_email = forms.EmailField(label="Новый email", widget=forms.EmailInput(attrs=_email_field_attrs(placeholder="you@example.com")))
     current_password = forms.CharField(
         label="Текущий пароль",
         strip=False,
@@ -368,7 +482,7 @@ class StarliftPasswordChangeForm(DjangoPasswordChangeForm):
 class StarliftPasswordResetForm(DjangoPasswordResetForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["email"].widget.attrs.update(_field_attrs(placeholder="you@example.com"))
+        self.fields["email"].widget.attrs.update(_email_field_attrs(placeholder="you@example.com"))
 
 
 class StarliftSetPasswordForm(DjangoSetPasswordForm):

@@ -27,7 +27,7 @@ services:
     volumes:
       - mediafiles:/app/media
     ports:
-      - "80:8000"
+      - "127.0.0.1:8000:8000"
 
   parser:
     build: .

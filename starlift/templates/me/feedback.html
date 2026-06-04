@@ -1,0 +1,423 @@
+{% extends 'me/_base.html' %}
+
+{% block title %}Мои отзывы — StarLift{% endblock %}
+
+{% block me_content %}
+<style>
+    .fb-toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .fb-toolbar select, .fb-toolbar input {
+        height: 40px;
+        background: var(--white);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 0 12px;
+        font-size: 13px;
+        color: var(--text-main);
+        outline: none;
+        font-family: inherit;
+        transition: var(--transition);
+        box-sizing: border-box;
+    }
+    .fb-toolbar select:focus, .fb-toolbar input:focus {
+        border-color: var(--sber-green);
+        box-shadow: 0 0 0 3px var(--light-green);
+    }
+    .fb-toolbar .btn-action { height: 40px; }
+    .fb-score {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 30px; height: 30px; border-radius: 50%;
+        font-weight: 800; font-size: 12px; color: #fff;
+    }
+    .fb-score.promoter { background: var(--sber-green); }
+    .fb-score.passive { background: #E0A500; }
+    .fb-score.detractor { background: #D93E4E; }
+    /* Оценка спикера — золотой круг + ободок, чтобы строка читалась как «своя» */
+    .fb-score.self-event {
+        background: linear-gradient(135deg, #FFD166, #FFB347);
+        color: #6B4F00;
+        box-shadow: 0 0 0 2px rgba(180, 130, 0, 0.4), 0 3px 8px rgba(255, 180, 71, 0.35);
+    }
+    .fb-comment { color: var(--text-main); font-size: 13px; line-height: 1.5; max-width: 480px; }
+    .fb-comment.empty { color: var(--text-muted); font-style: italic; }
+
+    /* Подсветка всей «своей» строки */
+    tr.fb-row-self {
+        background: linear-gradient(90deg, rgba(255, 209, 102, 0.18), rgba(255, 209, 102, 0.04));
+    }
+    tr.fb-row-self:hover { background: rgba(255, 209, 102, 0.28) !important; }
+    [data-theme="dark"] tr.fb-row-self {
+        background: linear-gradient(90deg, rgba(255, 209, 102, 0.10), rgba(255, 209, 102, 0.02));
+    }
+    .fb-source-chip {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 2px 8px; border-radius: 999px;
+        font-size: 11px; font-weight: 700;
+        background: rgba(255, 209, 102, 0.3); color: #B07A00;
+        border: 1px solid rgba(180, 130, 0, 0.35);
+        white-space: nowrap;
+    }
+    [data-theme="dark"] .fb-source-chip { color: #FFD166; background: rgba(255, 209, 102, 0.14); }
+
+    /* --- «Моя оценка мероприятий» (золотой) --- */
+    .my-rate-block {
+        padding: 20px 22px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, rgba(255, 209, 102, 0.22), rgba(255, 231, 163, 0.10));
+        border: 1px solid rgba(180, 130, 0, 0.4);
+        box-shadow: 0 6px 18px rgba(255, 209, 102, 0.18);
+        display: grid; gap: 14px;
+    }
+    [data-theme="dark"] .my-rate-block {
+        background: linear-gradient(135deg, rgba(255, 209, 102, 0.10), rgba(255, 209, 102, 0.04));
+        border-color: rgba(255, 209, 102, 0.35);
+    }
+    .my-rate-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .my-rate-icon {
+        width: 44px; height: 44px; flex-shrink: 0;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #FFD166, #FFB347);
+        color: #6B4F00;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 20px;
+        box-shadow: 0 4px 10px rgba(255, 180, 71, 0.35);
+    }
+    .my-rate-title { margin: 0; font-size: 16px; font-weight: 800; color: var(--text-main); }
+    .my-rate-sub { font-size: 12px; color: var(--text-muted); }
+
+    .mr-list { display: grid; gap: 10px; }
+    .mr-row {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+    }
+    .mr-info { min-width: 0; }
+    .mr-info strong { font-size: 14px; color: var(--text-main); display: block; }
+    .mr-info span { font-size: 12px; color: var(--text-muted); }
+    .mr-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 10px; border-radius: 999px;
+        background: rgba(255, 209, 102, 0.3);
+        color: #B07A00;
+        font-weight: 800; font-size: 13px;
+        white-space: nowrap;
+    }
+    [data-theme="dark"] .mr-chip { color: #FFD166; background: rgba(255, 209, 102, 0.14); }
+    .mr-chip.empty {
+        background: var(--white);
+        color: var(--text-muted);
+        border: 1px dashed var(--border-color);
+        font-weight: 600;
+    }
+    .mr-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 7px 12px; border-radius: 10px;
+        background: var(--white);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        font-weight: 600;
+        font-size: 12px;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+    .mr-btn:hover { border-color: var(--sber-green); color: var(--sber-green); }
+    .mr-form {
+        grid-column: 1 / -1;
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+        padding-top: 10px;
+        border-top: 1px solid var(--border-color);
+        margin-top: 6px;
+    }
+    .mr-form.open { display: flex; }
+    .mr-form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .mr-form label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .mr-form input[type="number"] {
+        width: 70px; background: var(--white); color: var(--text-main);
+        border: 1px solid var(--border-color); border-radius: 10px;
+        padding: 7px 10px; font-size: 13px; font-weight: 700;
+        outline: none; font-family: inherit; text-align: center;
+        -moz-appearance: textfield;
+    }
+    .mr-form input[type="number"]::-webkit-outer-spin-button,
+    .mr-form input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .mr-form input[type="number"]:focus { border-color: var(--sber-green); box-shadow: 0 0 0 4px var(--light-green); }
+    .mr-form textarea {
+        width: 100%; box-sizing: border-box;
+        background: var(--white); color: var(--text-main);
+        border: 1px solid var(--border-color); border-radius: 10px;
+        padding: 7px 10px; font-size: 13px;
+        resize: vertical; min-height: 48px;
+        font-family: inherit; outline: none;
+    }
+    .mr-form textarea:focus { border-color: var(--sber-green); box-shadow: 0 0 0 4px var(--light-green); }
+    .mr-form-buttons { display: flex; gap: 8px; }
+    .mr-form .btn-save {
+        padding: 7px 14px; border-radius: 10px; background: var(--sber-green); color: #fff;
+        border: none; font-weight: 700; font-size: 12px; cursor: pointer;
+    }
+    .mr-form .btn-cancel {
+        padding: 7px 14px; border-radius: 10px; background: var(--white);
+        border: 1px solid var(--border-color); color: var(--text-muted);
+        cursor: pointer; font-size: 12px; font-weight: 600;
+    }
+    .mr-form .mr-msg { font-size: 12px; color: #D93E4E; min-height: 14px; }
+    .mr-form .mr-msg.success { color: var(--sber-green); }
+
+    .mr-toggle-rest {
+        background: none; border: none; color: var(--sber-green);
+        font-weight: 700; cursor: pointer; padding: 4px 0; font-size: 13px;
+        align-self: flex-start; font-family: inherit;
+    }
+    .mr-toggle-rest:hover { text-decoration: underline; }
+
+    @media (max-width: 600px) {
+        .mr-row { grid-template-columns: 1fr; }
+        .mr-row .mr-chip, .mr-row .mr-btn { justify-self: flex-start; }
+    }
+</style>
+
+{% if past_events_for_rating %}
+<div class="my-rate-block" style="margin-bottom: 18px;">
+    <div class="my-rate-head">
+        <div class="my-rate-icon"><i class="fa-solid fa-star"></i></div>
+        <div>
+            <h3 class="my-rate-title">Моя оценка мероприятий</h3>
+            <span class="my-rate-sub">Поставьте оценку прошедшим событиям — она выделяется отдельно от обычных отзывов и видна на карточке мероприятия.</span>
+        </div>
+    </div>
+
+    <div class="mr-list" id="mrList">
+        {% for ev in past_events_for_rating %}
+        <div class="mr-row{% if forloop.counter > 3 %} mr-row-extra{% endif %}" data-event-id="{{ ev.id }}"
+             {% if forloop.counter > 3 %}style="display:none;"{% endif %}>
+            <div class="mr-info">
+                <strong>{{ ev.title }}</strong>
+                <span>
+                    {% if ev.event_date %}{{ ev.event_date|date:'d.m.Y' }}{% elif ev.date %}{{ ev.date }}{% endif %}
+                    {% if ev.location %} · {{ ev.location }}{% endif %}
+                </span>
+            </div>
+            {% if ev.my_event_rating is not None %}
+            <span class="mr-chip" data-rating-chip>
+                <i class="fa-solid fa-star"></i><span data-rating-value>{{ ev.my_event_rating }}</span>/10
+            </span>
+            <button type="button" class="mr-btn" data-rate-open>
+                <i class="fa-solid fa-pen"></i> Изменить
+            </button>
+            {% else %}
+            <span class="mr-chip empty" data-rating-chip-empty>—</span>
+            <button type="button" class="mr-btn" data-rate-open>
+                <i class="fa-solid fa-star"></i> Поставить
+            </button>
+            {% endif %}
+
+            <form class="mr-form" data-rate-form>
+                {% csrf_token %}
+                <div class="mr-form-row">
+                    <label>Оценка (0–10)</label>
+                    <input type="number" name="score" min="0" max="10" step="1" required
+                           value="{% if ev.my_event_rating is not None %}{{ ev.my_event_rating }}{% endif %}">
+                </div>
+                <textarea name="comment" placeholder="Комментарий (необязательно)">{{ ev.my_event_rating_comment }}</textarea>
+                <div class="mr-msg" data-rate-msg></div>
+                <div class="mr-form-buttons">
+                    <button type="submit" class="btn-save"><i class="fa-solid fa-floppy-disk"></i> Сохранить</button>
+                    <button type="button" class="btn-cancel" data-rate-cancel>Отмена</button>
+                </div>
+            </form>
+        </div>
+        {% endfor %}
+        {% if past_events_for_rating|length > 3 %}
+        <button type="button" class="mr-toggle-rest" id="mrToggleRest">
+            <i class="fa-solid fa-chevron-down"></i> Показать ещё ({{ past_events_for_rating|length|add:"-3" }})
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<div class="content-block" style="padding:22px; display:grid; gap:16px;">
+    <form method="get" class="fb-toolbar">
+        <select name="event" aria-label="Мероприятие">
+            <option value="">Все мероприятия</option>
+            {% for ev in events_for_filter %}
+            <option value="{{ ev.id }}" {% if filter_event == ev.id|stringformat:'s' %}selected{% endif %}>{{ ev.title }}</option>
+            {% endfor %}
+        </select>
+        <input type="number" name="score_min" min="0" max="10" placeholder="Оценка от" value="{{ filter_score_min }}" style="width:120px;">
+        <input type="number" name="score_max" min="0" max="10" placeholder="до" value="{{ filter_score_max }}" style="width:90px;">
+        <select name="sort" aria-label="Сортировка">
+            <option value="-created_at" {% if sort == '-created_at' %}selected{% endif %}>Сначала новые</option>
+            <option value="created_at" {% if sort == 'created_at' %}selected{% endif %}>Сначала старые</option>
+            <option value="-score" {% if sort == '-score' %}selected{% endif %}>По оценке ↓</option>
+            <option value="score" {% if sort == 'score' %}selected{% endif %}>По оценке ↑</option>
+        </select>
+        <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-filter"></i> Применить</button>
+        {% if filter_event or filter_score_min or filter_score_max %}
+        <a href="{% url 'me_feedback' %}" class="btn-action"><i class="fa-solid fa-xmark"></i> Сбросить</a>
+        {% endif %}
+        <span style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+            <span style="font-size:12px; color:var(--text-muted);">Найдено: <strong>{{ total }}</strong></span>
+            <a href="{% url 'me_feedback_csv' %}" class="btn-action" title="Скачать в CSV"><i class="fa-solid fa-download"></i> CSV</a>
+        </span>
+    </form>
+
+    {% if feedbacks %}
+    <div class="responsive-table">
+        <table class="me-table">
+            <thead>
+                <tr>
+                    <th>Оценка</th>
+                    <th>Мероприятие</th>
+                    <th>Комментарий</th>
+                    <th>Дата</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in feedbacks %}
+                <tr class="{% if f.kind == 'self_event' %}fb-row-self{% endif %}">
+                    <td data-label="Оценка">
+                        <span class="fb-score {% if f.kind == 'self_event' %}self-event{% elif f.score >= 9 %}promoter{% elif f.score >= 7 %}passive{% else %}detractor{% endif %}">{{ f.score }}</span>
+                    </td>
+                    <td data-label="Мероприятие" style="font-weight:600;">
+                        {{ f.event.title }}
+                        {% if f.kind == 'self_event' %}
+                        <span class="fb-source-chip" title="Оценка от вас за мероприятие"><i class="fa-solid fa-star"></i> Моя оценка</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Комментарий">
+                        {% if f.comment %}
+                            <div class="fb-comment">{{ f.comment }}</div>
+                        {% else %}
+                            <div class="fb-comment empty">Без комментария</div>
+                        {% endif %}
+                    </td>
+                    <td data-label="Дата" style="color:var(--text-muted); white-space:nowrap;">{{ f.created_at|date:'d.m.Y' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="me-empty"><i class="fa-solid fa-comments" style="font-size:22px; display:block; margin-bottom:8px;"></i>По выбранным фильтрам отзывов нет.</div>
+    {% endif %}
+</div>
+
+{% if past_events_for_rating %}
+<script>
+(function() {
+    function getCsrf(form) {
+        const inp = form.querySelector('input[name="csrfmiddlewaretoken"]');
+        return inp ? inp.value : '';
+    }
+
+    // «Показать ещё»
+    const toggleRest = document.getElementById('mrToggleRest');
+    if (toggleRest) {
+        toggleRest.addEventListener('click', () => {
+            const extras = document.querySelectorAll('.mr-row-extra');
+            const isHidden = extras[0] && extras[0].style.display === 'none';
+            extras.forEach(r => { r.style.display = isHidden ? '' : 'none'; });
+            toggleRest.innerHTML = isHidden
+                ? '<i class="fa-solid fa-chevron-up"></i> Свернуть'
+                : '<i class="fa-solid fa-chevron-down"></i> Показать ещё';
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        const openBtn = e.target.closest('.mr-list [data-rate-open]');
+        if (openBtn) {
+            const row = openBtn.closest('.mr-row');
+            const form = row && row.querySelector('[data-rate-form]');
+            if (form) {
+                form.classList.add('open');
+                const input = form.querySelector('input[name=score]');
+                if (input) { input.focus(); input.select(); }
+            }
+            return;
+        }
+        const cancelBtn = e.target.closest('.mr-list [data-rate-cancel]');
+        if (cancelBtn) {
+            const form = cancelBtn.closest('[data-rate-form]');
+            if (form) {
+                form.classList.remove('open');
+                const msg = form.querySelector('[data-rate-msg]');
+                if (msg) { msg.textContent = ''; msg.classList.remove('success'); }
+            }
+        }
+    });
+
+    document.addEventListener('submit', async (e) => {
+        const form = e.target.closest('.mr-list [data-rate-form]');
+        if (!form) return;
+        e.preventDefault();
+        const row = form.closest('.mr-row');
+        const eventId = row && row.dataset.eventId;
+        const msg = form.querySelector('[data-rate-msg]');
+        if (msg) { msg.textContent = ''; msg.classList.remove('success'); }
+        if (!eventId) return;
+
+        const score = form.querySelector('input[name=score]').value.trim();
+        const comment = form.querySelector('textarea[name=comment]').value.trim();
+        const n = Number(score);
+        if (!Number.isInteger(n) || n < 0 || n > 10) {
+            if (msg) msg.textContent = 'Оценка — целое число от 0 до 10.';
+            return;
+        }
+
+        const body = new URLSearchParams();
+        body.append('score', String(n));
+        body.append('comment', comment);
+
+        try {
+            const r = await fetch(`/me/events/${eventId}/rate/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCsrf(form),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                credentials: 'same-origin',
+                body: body.toString(),
+            });
+            const data = await r.json();
+            if (!r.ok || !data.ok) {
+                if (msg) msg.textContent = 'Не удалось сохранить.';
+                return;
+            }
+
+            // Обновляем chip
+            let chip = row.querySelector('[data-rating-chip]');
+            const empty = row.querySelector('[data-rating-chip-empty]');
+            if (empty) empty.remove();
+            if (!chip) {
+                chip = document.createElement('span');
+                chip.className = 'mr-chip';
+                chip.setAttribute('data-rating-chip', '');
+                chip.innerHTML = `<i class="fa-solid fa-star"></i><span data-rating-value>${data.score}</span>/10`;
+                const btn = row.querySelector('[data-rate-open]');
+                row.insertBefore(chip, btn);
+                if (btn) btn.innerHTML = '<i class="fa-solid fa-pen"></i> Изменить';
+            } else {
+                chip.querySelector('[data-rating-value]').textContent = data.score;
+            }
+
+            if (msg) {
+                msg.textContent = 'Сохранено.';
+                msg.classList.add('success');
+            }
+            setTimeout(() => form.classList.remove('open'), 500);
+        } catch (err) {
+            if (msg) msg.textContent = 'Ошибка сети.';
+        }
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

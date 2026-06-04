@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .me-shell { display: grid; gap: 20px; }
+    .me-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .me-title { margin: 0; font-size: clamp(24px, 3vw, 32px); font-weight: 800; letter-spacing: -0.03em; color: var(--text-main); }
+    .me-subtitle { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; }
+    .me-nav { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px; background: var(--white); border: 1px solid var(--border-color); border-radius: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    @media (max-width: 600px) {
+        .me-nav { flex-wrap: nowrap; }
+        .me-nav a { flex-shrink: 0; }
+    }
+    .me-nav a { padding: 8px 14px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 13px; color: var(--text-muted); transition: var(--transition); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .me-nav a:hover { color: var(--text-main); background: var(--light-green); text-decoration: none; }
+    .me-nav a.active { background: var(--sber-green); color: #fff; }
+
+    /* Card grid + bars used across /me/ pages */
+    .me-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    @media (max-width: 900px) { .me-grid-4 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 480px) { .me-grid-4 { grid-template-columns: 1fr; } }
+
+    .me-stat {
+        display: flex; flex-direction: column; gap: 6px;
+        padding: 18px 20px;
+    }
+    .me-stat-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .me-stat-value { font-size: 28px; font-weight: 800; color: var(--text-main); line-height: 1; }
+    .me-stat-sub { font-size: 12px; color: var(--text-muted); }
+    .me-stat-value.positive { color: var(--sber-green); }
+    .me-stat-value.negative { color: #D93E4E; }
+
+    .me-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+    .me-table th, .me-table td { padding: 10px 12px; border-bottom: 1px solid var(--border-color); text-align: left; vertical-align: middle; }
+    .me-table th { font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; background: var(--th-bg); }
+    .me-table tbody tr:hover { background: var(--tr-hover); }
+
+    .me-empty { padding: 36px 20px; text-align: center; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 14px; }
+
+    .me-section-title { display: flex; align-items: center; gap: 10px; margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: var(--text-main); }
+</style>
+
+<div class="me-shell" id="me-shell">
+    <div class="me-header animate-fade">
+        <div style="min-width:0;">
+            <h1 class="me-title">{% block me_title %}Личный кабинет{% endblock %}</h1>
+            <p class="me-subtitle" id="me-subtitle">{% block me_subtitle %}Ваши отзывы, мероприятия и заявки в одном месте.{% endblock %}</p>
+        </div>
+        <div id="me-header-extra">{% block me_header_extra %}{% endblock %}</div>
+    </div>
+
+    <nav class="me-nav animate-fade" style="animation-delay:0.04s;" id="me-nav">
+        {% if user.profile.role == 'speaker' %}
+        <a href="{% url 'me_dashboard' %}" class="{% if active == 'dashboard' %}active{% endif %}"><i class="fa-solid fa-chart-line"></i> Статистика</a>
+        <a href="{% url 'me_events' %}" class="{% if active == 'events' %}active{% endif %}"><i class="fa-regular fa-calendar"></i> Мероприятия</a>
+        <a href="{% url 'me_feedback' %}" class="{% if active == 'feedback' %}active{% endif %}"><i class="fa-solid fa-comments"></i> Отзывы</a>
+        <a href="{% url 'me_requests' %}" class="{% if active == 'requests' %}active{% endif %}"><i class="fa-solid fa-paper-plane"></i> Заявки</a>
+        <a href="{% url 'me_invitations' %}" class="{% if active == 'invitations' %}active{% endif %}"><i class="fa-solid fa-envelope-open-text"></i> Приглашения</a>
+        {% endif %}
+        <a href="{% url 'me_favorites' %}" class="{% if active == 'favorites' %}active{% endif %}"><i class="fa-solid fa-heart"></i> Избранные</a>
+        <a href="{% url 'accounts:profile' %}" class="{% if active == 'settings' %}active{% endif %}"><i class="fa-solid fa-gear"></i> Настройки</a>
+    </nav>
+
+    <div class="animate-fade" id="me-tab-content" style="animation-delay:0.08s;">
+        {% block me_content %}{% endblock %}
+    </div>
+</div>
+{% endblock %}

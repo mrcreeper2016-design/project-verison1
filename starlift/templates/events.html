@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
-<script>window.__isAdmin = {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}true{% else %}false{% endif %};</script>
+<script>window.__isAdmin = {% if user.is_authenticated and user.profile.role == 'admin' or user.profile.role == 'devrel' or user.is_superuser %}true{% else %}false{% endif %};</script>
 <style>
     .ev-form { display: grid; gap: 12px; }
     .ev-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 0; }
@@ -299,6 +299,33 @@
         color: var(--text-muted);
     }
 
+    /* Compact action buttons in the event modal (admin/devrel/speaker) */
+    .ev-act {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
+        cursor: pointer;
+        text-decoration: none;
+        border: 1px solid transparent;
+        transition: var(--transition);
+        white-space: nowrap;
+    }
+    .ev-act i { font-size: 11px; }
+    .ev-act-primary { background: var(--sber-green); color: #fff; border-color: var(--sber-green); }
+    .ev-act-primary:hover:not(:disabled) { background: #086d31; }
+    .ev-act-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ev-act-accent { background: var(--light-green); color: var(--sber-green); border-color: rgba(10,128,59,0.3); }
+    .ev-act-accent:hover { background: rgba(10,128,59,0.18); }
+    .ev-act-ghost { background: var(--white); color: var(--text-main); border-color: var(--border-color); }
+    .ev-act-ghost:hover { background: var(--light-green); color: var(--sber-green); border-color: rgba(10,128,59,0.3); }
+    .ev-act-danger { background: rgba(217,62,78,0.08); color: #D93E4E; border-color: rgba(217,62,78,0.25); padding: 6px 9px; }
+    .ev-act-danger:hover { background: rgba(217,62,78,0.16); }
+
     .section-title {
         margin: 0;
         font-size: 18px;
@@ -497,6 +524,130 @@
         word-break: break-word;
     }
 
+    /* Плашка «Оценка от спикеров» — выделяется выше остального фидбэка */
+    .speaker-ratings-plate {
+        margin: 14px 0 4px;
+        padding: 16px 18px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(255, 209, 102, 0.22), rgba(255, 231, 163, 0.12));
+        border: 1px solid rgba(180, 130, 0, 0.35);
+        box-shadow: 0 6px 18px rgba(255, 209, 102, 0.18);
+        display: none;
+    }
+    .speaker-ratings-plate.is-visible { display: block; }
+    [data-theme="dark"] .speaker-ratings-plate {
+        background: linear-gradient(135deg, rgba(255, 209, 102, 0.10), rgba(255, 209, 102, 0.04));
+        border-color: rgba(255, 209, 102, 0.35);
+    }
+
+    .srp-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+    }
+    .srp-icon {
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #FFD166, #FFB347);
+        color: #6B4F00;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        box-shadow: 0 4px 10px rgba(255, 180, 71, 0.35);
+    }
+    .srp-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .srp-avg {
+        font-size: 28px;
+        font-weight: 800;
+        color: var(--text-main);
+        line-height: 1;
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+    }
+    .srp-avg .srp-of-ten {
+        font-size: 14px;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+    .srp-count {
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+    .srp-toggle {
+        background: none;
+        border: none;
+        color: var(--sber-green);
+        font-weight: 700;
+        cursor: pointer;
+        padding: 4px 0;
+        margin-top: 8px;
+        font-size: 13px;
+        font-family: inherit;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .srp-toggle:hover { text-decoration: underline; }
+    .srp-items {
+        display: none;
+        margin-top: 12px;
+        gap: 10px;
+        flex-direction: column;
+    }
+    .srp-items.is-open { display: flex; }
+    .srp-item {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 10px;
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+    }
+    .srp-item .avatar {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+    }
+    .srp-item-body { flex: 1; min-width: 0; }
+    .srp-item-row {
+        display: flex;
+        gap: 8px;
+        align-items: baseline;
+        flex-wrap: wrap;
+    }
+    .srp-item-name { font-weight: 700; font-size: 13px; color: var(--text-main); }
+    .srp-item-score {
+        font-weight: 800;
+        font-size: 14px;
+        color: #B07A00;
+        background: rgba(255, 209, 102, 0.25);
+        padding: 1px 8px;
+        border-radius: 999px;
+    }
+    [data-theme="dark"] .srp-item-score { color: #FFD166; background: rgba(255, 209, 102, 0.12); }
+    .srp-item-comment {
+        margin: 4px 0 0;
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.4;
+        word-break: break-word;
+    }
+
     @media (max-width: 960px) {
         .events-grid,
         .event-modal-grid {
@@ -524,19 +675,92 @@
         .events-header { flex-direction: column; align-items: flex-start; gap: 12px; }
         .events-title { font-size: 22px !important; }
         .event-card { padding: 14px; }
+
+        /* Фуллскрин-модалка мероприятия: убираем внешние отступы у контейнера */
+        #eventModalOverlay.modal-overlay {
+            padding: 0 !important;
+            align-items: stretch;
+        }
         #eventModalOverlay .modal-content.event-detail-modal {
             width: 100vw !important;
             height: 100vh !important;
             max-height: 100vh !important;
             border-radius: 0 !important;
-            padding: 16px 14px !important;
+            padding: 56px 16px 20px !important;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+        /* Кнопка закрытия — фикс наверху, не «улетает» */
+        #eventModalOverlay .modal-close {
+            position: fixed;
+            top: 14px;
+            right: 14px;
+            z-index: 5;
+            background: var(--panel-bg);
+            border-radius: 999px;
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        /* Уплощаем «карточки внутри карточки» — они в фуллскрин-модалке только мешают */
+        .event-detail-modal .event-modal-grid {
+            gap: 22px;
+            margin-top: 0;
+        }
+        .event-detail-modal .event-modal-section {
+            padding: 0;
+            border: none;
+            background: transparent;
+            border-radius: 0;
+        }
+        .event-detail-modal .event-modal-section + .event-modal-section {
+            border-top: 1px solid var(--border-color);
+            padding-top: 18px;
+        }
+        .event-detail-modal .event-modal-section:active {
+            transform: none;
+        }
+
+        .event-detail-modal .event-modal-title {
+            font-size: 20px;
+            line-height: 1.25;
+            margin-bottom: 10px;
+        }
+        .event-detail-modal .section-title {
+            font-size: 16px;
+        }
+        .event-detail-modal .event-desc-body {
+            font-size: 14px;
+        }
+
+        /* Расписание: не отдельный скролл, естественный поток внутри модалки */
+        .event-detail-modal .event-schedule-scroll {
+            max-height: none !important;
+            overflow: visible !important;
+            padding-right: 0 !important;
+        }
+
+        /* Чипы спикеров — компактнее */
+        .event-detail-modal .speaker-chip {
+            padding: 8px 10px;
         }
     }
 
     @media (max-width: 480px) {
         .schedule-item {
-            grid-template-columns: 1fr !important;
-            gap: 4px !important;
+            grid-template-columns: 60px 1fr !important;
+            gap: 8px !important;
+            padding: 10px !important;
+        }
+        .schedule-time {
+            font-size: 11px;
+        }
+        .schedule-text {
+            font-size: 13px;
         }
         .stacked-avatars .avatar {
             width: 28px !important;
@@ -544,6 +768,17 @@
             margin-left: -6px;
         }
         .stacked-avatars .avatar:first-child { margin-left: 0; }
+
+        #eventModalOverlay .modal-content.event-detail-modal {
+            padding: 52px 12px 16px !important;
+        }
+        .event-detail-modal .event-modal-title { font-size: 19px; }
+        /* «Перейти на мероприятие» — sticky внизу для удобства большого пальца */
+        .event-detail-modal #eventGoLink {
+            position: sticky;
+            bottom: 8px;
+            z-index: 4;
+        }
     }
 </style>
 
@@ -569,7 +804,6 @@
             <div class="filters-panel" id="evFiltersPanel" role="dialog" aria-label="Фильтры мероприятий">
                 <div class="filters-panel-title">
                     <span>Фильтры</span>
-                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Esc / клик вне — закрыть</span>
                 </div>
                 <div class="filters-grid">
                     <div class="filter-field" style="grid-column: 1 / -1;">
@@ -607,7 +841,7 @@
             <i class="fa-solid fa-plus"></i> Предложить мероприятие
         </button>
         {% endif %}
-        {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+        {% if user.is_authenticated and user.profile.role == 'admin' or user.profile.role == 'devrel' or user.is_superuser %}
         <button type="button" class="btn-action" id="btnAdminCreateEvent" style="padding: 8px 14px; border-radius: 12px; background: var(--sber-green); color: #fff; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-plus"></i> Создать мероприятие
         </button>
@@ -737,6 +971,14 @@ function parseEventDate(ev) {
     d = parseLooseDateString(ev.title || '');
     if (d) return d;
     return parseLooseDateString((ev.description || '').slice(0, 800));
+}
+
+function pluralRu(n, forms) {
+    const mod10 = Math.abs(n) % 10;
+    const mod100 = Math.abs(n) % 100;
+    if (mod10 === 1 && mod100 !== 11) return forms[0];
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+    return forms[2];
 }
 
 function escapeHtml(str) {
@@ -1012,6 +1254,43 @@ function renderEventModal(eventId) {
     window.__currentEventId = ev.id;
     window.__currentEventTitle = ev.title;
 
+    // --- Deadline display + join button state ---
+    const fmtDeadline = (iso) => {
+        if (!iso) return '';
+        const parts = String(iso).split('-');
+        if (parts.length === 3) return `${parts[2]}.${parts[1]}.${parts[0]}`;
+        return iso;
+    };
+    const joinBtnEl = document.getElementById('btnRequestJoin');
+    const joinInfoEl = document.getElementById('joinDeadlineInfo');
+    if (joinBtnEl && joinInfoEl) {
+        if (ev.can_self_submit) {
+            joinBtnEl.disabled = false;
+            joinBtnEl.style.opacity = '';
+            joinBtnEl.style.cursor = 'pointer';
+            joinInfoEl.textContent = ev.application_deadline
+                ? `Приём заявок открыт до ${fmtDeadline(ev.application_deadline)}`
+                : '';
+        } else {
+            joinBtnEl.disabled = true;
+            joinBtnEl.style.opacity = '0.5';
+            joinBtnEl.style.cursor = 'not-allowed';
+            joinInfoEl.textContent = ev.application_deadline
+                ? `Приём заявок закрыт (дедлайн ${fmtDeadline(ev.application_deadline)})`
+                : 'Подача заявок только по приглашению DevRel';
+        }
+    }
+    const inviteBtnEl = document.getElementById('btnInviteSpeaker');
+    if (inviteBtnEl) {
+        inviteBtnEl.href = `/console/events/${ev.id}/invite/`;
+    }
+    const evDeadlineInfo = document.getElementById('eventDeadlineInfo');
+    if (evDeadlineInfo) {
+        evDeadlineInfo.textContent = ev.application_deadline
+            ? `Дедлайн подачи заявок: ${fmtDeadline(ev.application_deadline)}`
+            : 'Дедлайн подачи заявок не задан — попасть в событие можно только по приглашению DevRel';
+    }
+
     const descEl = document.getElementById('eventModalDescription');
     const descToggle = document.getElementById('eventModalDescToggle');
     const rawDesc = ev.description && ev.description !== 'None' ? String(ev.description) : '';
@@ -1045,11 +1324,67 @@ function renderEventModal(eventId) {
     document.getElementById('eventLocationLine').textContent = ev.location && ev.location !== 'None' ? ev.location : 'Онлайн/Офлайн';
     document.getElementById('eventCountLine').textContent = ev.date && ev.date !== 'None' ? ev.date : 'Дата уточняется';
 
-    let formatHtml = 'Информация недоступна';
-    if (ev.link && ev.link !== 'None') {
-        formatHtml = `<a href="${escapeHtml(ev.link)}" target="_blank" rel="noopener noreferrer">Перейти по ссылке</a>`;
+    const goLink = document.getElementById('eventGoLink');
+    const goLabel = document.getElementById('eventGoLinkLabel');
+    if (goLink) {
+        const hasLink = ev.link && ev.link !== 'None' && String(ev.link).trim() !== '';
+        if (hasLink) {
+            goLink.href = ev.link;
+            goLink.style.pointerEvents = '';
+            goLink.style.opacity = '';
+            goLink.style.cursor = 'pointer';
+            if (goLabel) goLabel.textContent = 'Перейти на мероприятие';
+        } else {
+            goLink.href = '#';
+            goLink.style.pointerEvents = 'none';
+            goLink.style.opacity = '0.55';
+            goLink.style.cursor = 'not-allowed';
+            if (goLabel) goLabel.textContent = 'Ссылка недоступна';
+        }
     }
-    document.getElementById('eventFormatLine').innerHTML = formatHtml;
+
+    // --- Плашка «Оценка от спикеров» ---
+    const ratingsPlate = document.getElementById('eventRatingsPlate');
+    const ratingsAvg = document.getElementById('eventRatingsAvg');
+    const ratingsCount = document.getElementById('eventRatingsCount');
+    const ratingsItems = document.getElementById('eventRatingsItems');
+    const ratingsToggle = document.getElementById('eventRatingsToggle');
+    const sr = ev.speaker_ratings || { avg: null, count: 0, items: [] };
+    if (ratingsPlate && sr.count > 0) {
+        ratingsPlate.classList.add('is-visible');
+        if (ratingsAvg) ratingsAvg.textContent = sr.avg != null ? String(sr.avg) : '—';
+        if (ratingsCount) ratingsCount.textContent = sr.count + ' ' + pluralRu(sr.count, ['оценка', 'оценки', 'оценок']);
+        if (ratingsItems) {
+            ratingsItems.innerHTML = (sr.items || []).map(it => {
+                const alt = escapeHtml(it.speaker_name || '');
+                const img = it.speaker_avatar
+                    ? `<img class="avatar" src="${escapeHtml(it.speaker_avatar)}" alt="${alt}">`
+                    : `<div class="avatar" style="background:var(--sber-green);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;" aria-hidden="true">${escapeHtml((it.speaker_name || '?').charAt(0))}</div>`;
+                const cmt = it.comment ? `<p class="srp-item-comment">${escapeHtml(it.comment)}</p>` : '';
+                return `<div class="srp-item">${img}<div class="srp-item-body">
+                    <div class="srp-item-row">
+                        <span class="srp-item-name">${escapeHtml(it.speaker_name)}</span>
+                        <span class="srp-item-score">${it.score}/10</span>
+                    </div>${cmt}
+                </div></div>`;
+            }).join('');
+            ratingsItems.classList.remove('is-open');
+        }
+        if (ratingsToggle) {
+            ratingsToggle.setAttribute('aria-expanded', 'false');
+            ratingsToggle.querySelector('span').textContent = 'Показать оценки';
+            ratingsToggle.querySelector('i').className = 'fa-solid fa-chevron-down';
+            ratingsToggle.onclick = () => {
+                const open = ratingsItems.classList.toggle('is-open');
+                ratingsToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                ratingsToggle.querySelector('span').textContent = open ? 'Скрыть оценки' : 'Показать оценки';
+                ratingsToggle.querySelector('i').className = open ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down';
+            };
+        }
+    } else if (ratingsPlate) {
+        ratingsPlate.classList.remove('is-visible');
+        if (ratingsItems) ratingsItems.innerHTML = '';
+    }
 
     const spWrap = document.getElementById('eventSpeakersList');
     const spList = ev.speakers || [];
@@ -1114,13 +1449,19 @@ function renderEventModal(eventId) {
     }
 
     const schedEl = document.getElementById('eventScheduleList');
-    let scheduleHtml = '<p style="color:var(--text-muted);font-size:14px;margin:0;">Смотрите подробное расписание на официальном сайте мероприятия.</p>';
-    if (ev.schedule && ev.schedule !== 'None' && String(ev.schedule).trim() !== '') {
-        scheduleHtml = ev.schedule;
-    }
+    const schedHead = document.getElementById('eventScheduleHeading');
+    const hasSchedule = ev.schedule && ev.schedule !== 'None' && String(ev.schedule).trim() !== '';
     if (schedEl) {
-        schedEl.innerHTML = scheduleHtml;
-        schedEl.classList.add('event-schedule-scroll');
+        if (hasSchedule) {
+            schedEl.innerHTML = ev.schedule;
+            schedEl.classList.add('event-schedule-scroll');
+            schedEl.style.display = '';
+            if (schedHead) schedHead.style.display = '';
+        } else {
+            schedEl.innerHTML = '';
+            schedEl.style.display = 'none';
+            if (schedHead) schedHead.style.display = 'none';
+        }
     }
 }
 
@@ -1200,6 +1541,22 @@ if (document.readyState === 'loading') {
                         <button type="button" class="event-desc-toggle" id="eventModalDescToggle" aria-controls="eventModalDescription">Показать полностью</button>
                     </div>
 
+                    <div class="speaker-ratings-plate" id="eventRatingsPlate" aria-live="polite">
+                        <div class="srp-head">
+                            <div class="srp-icon"><i class="fa-solid fa-star"></i></div>
+                            <div style="display:flex; flex-direction:column; gap:2px;">
+                                <p class="srp-title">Общая оценка мероприятия</p>
+                                <div class="srp-avg"><span id="eventRatingsAvg">—</span><span class="srp-of-ten">/ 10</span></div>
+                            </div>
+                            <span class="srp-count" id="eventRatingsCount"></span>
+                        </div>
+                        <button type="button" class="srp-toggle" id="eventRatingsToggle" aria-expanded="false" aria-controls="eventRatingsItems">
+                            <i class="fa-solid fa-chevron-down"></i>
+                            <span>Показать оценки</span>
+                        </button>
+                        <div class="srp-items" id="eventRatingsItems"></div>
+                    </div>
+
                     <div style="display:grid; gap:12px; margin-top:18px;">
                         <div class="speaker-chip">
                             <img class="avatar" id="eventCoverAvatar" src="" alt="Cover avatar">
@@ -1208,13 +1565,16 @@ if (document.readyState === 'loading') {
                                 <span id="eventCountLine"></span>
                             </div>
                         </div>
-                        <div class="speaker-chip">
-                            <div class="avatar" style="background: var(--sber-green); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800;">...</div>
-                            <div>
-                                <strong>Подробнее</strong>
-                                <span id="eventFormatLine"></span>
-                            </div>
-                        </div>
+                        <a id="eventGoLink" href="#" target="_blank" rel="noopener noreferrer"
+                           style="display:flex; align-items:center; justify-content:center; gap:10px;
+                                  padding:14px 20px; border-radius:14px;
+                                  background: var(--sber-green); color:#fff;
+                                  font-size:15px; font-weight:700; text-decoration:none;
+                                  box-shadow: 0 6px 16px rgba(10,128,59,0.25);
+                                  transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                            <span id="eventGoLinkLabel">Перейти на мероприятие</span>
+                        </a>
                     </div>
                 </div>
 
@@ -1223,29 +1583,36 @@ if (document.readyState === 'loading') {
                     <div id="eventSpeakersList" style="display:grid; gap:10px;"></div>
 
                     {% if user.is_authenticated and user.profile.role == 'speaker' %}
-                    <button type="button" id="btnRequestJoin" style="margin-top: 14px; padding: 10px 16px; border-radius: 12px; background: var(--sber-green); color: #fff; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                        <i class="fa-solid fa-paper-plane"></i> Подать заявку на участие
-                    </button>
-                    {% endif %}
-                    {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
-                    <div style="margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button type="button" id="btnAdminEditEvent" style="padding: 8px 14px; border-radius: 10px; background: var(--white); color: var(--text-main); border: 1px solid var(--border-color); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                            <i class="fa-solid fa-pen"></i> Редактировать
+                    <div id="joinSection" style="margin-top:12px; display:grid; gap:4px;">
+                        <button type="button" id="btnRequestJoin" class="ev-act ev-act-primary">
+                            <i class="fa-solid fa-paper-plane"></i> Подать заявку
                         </button>
-                        <button type="button" id="btnAdminDeleteEvent" style="padding: 8px 14px; border-radius: 10px; background: rgba(217,62,78,0.1); color: #D93E4E; border: 1px solid rgba(217,62,78,0.3); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                            <i class="fa-solid fa-trash"></i> Удалить
-                        </button>
+                        <span id="joinDeadlineInfo" style="font-size:11px; color:var(--text-muted);"></span>
                     </div>
                     {% endif %}
+                    {% if user.is_authenticated and user.profile.role == 'admin' or user.profile.role == 'devrel' or user.is_superuser %}
+                    <div style="margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap;">
+                        <a id="btnInviteSpeaker" href="#" class="ev-act ev-act-accent">
+                            <i class="fa-solid fa-paper-plane"></i> Пригласить
+                        </a>
+                        <button type="button" id="btnAdminEditEvent" class="ev-act ev-act-ghost">
+                            <i class="fa-solid fa-pen"></i> Редактировать
+                        </button>
+                        <button type="button" id="btnAdminDeleteEvent" class="ev-act ev-act-danger" title="Удалить">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                    <div id="eventDeadlineInfo" style="margin-top:6px; font-size:11px; color:var(--text-muted);"></div>
+                    {% endif %}
 
-                    <h3 class="section-title" style="margin: 18px 0 14px; font-size: 18px;"><i class="fa-solid fa-clock"></i> Расписание</h3>
+                    <h3 class="section-title" id="eventScheduleHeading" style="margin: 18px 0 14px; font-size: 18px;"><i class="fa-solid fa-clock"></i> Расписание</h3>
                     <div class="schedule-list" id="eventScheduleList"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    {% if user.is_authenticated and user.profile.role == 'admin' or user.is_superuser %}
+    {% if user.is_authenticated and user.profile.role == 'admin' or user.profile.role == 'devrel' or user.is_superuser %}
     <div class="modal-overlay" id="adminEventModal">
         <div class="modal-content" style="max-width: 820px; width: 100%; padding: 36px 40px;">
             <i class="fa-solid fa-xmark modal-close" id="adminEventClose"></i>
@@ -1259,6 +1626,10 @@ if (document.readyState === 'loading') {
                 <div class="ev-form-grid">
                     <label>Дата
                         <input type="date" name="event_date">
+                    </label>
+                    <label>Дедлайн подачи заявок
+                        <input type="date" name="application_deadline">
+                        <span style="display:block; font-size:11px; color:var(--text-muted); margin-top:4px;">Если не указать — будет автоматически за 14 дней до события</span>
                     </label>
                     <label>Место
                         <input type="text" name="location" maxlength="200" placeholder="Москва, Сколково">
@@ -1291,6 +1662,7 @@ if (document.readyState === 'loading') {
             const f = document.getElementById('adminEventForm');
             f.querySelector('[name=title]').value = ev ? (ev.title || '') : '';
             f.querySelector('[name=event_date]').value = ev && ev.event_date ? ev.event_date : '';
+            f.querySelector('[name=application_deadline]').value = ev && ev.application_deadline ? ev.application_deadline : '';
             f.querySelector('[name=location]').value = ev ? (ev.location || '') : '';
             f.querySelector('[name=link]').value = ev ? (ev.link || '') : '';
             f.querySelector('[name=topic]').value = ev ? (ev.topic || '') : '';
@@ -1508,6 +1880,7 @@ if (document.readyState === 'loading') {
                             already_pending: 'Вы уже подали заявку на это мероприятие.',
                             topic_required: 'Укажите тему доклада.',
                             no_speaker_profile: 'У вашего аккаунта не привязан профиль спикера.',
+                            submissions_closed: 'Приём заявок на это мероприятие закрыт. Попасть можно только по приглашению DevRel.',
                         };
                         msg.textContent = errMap[data.error] || ('Ошибка: ' + (data.error || 'не удалось отправить'));
                     }

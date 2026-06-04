@@ -19,11 +19,12 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 
-from starlift.models import Event, EventRequest, Speaker
+from starlift.models import Event, EventInvitation, EventRequest, Speaker, SpeakerApplication
 
 from ..decorators import role_required
 from ..models import AuditLog, LoginAttempt, UserProfile
 from ..services import audit, lockout
+from ..services.companies import ALLOWED_COMPANIES, is_allowed_company
 from ..services.speaker_avatar import seed_user_profile_avatar_from_linked_speaker
 
 
@@ -53,7 +54,7 @@ def users_view(request: HttpRequest) -> HttpResponse:
             | Q(first_name__icontains=q)
             | Q(last_name__icontains=q)
         )
-    if role_filter in (UserProfile.ROLE_ADMIN, UserProfile.ROLE_SPEAKER, UserProfile.ROLE_GUEST):
+    if role_filter in (UserProfile.ROLE_ADMIN, UserProfile.ROLE_DEVREL, UserProfile.ROLE_SPEAKER, UserProfile.ROLE_GUEST):
         qs = qs.filter(profile__role=role_filter)
     if active_filter == "active":
         qs = qs.filter(is_active=True)
@@ -119,7 +120,7 @@ def user_detail_view(request: HttpRequest, user_id: int) -> HttpResponse:
 
         elif action == "change_role":
             new_role = request.POST.get("role")
-            if new_role in (UserProfile.ROLE_ADMIN, UserProfile.ROLE_SPEAKER, UserProfile.ROLE_GUEST):
+            if new_role in (UserProfile.ROLE_ADMIN, UserProfile.ROLE_DEVREL, UserProfile.ROLE_SPEAKER, UserProfile.ROLE_GUEST):
                 if new_role != profile.role:
                     old_role = profile.role
                     profile.role = new_role
@@ -233,6 +234,24 @@ def user_detail_view(request: HttpRequest, user_id: int) -> HttpResponse:
                             messages.success(request, f"Связан со спикером «{speaker.name}».")
                 except Speaker.DoesNotExist:
                     messages.error(request, "Спикер не найден.")
+        elif action == "set_company":
+            new_company = (request.POST.get("company") or "").strip()
+            if not is_allowed_company(new_company):
+                messages.error(request, "Недопустимое значение компании.")
+            else:
+                old_company = profile.company
+                if new_company != old_company:
+                    profile.company = new_company
+                    profile.save(update_fields=["company", "updated_at"])
+                    audit.log(
+                        action=AuditLog.ACTION_PROFILE_UPDATED,
+                        actor=request.user,
+                        request=request,
+                        target=target,
+                        metadata={"field": "company", "from": old_company, "to": new_company},
+                    )
+                    messages.success(request, "Компания обновлена.")
+
         elif action == "delete_guest":
             if profile.role != UserProfile.ROLE_GUEST:
                 messages.error(request, "Удаление разрешено только для пользователей с ролью «Гость».")
@@ -280,6 +299,7 @@ def user_detail_view(request: HttpRequest, user_id: int) -> HttpResponse:
             "recent_attempts": recent_attempts,
             "recent_events": recent_events,
             "is_locked": lockout.is_locked(target.username),
+            "allowed_companies": ALLOWED_COMPANIES,
         },
     )
 
@@ -319,23 +339,118 @@ def audit_view(request: HttpRequest) -> HttpResponse:
     )
 
 
-@role_required("admin")
+def _devrel_visible_applications(actor) -> "QuerySet[SpeakerApplication]":
+    """SpeakerApplication queryset filtered per actor's routing rules.
+
+    Admin/superuser sees all. DevRel sees applications whose `company`
+    matches their `UserProfile.company` (case-insensitive) plus all
+    applications with empty company ("общий пул"). Other roles get nothing.
+    """
+    qs = SpeakerApplication.objects.select_related("applicant", "reviewed_by").order_by("-created_at")
+    if actor.is_superuser:
+        return qs
+    profile = getattr(actor, "profile", None)
+    if profile is None:
+        return SpeakerApplication.objects.none()
+    if profile.role == UserProfile.ROLE_ADMIN:
+        return qs
+    if profile.role == UserProfile.ROLE_DEVREL:
+        actor_company = (profile.company or "").strip()
+        if actor_company:
+            return qs.filter(Q(company__iexact=actor_company) | Q(company=""))
+        return qs.filter(company="")
+    return SpeakerApplication.objects.none()
+
+
+def _devrel_visible_speaker_events(actor):
+    """Event queryset (pending self-submissions) filtered per actor's routing.
+
+    Та же логика, что у SpeakerApplication: DevRel видит события, чей
+    submitted_by.profile.company совпадает с его company, плюс события, у
+    submitter'а которых company пустая. Admin/superuser видят все.
+    """
+    from starlift.models import Event
+
+    qs = (
+        Event.objects.filter(verification_status=Event.VERIFICATION_PENDING)
+        .select_related("submitted_by", "submitted_by__profile", "verified_by")
+        .prefetch_related("speakers")
+        .order_by("-created_at")
+    )
+    if actor.is_superuser:
+        return qs
+    profile = getattr(actor, "profile", None)
+    if profile is None:
+        return Event.objects.none()
+    if profile.role == UserProfile.ROLE_ADMIN:
+        return qs
+    if profile.role == UserProfile.ROLE_DEVREL:
+        actor_company = (profile.company or "").strip()
+        if actor_company:
+            return qs.filter(
+                Q(submitted_by__profile__company__iexact=actor_company)
+                | Q(submitted_by__profile__company="")
+                | Q(submitted_by__isnull=True)
+            )
+        return qs.filter(Q(submitted_by__profile__company="") | Q(submitted_by__isnull=True))
+    return Event.objects.none()
+
+
+@role_required("admin", "devrel")
 @never_cache
 @require_http_methods(["GET"])
 def event_requests_view(request: HttpRequest) -> HttpResponse:
     status = request.GET.get("status", "pending")
     kind = request.GET.get("kind", "")
 
-    qs = EventRequest.objects.select_related("speaker", "event", "reviewed_by").order_by("-created_at")
+    er_qs = EventRequest.objects.select_related("speaker", "event", "reviewed_by").order_by("-created_at")
     if status in (EventRequest.STATUS_PENDING, EventRequest.STATUS_APPROVED, EventRequest.STATUS_REJECTED):
-        qs = qs.filter(status=status)
+        er_qs = er_qs.filter(status=status)
     if kind in (EventRequest.KIND_CREATE, EventRequest.KIND_JOIN):
-        qs = qs.filter(kind=kind)
+        er_qs = er_qs.filter(kind=kind)
 
-    paginator = Paginator(qs, 50)
+    apps_qs = _devrel_visible_applications(request.user)
+    if status in (SpeakerApplication.STATUS_PENDING, SpeakerApplication.STATUS_APPROVED, SpeakerApplication.STATUS_REJECTED):
+        apps_qs = apps_qs.filter(status=status)
+
+    # Self-submitted events ждут верификации. Чтобы их видеть в approved/
+    # rejected состояниях нужны верифицированные/отклонённые Event'ы — берём
+    # тот же фильтр статусов.
+    from starlift.models import Event
+    speaker_events_qs = _devrel_visible_speaker_events(request.user)  # pending base
+    if status == EventRequest.STATUS_APPROVED:
+        # Подтверждённые: фильтруем все события self-source, переключаем queryset
+        base = Event.objects.filter(verification_status=Event.VERIFICATION_VERIFIED, submitted_by__isnull=False)
+        speaker_events_qs = base.select_related("submitted_by", "verified_by").prefetch_related("speakers")
+    elif status == EventRequest.STATUS_REJECTED:
+        base = Event.objects.filter(verification_status=Event.VERIFICATION_REJECTED, submitted_by__isnull=False)
+        speaker_events_qs = base.select_related("submitted_by", "verified_by").prefetch_related("speakers")
+    # для pending — берём _devrel_visible_speaker_events как есть
+
+    show_event_requests = kind in ("", EventRequest.KIND_CREATE, EventRequest.KIND_JOIN)
+    show_applications = kind in ("", "speaker")
+    show_speaker_events = kind in ("", "event")
+
+    items = []
+    if show_event_requests:
+        for r in er_qs:
+            items.append({"kind": "event_request", "obj": r, "created_at": r.created_at})
+    if show_applications:
+        for a in apps_qs:
+            items.append({"kind": "speaker_application", "obj": a, "created_at": a.created_at})
+    if show_speaker_events:
+        for ev in speaker_events_qs:
+            items.append({"kind": "speaker_event", "obj": ev, "created_at": ev.created_at})
+    items.sort(key=lambda x: x["created_at"] or timezone.now(), reverse=True)
+
+    paginator = Paginator(items, 50)
     page = paginator.get_page(request.GET.get("page"))
 
-    pending_count = EventRequest.objects.filter(status=EventRequest.STATUS_PENDING).count()
+    pending_count = (
+        EventRequest.objects.filter(status=EventRequest.STATUS_PENDING).count()
+        + _devrel_visible_applications(request.user).filter(status=SpeakerApplication.STATUS_PENDING).count()
+        + _devrel_visible_speaker_events(request.user).count()
+    )
 
     return render(
         request,
@@ -350,7 +465,7 @@ def event_requests_view(request: HttpRequest) -> HttpResponse:
     )
 
 
-@role_required("admin")
+@role_required("admin", "devrel")
 @never_cache
 @require_http_methods(["POST"])
 @csrf_protect
@@ -415,3 +530,388 @@ def event_request_action_view(request: HttpRequest, request_id: int, action: str
         messages.error(request, "Неизвестное действие.")
 
     return redirect(reverse("accounts:event_requests") + f"?status={request.POST.get('return_status', 'pending')}")
+
+
+def _check_application_access(actor, application: SpeakerApplication):
+    """Return True if actor may view/act on `application`."""
+    visible_ids = _devrel_visible_applications(actor).values_list("pk", flat=True)
+    return application.pk in set(visible_ids)
+
+
+@role_required("admin", "devrel")
+@never_cache
+@require_http_methods(["GET"])
+def speaker_application_detail_view(request: HttpRequest, application_id: int) -> HttpResponse:
+    app = get_object_or_404(SpeakerApplication.objects.select_related("applicant"), pk=application_id)
+    if not _check_application_access(request.user, app):
+        return redirect(reverse("accounts:event_requests"))
+
+    available_speakers = Speaker.objects.filter(user__isnull=True).order_by("name")[:500]
+    return render(
+        request,
+        "accounts/console/speaker_application_detail.html",
+        {
+            "active": "event_requests",
+            "application": app,
+            "available_speakers": available_speakers,
+        },
+    )
+
+
+@role_required("admin", "devrel")
+@never_cache
+@csrf_protect
+@require_http_methods(["POST"])
+def speaker_application_action_view(request: HttpRequest, application_id: int, action: str) -> HttpResponse:
+    app = get_object_or_404(SpeakerApplication.objects.select_related("applicant"), pk=application_id)
+    if not _check_application_access(request.user, app):
+        return redirect(reverse("accounts:event_requests"))
+
+    if app.status != SpeakerApplication.STATUS_PENDING:
+        messages.error(request, "Заявка уже обработана.")
+        return redirect(reverse("accounts:event_requests"))
+
+    applicant = app.applicant
+    profile, _ = UserProfile.objects.get_or_create(user=applicant)
+
+    if action == "approve":
+        mode = request.POST.get("mode", "create")
+        with transaction.atomic():
+            if mode == "link":
+                speaker_id = request.POST.get("speaker_id")
+                if not speaker_id:
+                    messages.error(request, "Выберите спикерскую карточку для привязки.")
+                    return redirect(reverse("accounts:speaker_application_detail", args=[app.pk]))
+                try:
+                    speaker = Speaker.objects.select_for_update().get(pk=speaker_id)
+                except Speaker.DoesNotExist:
+                    messages.error(request, "Спикер не найден.")
+                    return redirect(reverse("accounts:speaker_application_detail", args=[app.pk]))
+                if speaker.user_id and speaker.user_id != applicant.pk:
+                    messages.error(request, f"Эта карточка уже привязана к {speaker.user.username}.")
+                    return redirect(reverse("accounts:speaker_application_detail", args=[app.pk]))
+                speaker.user = applicant
+                speaker.save(update_fields=["user"])
+                seed_user_profile_avatar_from_linked_speaker(speaker, applicant)
+                resulting_speaker = speaker
+            else:
+                full_name = f"{applicant.first_name} {applicant.last_name}".strip() or applicant.username
+                resulting_speaker = Speaker.objects.create(
+                    name=full_name,
+                    sub=app.company,
+                    stack=app.stack,
+                    city=app.city,
+                    bio=app.description,
+                    user=applicant,
+                )
+
+            old_role = profile.role
+            profile.role = UserProfile.ROLE_SPEAKER
+            profile.save(update_fields=["role", "updated_at"])
+
+            app.status = SpeakerApplication.STATUS_APPROVED
+            app.reviewed_at = timezone.now()
+            app.reviewed_by = request.user
+            app.resulting_speaker = resulting_speaker
+            app.save(update_fields=["status", "reviewed_at", "reviewed_by", "resulting_speaker"])
+
+            audit.log(
+                action=AuditLog.ACTION_SPEAKER_APPLICATION_APPROVED,
+                actor=request.user,
+                request=request,
+                target=applicant,
+                metadata={
+                    "application_id": app.pk,
+                    "speaker_id": resulting_speaker.pk,
+                    "mode": mode,
+                },
+            )
+            audit.log(
+                action=AuditLog.ACTION_ROLE_CHANGED,
+                actor=request.user,
+                request=request,
+                target=applicant,
+                metadata={"from": old_role, "to": UserProfile.ROLE_SPEAKER},
+            )
+            audit.log(
+                action=AuditLog.ACTION_SPEAKER_LINKED,
+                actor=request.user,
+                request=request,
+                target=applicant,
+                metadata={
+                    "speaker_id": resulting_speaker.pk,
+                    "speaker_name": resulting_speaker.name,
+                    "mode": "application_" + mode,
+                },
+            )
+        messages.success(request, f"Заявка одобрена. {applicant.username} теперь спикер.")
+
+    elif action == "reject":
+        reason = (request.POST.get("rejection_reason") or "").strip()
+        if not reason:
+            messages.error(request, "Укажите причину отклонения.")
+            return redirect(reverse("accounts:speaker_application_detail", args=[app.pk]))
+        app.status = SpeakerApplication.STATUS_REJECTED
+        app.rejection_reason = reason
+        app.reviewed_at = timezone.now()
+        app.reviewed_by = request.user
+        app.save(update_fields=["status", "rejection_reason", "reviewed_at", "reviewed_by"])
+        audit.log(
+            action=AuditLog.ACTION_SPEAKER_APPLICATION_REJECTED,
+            actor=request.user,
+            request=request,
+            target=applicant,
+            metadata={"application_id": app.pk, "reason": reason},
+        )
+        messages.success(request, "Заявка отклонена.")
+    else:
+        messages.error(request, "Неизвестное действие.")
+
+    return redirect(reverse("accounts:event_requests"))
+
+
+def _devrel_visible_speakers(actor):
+    """Спикеры, которых актор может пригласить.
+
+    DevRel → только linked-user с UserProfile.company == actor.profile.company.
+    Admin/superuser → любой спикер с linked user.
+    """
+    qs = Speaker.objects.filter(user__isnull=False).select_related("user", "user__profile")
+    if actor.is_superuser:
+        return qs
+    profile = getattr(actor, "profile", None)
+    if profile is None:
+        return Speaker.objects.none()
+    if profile.role == UserProfile.ROLE_ADMIN:
+        return qs
+    if profile.role == UserProfile.ROLE_DEVREL:
+        actor_company = (profile.company or "").strip()
+        if not actor_company:
+            return Speaker.objects.none()
+        return qs.filter(user__profile__company__iexact=actor_company)
+    return Speaker.objects.none()
+
+
+@role_required("admin", "devrel")
+@never_cache
+@require_http_methods(["GET", "POST"])
+@csrf_protect
+def event_invite_view(request, event_id):
+    """Страница «Пригласить спикера» для конкретного события."""
+    event = get_object_or_404(Event, pk=event_id)
+    today = timezone.localdate()
+
+    if event.status == "past":
+        messages.error(request, "Событие уже прошло.")
+        return redirect(reverse("accounts:event_requests"))
+    if event.application_deadline and event.application_deadline < today:
+        messages.error(request, "Дедлайн подачи заявок на это событие прошёл.")
+        return redirect(reverse("accounts:event_requests"))
+
+    visible_speakers_qs = _devrel_visible_speakers(request.user)
+    visible_speakers = list(
+        visible_speakers_qs.exclude(events=event).order_by("name")
+    )
+
+    if request.method == "POST":
+        speaker_id = request.POST.get("speaker_id")
+        message_text = (request.POST.get("message") or "").strip()
+
+        try:
+            speaker = visible_speakers_qs.get(pk=speaker_id)
+        except Speaker.DoesNotExist:
+            messages.error(request, "Выбранный спикер недоступен.")
+            return redirect(reverse("accounts:event_invite", args=[event.pk]))
+
+        if event.speakers.filter(pk=speaker.pk).exists():
+            messages.error(request, "Спикер уже участвует в событии.")
+            return redirect(reverse("accounts:event_invite", args=[event.pk]))
+
+        if EventInvitation.objects.filter(
+            event=event, speaker=speaker, status=EventInvitation.STATUS_PENDING,
+        ).exists():
+            messages.error(request, "Активное приглашение уже отправлено этому спикеру.")
+            return redirect(reverse("accounts:event_invite", args=[event.pk]))
+
+        with transaction.atomic():
+            inv = EventInvitation.objects.create(
+                event=event,
+                speaker=speaker,
+                invited_by=request.user,
+                message=message_text,
+            )
+            audit.log(
+                action=AuditLog.ACTION_EVENT_INVITATION_SENT,
+                actor=request.user,
+                request=request,
+                target=speaker.user if speaker.user_id else None,
+                metadata={
+                    "invitation_id": inv.pk,
+                    "event_id": event.pk,
+                    "speaker_id": speaker.pk,
+                },
+            )
+        messages.success(request, f"Приглашение отправлено: {speaker.name}.")
+        return redirect(reverse("accounts:event_invite", args=[event.pk]))
+
+    sent_invitations = (
+        EventInvitation.objects.filter(event=event)
+        .select_related("speaker", "invited_by")
+        .order_by("-created_at")[:50]
+    )
+
+    return render(
+        request,
+        "accounts/console/event_invite.html",
+        {
+            "active": "event_requests",
+            "event": event,
+            "speakers": visible_speakers,
+            "invitations": sent_invitations,
+        },
+    )
+
+
+@role_required("admin", "devrel")
+@never_cache
+@csrf_protect
+@require_http_methods(["POST"])
+def event_invitation_cancel_view(request, invitation_id):
+    inv = get_object_or_404(EventInvitation.objects.select_related("event", "speaker", "speaker__user"), pk=invitation_id)
+    if inv.status != EventInvitation.STATUS_PENDING:
+        messages.error(request, "Это приглашение уже не активно.")
+        return redirect(reverse("accounts:event_invite", args=[inv.event_id]))
+
+    # DevRel может отменять только свои + только в рамках своей зоны спикеров.
+    profile = getattr(request.user, "profile", None)
+    actor_company = (profile.company or "").strip() if profile else ""
+    is_admin = request.user.is_superuser or (profile and profile.role == UserProfile.ROLE_ADMIN)
+    if not is_admin:
+        speaker_company = ""
+        if inv.speaker.user_id:
+            try:
+                speaker_company = (inv.speaker.user.profile.company or "").strip()
+            except UserProfile.DoesNotExist:
+                speaker_company = ""
+        if not actor_company or actor_company.lower() != speaker_company.lower():
+            messages.error(request, "Нет прав отменять это приглашение.")
+            return redirect(reverse("accounts:event_invite", args=[inv.event_id]))
+
+    inv.status = EventInvitation.STATUS_CANCELLED
+    inv.responded_at = timezone.now()
+    inv.save(update_fields=["status", "responded_at"])
+    audit.log(
+        action=AuditLog.ACTION_EVENT_INVITATION_CANCELLED,
+        actor=request.user,
+        request=request,
+        target=inv.speaker.user if inv.speaker.user_id else None,
+        metadata={"invitation_id": inv.pk, "event_id": inv.event_id},
+    )
+    messages.success(request, "Приглашение отменено.")
+    return redirect(reverse("accounts:event_invite", args=[inv.event_id]))
+
+
+def _can_moderate_speaker_event(actor, event) -> bool:
+    """Проверка прав на одобрение/отклонение self-submitted события."""
+    if actor.is_superuser:
+        return True
+    profile = getattr(actor, "profile", None)
+    if profile is None:
+        return False
+    if profile.role == UserProfile.ROLE_ADMIN:
+        return True
+    if profile.role != UserProfile.ROLE_DEVREL:
+        return False
+    actor_company = (profile.company or "").strip()
+    submitter = event.submitted_by
+    if submitter is None:
+        return True  # «без owner-а» — общий пул
+    submitter_company = ""
+    try:
+        submitter_company = (submitter.profile.company or "").strip()
+    except UserProfile.DoesNotExist:
+        submitter_company = ""
+    if not submitter_company:
+        return True
+    if not actor_company:
+        return False
+    return actor_company.lower() == submitter_company.lower()
+
+
+@role_required("admin", "devrel")
+@never_cache
+@require_http_methods(["GET"])
+def speaker_event_detail_view(request: HttpRequest, event_id: int) -> HttpResponse:
+    from starlift.models import Event
+
+    event = get_object_or_404(
+        Event.objects.select_related("submitted_by", "verified_by")
+        .prefetch_related("speakers", "photos"),
+        pk=event_id,
+    )
+    if not _can_moderate_speaker_event(request.user, event):
+        return redirect(reverse("accounts:event_requests"))
+
+    return render(
+        request,
+        "accounts/console/speaker_event_detail.html",
+        {
+            "active": "event_requests",
+            "event": event,
+            "photos": list(event.photos.all()),
+            "speakers": list(event.speakers.all()),
+        },
+    )
+
+
+@role_required("admin", "devrel")
+@never_cache
+@csrf_protect
+@require_http_methods(["POST"])
+def speaker_event_action_view(request: HttpRequest, event_id: int, action: str) -> HttpResponse:
+    from starlift.models import Event
+
+    event = get_object_or_404(Event.objects.select_related("submitted_by"), pk=event_id)
+    if not _can_moderate_speaker_event(request.user, event):
+        return redirect(reverse("accounts:event_requests"))
+
+    if event.verification_status != Event.VERIFICATION_PENDING:
+        messages.info(request, "Это мероприятие уже обработано.")
+        return redirect(reverse("accounts:event_requests"))
+
+    if action == "approve":
+        event.verification_status = Event.VERIFICATION_VERIFIED
+        event.verified_by = request.user
+        event.verified_at = timezone.now()
+        event.rejection_reason = ""
+        event.save(update_fields=["verification_status", "verified_by", "verified_at", "rejection_reason"])
+        audit.log(
+            action=AuditLog.ACTION_EVENT_SUBMISSION_APPROVED,
+            actor=request.user,
+            request=request,
+            target=event.submitted_by,
+            metadata={"event_id": event.pk},
+        )
+        messages.success(request, f"«{event.title}» подтверждено.")
+    elif action == "reject":
+        reason = (request.POST.get("rejection_reason") or "").strip()
+        if not reason:
+            messages.error(request, "Укажите причину отклонения.")
+            return redirect(reverse("accounts:speaker_event_detail", args=[event.pk]))
+        event.verification_status = Event.VERIFICATION_REJECTED
+        event.rejection_reason = reason
+        event.verified_by = request.user
+        event.verified_at = timezone.now()
+        event.save(update_fields=["verification_status", "rejection_reason", "verified_by", "verified_at"])
+        audit.log(
+            action=AuditLog.ACTION_EVENT_SUBMISSION_REJECTED,
+            actor=request.user,
+            request=request,
+            target=event.submitted_by,
+            metadata={"event_id": event.pk, "reason": reason},
+        )
+        messages.success(request, "Мероприятие отклонено.")
+    else:
+        messages.error(request, "Неизвестное действие.")
+
+    return redirect(reverse("accounts:event_requests"))

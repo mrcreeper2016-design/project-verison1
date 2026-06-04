@@ -184,7 +184,7 @@ def import_parsed_row(rec: dict[str, str], *, counters: ImportCounters | None = 
                 speaker = Speaker(
                     name=normalized_display_name(author) or author,
                     sub=_clip(company.strip(), 200) if company else "",
-                    stack=_clip(stack.strip(), 200) if stack else "",
+                    stack=stack.strip() if stack else "",
                     city=_SPEAKER_CITY_DEFAULT,
                     status=Speaker.STATUS_UNAUTHORIZED,
                     nps=0,
@@ -200,7 +200,7 @@ def import_parsed_row(rec: dict[str, str], *, counters: ImportCounters | None = 
                         speaker.sub = new_sub
                         changed = True
                 if stack:
-                    new_stack = _clip(stack.strip(), 200)
+                    new_stack = stack.strip()
                     if speaker.stack != new_stack:
                         speaker.stack = new_stack
                         changed = True

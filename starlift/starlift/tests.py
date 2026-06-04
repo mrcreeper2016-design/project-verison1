@@ -65,22 +65,28 @@ class QrAccessTests(TestCase):
         self.sp_me.user = self.user_sp
         self.sp_me.save(update_fields=["user"])
 
-    def test_speaker_qr_page_hides_speaker_picker(self):
+    def test_speaker_qr_page_locks_speaker_to_self(self):
         self.client.login(username="spqr", password="Secret!234")
         r = self.client.get(reverse("qr_generator"))
         self.assertEqual(r.status_code, 200)
-        self.assertNotContains(r, 'id="speakerSelect"')
-        self.assertContains(r, "Выберите мероприятие")
-        self.assertContains(r, "My Talk")
-        self.assertNotContains(r, "Foreign Event")
+        body = r.content.decode()
+        # Speaker name is rendered as the readonly input value.
+        self.assertIn('value="MeSpeaker"', body)
+        self.assertIn('readonly', body)
+        # Their own events appear; foreign events do not.
+        self.assertIn("My Talk", body)
+        self.assertNotIn("Foreign Event", body)
 
     def test_admin_qr_page_lists_all_speakers(self):
         _login_admin(self.client)
         r = self.client.get(reverse("qr_generator"))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'id="speakerSelect"')
-        self.assertContains(r, "MeSpeaker")
-        self.assertContains(r, "OtherSpeaker")
+        body = r.content.decode()
+        self.assertIn("MeSpeaker", body)
+        self.assertIn("OtherSpeaker", body)
+        # The combobox input is present and not readonly for admins.
+        self.assertIn('id="speakerInput"', body)
+        self.assertNotIn('id="speakerSelect"', body)
 
     def test_speaker_can_generate_qr_only_own_event(self):
         self.client.login(username="spqr", password="Secret!234")
@@ -102,14 +108,55 @@ class QrAccessTests(TestCase):
         url = reverse("generate_qr", kwargs={"speaker_id": self.sp_other.id, "event_id": self.ev_foreign.id})
         self.assertEqual(self.client.get(url).status_code, 200)
 
-    def test_unlinked_speaker_sees_warning_and_disabled_controls(self):
+    def test_unlinked_speaker_sees_warning_and_no_form(self):
         self.sp_me.user = None
         self.sp_me.save(update_fields=["user"])
         self.client.login(username="spqr", password="Secret!234")
         r = self.client.get(reverse("qr_generator"))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "привязанная карточка")
-        self.assertIn("disabled", r.content.decode().lower())
+        body = r.content.decode()
+        self.assertIn("привязанная карточка", body)
+        # No generate button when there's no data to work with.
+        self.assertNotIn('id="generateBtn"', body)
+
+    def test_admin_cannot_generate_qr_for_non_participating_pair(self):
+        """Defence-in-depth: even if admin crafts the URL by hand, the server refuses."""
+        _login_admin(self.client)
+        # sp_me is on ev_ok only; sp_other on ev_foreign only.
+        url = reverse(
+            "generate_qr",
+            kwargs={"speaker_id": self.sp_me.id, "event_id": self.ev_foreign.id},
+        )
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_qr_poster_returns_png_for_valid_pair(self):
+        _login_admin(self.client)
+        url = reverse(
+            "qr_poster",
+            kwargs={"speaker_id": self.sp_me.id, "event_id": self.ev_ok.id},
+        )
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "image/png")
+        self.assertIn("attachment", resp["Content-Disposition"])
+        # PNG magic bytes
+        self.assertTrue(resp.content.startswith(b"\x89PNG\r\n\x1a\n"))
+
+    def test_qr_poster_forbidden_for_invalid_pair(self):
+        _login_admin(self.client)
+        url = reverse(
+            "qr_poster",
+            kwargs={"speaker_id": self.sp_me.id, "event_id": self.ev_foreign.id},
+        )
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_qr_poster_forbidden_for_other_speaker(self):
+        self.client.login(username="spqr", password="Secret!234")
+        url = reverse(
+            "qr_poster",
+            kwargs={"speaker_id": self.sp_other.id, "event_id": self.ev_foreign.id},
+        )
+        self.assertEqual(self.client.get(url).status_code, 403)
 
 
 def _login_member(client):
@@ -144,6 +191,28 @@ def _make_event(title: str = "Event", is_external: bool = False) -> Event:
     return Event.objects.create(title=title, status="past", is_external=is_external)
 
 
+class SpeakerFormAvatarTests(TestCase):
+    """Creating a speaker without an image must not invent a random avatar."""
+
+    def test_no_image_means_no_avatar(self):
+        from .forms import SpeakerForm
+
+        form = SpeakerForm(data={
+            "name": "Без Аватара",
+            "stack": "Python",
+            "city": "Moscow",
+            "img": "",
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+        speaker = form.save()
+        # img stays empty — no random pravatar id is injected.
+        self.assertEqual(speaker.img, "")
+        # And the derived URL is empty (placeholder/initials on the frontend),
+        # never a random i.pravatar.cc image.
+        self.assertEqual(speaker.card_avatar_url, "")
+        self.assertNotIn("pravatar", speaker.card_avatar_url)
+
+
 def _add_feedback(speaker: Speaker, event: Event, score: int, when=None) -> Feedback:
     fb = Feedback(speaker=speaker, event=event, score=score)
     fb.save()
@@ -171,7 +240,12 @@ class ComputeNpsTests(TestCase):
         self.assertEqual(stats["promoters"], 6)
         self.assertEqual(stats["passives"], 2)
         self.assertEqual(stats["detractors"], 2)
-        self.assertAlmostEqual(stats["nps"], 40.0, places=1)
+        # Promoter/detractor split → classic NPS would be (60% - 20%) = 40.
+        self.assertAlmostEqual(stats["promoter_pct"], 60.0, places=1)
+        self.assertAlmostEqual(stats["detractor_pct"], 20.0, places=1)
+        # In this product the ``nps`` key is the average score (0–10 scale,
+        # the value the dashboards display), not the classic NPS percentage.
+        self.assertAlmostEqual(stats["nps"], 8.0, places=1)
         self.assertAlmostEqual(stats["avg_score"], 8.0, places=1)
 
     def test_empty_feedbacks_returns_zero_nps(self):
@@ -186,11 +260,14 @@ class ComputeNpsTests(TestCase):
                 self.score = score
 
         stats = analytics_lib.compute_nps([FakeFb(10), FakeFb(10), FakeFb(5)])
-        # promoters=2, detractors=1, total=3 -> NPS = (66.66 - 33.33) ≈ 33.3
+        # promoters=2, detractors=1, total=3 → classic NPS ≈ (66.7 - 33.3).
         self.assertEqual(stats["total"], 3)
         self.assertEqual(stats["promoters"], 2)
         self.assertEqual(stats["detractors"], 1)
-        self.assertAlmostEqual(stats["nps"], 33.3, places=1)
+        self.assertAlmostEqual(stats["promoter_pct"], 66.7, places=1)
+        self.assertAlmostEqual(stats["detractor_pct"], 33.3, places=1)
+        # ``nps`` key = average score (0–10), here (10+10+5)/3 ≈ 8.3.
+        self.assertAlmostEqual(stats["nps"], 8.3, places=1)
 
 
 class NominationCandidatesTests(TestCase):
@@ -293,7 +370,8 @@ class FilterParserTests(TestCase):
 
 class DashboardViewTests(TestCase):
     def setUp(self):
-        _login_member(self.client)
+        # analytics_view is staff-only (@role_required('admin', 'devrel')).
+        _login_admin(self.client)
 
     def test_analytics_page_renders_without_data(self):
         response = self.client.get(reverse("analytics"))
@@ -334,13 +412,13 @@ class HomeDashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="home-dashboard"')
         self.assertContains(response, "/api/home/")
-        self.assertContains(response, "Оперативный центр")
+        self.assertContains(response, "Единая система скаутинга спикерских талантов")
 
     def test_home_api_returns_required_sections_with_empty_db(self):
         response = self.client.get("/api/home/")
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.content)
-        for key in ("version", "kpis", "upcoming_events", "top_speakers", "activity", "options"):
+        for key in ("version", "kpis", "upcoming_events", "top_speakers", "your_events", "activity", "options"):
             self.assertIn(key, data)
         self.assertEqual(data["kpis"]["total_speakers"], 0)
         self.assertEqual(data["kpis"]["active_speakers"], 0)
@@ -350,6 +428,8 @@ class HomeDashboardTests(TestCase):
         self.assertEqual(data["activity"], [])
 
     def test_home_api_reflects_filters_and_activity(self):
+        # Top speakers leaderboard is admin/devrel-only, so authenticate as admin.
+        _login_admin(self.client)
         alice = _make_speaker("Alice", city="Moscow", stack="Python")
         bob = _make_speaker("Bob", city="Kazan", stack="Frontend")
         event = _make_event("MeetupA")
@@ -366,6 +446,75 @@ class HomeDashboardTests(TestCase):
         self.assertGreaterEqual(data["kpis"]["total_feedbacks"], 4)
         self.assertEqual(data["kpis"]["active_speakers"], 1)
         # Activity feed should contain the recent feedback entries.
+        self.assertTrue(any(it["type"] == "feedback" for it in data["activity"]))
+
+    def test_top_speakers_hidden_for_speaker_role(self):
+        """Speakers must not receive the top-speakers leaderboard."""
+        alice = _make_speaker("Alice", city="Moscow", stack="Python")
+        event = _make_event("MeetupA")
+        now = timezone.now()
+        for s in [10, 10, 9, 10]:
+            _add_feedback(alice, event, s, when=now - timedelta(days=2))
+
+        # Default setUp logged us in as a speaker.
+        resp = self.client.get("/api/home/?period=30")
+        data = json.loads(resp.content)
+        self.assertEqual(data["top_speakers"], [])
+
+    def test_top_speakers_visible_for_admin_role(self):
+        _login_admin(self.client)
+        alice = _make_speaker("Alice", city="Moscow", stack="Python")
+        event = _make_event("MeetupA")
+        now = timezone.now()
+        for s in [10, 10, 9, 10]:
+            _add_feedback(alice, event, s, when=now - timedelta(days=2))
+
+        resp = self.client.get("/api/home/?period=30")
+        data = json.loads(resp.content)
+        self.assertIn("Alice", [sp["name"] for sp in data["top_speakers"]])
+
+    def test_your_events_for_linked_speaker(self):
+        """A speaker with a linked card sees their own events, but no activity."""
+        User = get_user_model()
+        user = User.objects.get(username="dashtester")  # logged in via setUp
+        card = _make_speaker("DashSpeaker")
+        card.user = user
+        card.save()
+
+        today = timezone.now().date()
+        upcoming = _make_event("FutureTalk")
+        upcoming.status = "future"
+        upcoming.event_date = today + timedelta(days=10)
+        upcoming.save()
+        past = _make_event("PastTalk")
+        past.event_date = today - timedelta(days=10)
+        past.save()
+        card.events.add(upcoming, past)
+        # Some unrelated event the speaker is not part of.
+        _make_event("NotMine")
+
+        resp = self.client.get("/api/home/?period=30")
+        data = json.loads(resp.content)
+        titles = [e["title"] for e in data["your_events"]]
+        self.assertIn("FutureTalk", titles)
+        self.assertIn("PastTalk", titles)
+        self.assertNotIn("NotMine", titles)
+        # Upcoming should be ordered before past.
+        self.assertLess(titles.index("FutureTalk"), titles.index("PastTalk"))
+        # Activity feed is admin/devrel-only.
+        self.assertEqual(data["activity"], [])
+
+    def test_your_events_empty_for_admin(self):
+        _login_admin(self.client)
+        alice = _make_speaker("Alice")
+        event = _make_event("MeetupA")
+        alice.events.add(event)
+        _add_feedback(alice, event, 10, when=timezone.now() - timedelta(days=2))
+
+        resp = self.client.get("/api/home/?period=30")
+        data = json.loads(resp.content)
+        self.assertEqual(data["your_events"], [])
+        # Admin keeps the activity feed.
         self.assertTrue(any(it["type"] == "feedback" for it in data["activity"]))
 
     def test_data_version_changes_on_new_feedback(self):
@@ -425,7 +574,7 @@ class HighloadParserTests(TestCase):
         self.assertEqual(r["company"], "ACME Corp")
         self.assertEqual(r["title"], "Talk One")
         self.assertEqual(r["date"], "12 марта")
-        self.assertEqual(r["stack"], "Python, Backend")
+        self.assertEqual(r["stack"], "Python | Backend")
         self.assertEqual(r["description"], "Abstract body")
         self.assertEqual(r["link"], "https://highload.ru/talk/one")
         self.assertTrue(r["author_avatar"].endswith("/static/jane.png"))
@@ -516,3 +665,113 @@ class SyncHighloadCommandTests(TestCase):
         mock_sync.return_value = ImportCounters()
         call_command("sync_highload", "--max-cycles=2", "--interval-minutes=1")
         self.assertEqual(mock_sync.call_count, 2)
+
+
+class SpeakerLikeTests(TestCase):
+    def setUp(self):
+        from accounts.models import UserProfile
+        User = get_user_model()
+
+        self.user = User.objects.create_user(
+            username="liker", email="liker@x.io", password="Secret!234"
+        )
+        self.user.profile.role = UserProfile.ROLE_SPEAKER
+        self.user.profile.email_verified = True
+        self.user.profile.save(update_fields=["role", "email_verified"])
+
+        self.speaker = _make_speaker("Hearted")
+
+    def test_like_toggle_creates_then_removes(self):
+        self.client.login(username="liker", password="Secret!234")
+        url = f"/api/speakers/{self.speaker.id}/like/"
+
+        # First POST → liked
+        r1 = self.client.post(url)
+        self.assertEqual(r1.status_code, 200)
+        d1 = r1.json()
+        self.assertTrue(d1["liked"])
+        self.assertEqual(d1["like_count"], 1)
+
+        # Second POST → unliked
+        r2 = self.client.post(url)
+        self.assertEqual(r2.status_code, 200)
+        d2 = r2.json()
+        self.assertFalse(d2["liked"])
+        self.assertEqual(d2["like_count"], 0)
+
+    def test_like_get_not_allowed(self):
+        self.client.login(username="liker", password="Secret!234")
+        r = self.client.get(f"/api/speakers/{self.speaker.id}/like/")
+        self.assertEqual(r.status_code, 405)
+
+    def test_like_requires_login(self):
+        r = self.client.post(f"/api/speakers/{self.speaker.id}/like/")
+        # @member_required redirects anon to login (302).
+        self.assertIn(r.status_code, (302, 403))
+
+    def test_speakers_api_includes_liked_flag_after_like(self):
+        self.client.login(username="liker", password="Secret!234")
+        self.client.post(f"/api/speakers/{self.speaker.id}/like/")
+        r = self.client.get("/api/speakers/")
+        self.assertEqual(r.status_code, 200)
+        items = r.json()
+        mine = next((s for s in items if s["id"] == self.speaker.id), None)
+        self.assertIsNotNone(mine)
+        self.assertTrue(mine["liked"])
+        self.assertEqual(mine["like_count"], 1)
+
+    def test_speakers_api_zero_likes_by_default(self):
+        self.client.login(username="liker", password="Secret!234")
+        r = self.client.get("/api/speakers/")
+        self.assertEqual(r.status_code, 200)
+        items = r.json()
+        mine = next((s for s in items if s["id"] == self.speaker.id), None)
+        self.assertIsNotNone(mine)
+        self.assertFalse(mine["liked"])
+        self.assertEqual(mine["like_count"], 0)
+
+
+class SpeakerRecommendTests(TestCase):
+    def setUp(self):
+        self.admin = _login_admin(self.client)
+        self.speaker = _make_speaker("RecMe")
+        self.assertFalse(self.speaker.recommended)
+
+    def test_recommend_toggle_flips_flag(self):
+        url = f"/api/speakers/{self.speaker.id}/recommend/"
+        r1 = self.client.post(url)
+        self.assertEqual(r1.status_code, 200)
+        self.assertTrue(r1.json()["recommended"])
+        self.speaker.refresh_from_db()
+        self.assertTrue(self.speaker.recommended)
+
+        r2 = self.client.post(url)
+        self.assertEqual(r2.status_code, 200)
+        self.assertFalse(r2.json()["recommended"])
+        self.speaker.refresh_from_db()
+        self.assertFalse(self.speaker.recommended)
+
+    def test_recommend_get_not_allowed(self):
+        r = self.client.get(f"/api/speakers/{self.speaker.id}/recommend/")
+        self.assertEqual(r.status_code, 405)
+
+    def test_recommend_forbidden_for_non_admin(self):
+        from accounts.models import UserProfile
+        User = get_user_model()
+        speaker_user = User.objects.create_user(
+            username="notadmin", email="na@x.io", password="Secret!234"
+        )
+        speaker_user.profile.role = UserProfile.ROLE_SPEAKER
+        speaker_user.profile.save(update_fields=["role"])
+        self.client.logout()
+        self.client.login(username="notadmin", password="Secret!234")
+        r = self.client.post(f"/api/speakers/{self.speaker.id}/recommend/")
+        self.assertEqual(r.status_code, 403)
+
+    def test_speakers_api_includes_recommended(self):
+        self.speaker.recommended = True
+        self.speaker.save(update_fields=["recommended"])
+        r = self.client.get("/api/speakers/")
+        item = next((s for s in r.json() if s["id"] == self.speaker.id), None)
+        self.assertIsNotNone(item)
+        self.assertTrue(item["recommended"])

@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'support/support.css' %}">
+
+<div class="support-page support-page--single">
+    <section class="support-page-main animate-fade">
+        <div class="support-ui"
+             data-csrf="{{ csrf_token }}"
+             data-token="{{ token }}"
+             data-viewer-kind="guest"
+             data-is-guest="1"
+             data-status="{{ ticket.status }}">
+
+            <div class="support-guest-info">
+                <div class="support-guest-info-icon"><i class="fa-solid fa-life-ring"></i></div>
+                <div class="support-guest-info-body">
+                    <div class="support-guest-info-title">{{ ticket.subject }}</div>
+                    <div class="support-guest-info-meta">
+                        Гость · {{ ticket.guest_email }} ·
+                        {% if ticket.status == 'closed' %}закрыт{% else %}открыт{% endif %}
+                    </div>
+                </div>
+                <span class="su-status-pill" data-status="{{ ticket.status }}">
+                    {% if ticket.status == 'closed' %}закрыт{% else %}open{% endif %}
+                </span>
+            </div>
+
+            <div class="su-conn-bar" data-su-conn hidden>
+                <i class="fa-solid fa-circle-notch"></i> Переподключение…
+            </div>
+
+            <div class="su-thread" data-thread-list></div>
+
+            <div class="su-typing" data-su-typing hidden>
+                <span class="su-typing-dots"><span></span><span></span><span></span></span>
+                <span class="su-typing-label">Печатает…</span>
+            </div>
+
+            <div class="su-composer" data-su-composer {% if ticket.status == 'closed' %}hidden{% endif %}>
+                <div class="su-composer-row">
+                    <textarea class="su-input" data-thread-input rows="1" maxlength="5000"
+                              placeholder="Напишите сообщение…" autocomplete="off"></textarea>
+                    <button class="su-send" type="button" data-thread-send aria-label="Отправить">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="su-composer-hint">
+                    <span><kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> перенос</span>
+                    <span data-thread-status></span>
+                </div>
+            </div>
+            <div class="su-closed-banner" data-su-closed-banner {% if ticket.status != 'closed' %}hidden{% endif %}>
+                <i class="fa-solid fa-lock"></i> Тикет закрыт администратором.<br>
+                Чтобы продолжить общение, создайте новое обращение.
+                <a href="{% url 'support_guest:guest_new' %}" class="su-closed-banner-cta">
+                    <i class="fa-solid fa-plus"></i> Новое обращение
+                </a>
+            </div>
+        </div>
+    </section>
+</div>
+
+{{ messages_data|json_script:"page-bootstrap-messages" }}
+<script src="{% static 'support/render.js' %}"></script>
+<script src="{% static 'support/support.js' %}"></script>
+{% endblock %}

@@ -6,13 +6,16 @@ from django.db import models
 
 class UserProfile(models.Model):
     ROLE_ADMIN = "admin"
+    ROLE_DEVREL = "devrel"
     ROLE_SPEAKER = "speaker"
     ROLE_GUEST = "guest"
     ROLE_CHOICES = [
         (ROLE_ADMIN, "Администратор"),
+        (ROLE_DEVREL, "DevRel"),
         (ROLE_SPEAKER, "Спикер"),
         (ROLE_GUEST, "Гость"),
     ]
+    STAFF_ROLES = (ROLE_ADMIN, ROLE_DEVREL)
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -21,6 +24,7 @@ class UserProfile(models.Model):
         primary_key=True,
     )
     role = models.CharField(max_length=16, choices=ROLE_CHOICES, default=ROLE_SPEAKER)
+    company = models.CharField(max_length=200, blank=True, default="")
     email_verified = models.BooleanField(default=False)
     pending_email = models.EmailField(null=True, blank=True)
     bio = models.TextField(blank=True, default="")
@@ -44,6 +48,15 @@ class UserProfile(models.Model):
         return self.role == self.ROLE_ADMIN
 
     @property
+    def is_devrel(self) -> bool:
+        return self.role == self.ROLE_DEVREL
+
+    @property
+    def is_staff_member(self) -> bool:
+        """admin or devrel — full content management privileges."""
+        return self.role in self.STAFF_ROLES
+
+    @property
     def is_speaker(self) -> bool:
         return self.role == self.ROLE_SPEAKER
 
@@ -53,8 +66,8 @@ class UserProfile(models.Model):
 
     @property
     def is_member(self) -> bool:
-        """Member == admin or speaker; guests are not members."""
-        return self.role in (self.ROLE_ADMIN, self.ROLE_SPEAKER)
+        """Member == anyone but guest (admin, devrel, speaker)."""
+        return self.role in (self.ROLE_ADMIN, self.ROLE_DEVREL, self.ROLE_SPEAKER)
 
     @property
     def avatar_url(self) -> str:
@@ -183,6 +196,17 @@ class AuditLog(models.Model):
     ACTION_GUEST_DELETED = "guest_deleted"
     ACTION_EMAIL_VERIFIED = "email_verified"
     ACTION_CONSENT_GIVEN = "consent_given"
+    ACTION_ASSISTANT_QUERY = "assistant_query"
+    ACTION_SPEAKER_APPLICATION_SUBMITTED = "speaker_application_submitted"
+    ACTION_SPEAKER_APPLICATION_APPROVED = "speaker_application_approved"
+    ACTION_SPEAKER_APPLICATION_REJECTED = "speaker_application_rejected"
+    ACTION_EVENT_SUBMISSION_SUBMITTED = "event_submission_submitted"
+    ACTION_EVENT_SUBMISSION_APPROVED = "event_submission_approved"
+    ACTION_EVENT_SUBMISSION_REJECTED = "event_submission_rejected"
+    ACTION_EVENT_INVITATION_SENT = "event_invitation_sent"
+    ACTION_EVENT_INVITATION_ACCEPTED = "event_invitation_accepted"
+    ACTION_EVENT_INVITATION_DECLINED = "event_invitation_declined"
+    ACTION_EVENT_INVITATION_CANCELLED = "event_invitation_cancelled"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

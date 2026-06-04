@@ -1,0 +1,10 @@
+{% if m.sender_kind == 'system' %}
+<div class="support-system">{{ m.body }}</div>
+{% else %}
+<div class="chat-msg {% if m.sender_kind == 'admin' %}assistant{% else %}user{% endif %}">
+    <div class="chat-avatar">
+        {% if m.sender_kind == 'admin' %}<i class="fa-solid fa-headset"></i>{% elif m.sender_kind == 'guest' %}<i class="fa-solid fa-user"></i>{% else %}{% if m.sender_user %}{{ m.sender_user.username|slice:":1"|upper }}{% else %}?{% endif %}{% endif %}
+    </div>
+    <div class="chat-bubble">{{ m.body|linebreaksbr }}</div>
+</div>
+{% endif %}

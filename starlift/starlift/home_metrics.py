@@ -16,8 +16,9 @@ Design goals:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from hashlib import blake2s
 from typing import Any
 
@@ -26,6 +27,55 @@ from django.utils import timezone
 
 from . import analytics as analytics_lib
 from .models import Event, Feedback, Speaker
+
+
+_RU_MONTHS = {
+    "январ": 1, "феврал": 2, "март": 3, "апрел": 4,
+    "ма": 5, "июн": 6, "июл": 7, "август": 8,
+    "сентябр": 9, "октябр": 10, "ноябр": 11, "декабр": 12,
+}
+_DATE_RE = re.compile(
+    r"(?P<day>\d{1,2})(?:\s*[-–—]\s*\d{1,2})?\s+(?P<month>[А-Яа-яёЁ]+)(?:\s+(?P<year>\d{4}))?",
+    re.IGNORECASE,
+)
+
+
+def parse_event_date(raw: str | None, today: date | None = None) -> date | None:
+    """Parse a Russian human-readable event date like "10 Мая 2026" / "4-5 марта 2025" / "7 ноября".
+
+    Takes the first day in a range. If the year is omitted, picks the nearest future
+    occurrence (this year if the month hasn't passed yet, otherwise next year).
+    """
+    if not raw:
+        return None
+    m = _DATE_RE.search(raw)
+    if not m:
+        return None
+    day = int(m.group("day"))
+    month_word = m.group("month").lower().replace("ё", "е")
+    month = None
+    for prefix, num in _RU_MONTHS.items():
+        if month_word.startswith(prefix):
+            month = num
+            break
+    if month is None:
+        return None
+    today = today or timezone.now().date()
+    year_str = m.group("year")
+    if year_str:
+        year = int(year_str)
+    else:
+        year = today.year
+        try:
+            candidate = date(year, month, day)
+        except ValueError:
+            return None
+        if candidate < today:
+            year += 1
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -36,7 +86,8 @@ ALLOWED_PERIODS = (30, 90, 180)
 NEW_SPEAKER_WINDOW_DAYS = 30
 
 UPCOMING_LIMIT = 6
-TOP_SPEAKERS_LIMIT = 5
+TOP_SPEAKERS_LIMIT = 9
+YOUR_EVENTS_LIMIT = 9
 ACTIVITY_LIMIT = 10
 ACTIVITY_WINDOW_DAYS = 60
 
@@ -173,8 +224,10 @@ def compute_kpis(filters: HomeFilters) -> dict[str, Any]:
 def upcoming_events(filters: HomeFilters, limit: int = UPCOMING_LIMIT) -> list[dict[str, Any]]:
     today = timezone.now().date()
 
-    # Primary: event_date today or in the future.
-    # Fallback: events without event_date but explicitly marked status='future'.
+    # Keep events that are explicitly future-dated OR have no event_date but a
+    # parseable human ``date`` string that resolves to today/future. Past
+    # events are filtered out in Python below because ``Event.date`` is a
+    # free-form string and most rows have ``event_date=NULL``.
     qs = Event.objects.filter(
         Q(event_date__gte=today) | Q(event_date__isnull=True, status="future")
     )
@@ -187,19 +240,30 @@ def upcoming_events(filters: HomeFilters, limit: int = UPCOMING_LIMIT) -> list[d
     qs = (
         qs.distinct()
         .annotate(speakers_count=Count("speakers", distinct=True))
-        .order_by(F("event_date").asc(nulls_last=True), "id")
     )
 
+    # Resolve a real date for each candidate, drop anything that turns out to
+    # be in the past, then sort by it (events with no parseable date go last).
+    candidates: list[tuple[date | None, Event]] = []
+    for ev in qs:
+        resolved = ev.event_date or parse_event_date(ev.date, today=today)
+        if resolved and resolved < today:
+            continue
+        candidates.append((resolved, ev))
+
+    far_future = date.max
+    candidates.sort(key=lambda pair: (pair[0] or far_future, pair[1].id))
+
     items: list[dict[str, Any]] = []
-    for ev in qs[:limit]:
+    for resolved, ev in candidates[:limit]:
         description = (ev.description or "").strip()
         if len(description) > 160:
             description = description[:157] + "…"
         items.append({
             "id": ev.id,
             "title": ev.title,
-            "date_iso": ev.event_date.isoformat() if ev.event_date else None,
-            "date_label": ev.event_date.strftime("%d.%m.%Y") if ev.event_date else (ev.date or ""),
+            "date_iso": resolved.isoformat() if resolved else None,
+            "date_label": resolved.strftime("%d.%m.%Y") if resolved else (ev.date or ""),
             "location": ev.location or "",
             "description": description,
             "status": ev.status or "future",
@@ -256,6 +320,51 @@ def top_speakers(filters: HomeFilters, limit: int = TOP_SPEAKERS_LIMIT) -> list[
     return result
 
 
+def your_events(speaker, limit: int = YOUR_EVENTS_LIMIT) -> list[dict[str, Any]]:
+    """Speaker's own events for the home panel — upcoming first, then past.
+
+    Mirrors the date-resolution logic of ``upcoming_events`` (``event_date``
+    or a parsed human ``date`` string) so ordering is consistent across the
+    dashboard. Upcoming are sorted ascending (nearest first), past descending
+    (most recent first), then concatenated and capped at ``limit``.
+    """
+    today = timezone.now().date()
+
+    qs = speaker.events.all().annotate(fb_count=Count("feedbacks", distinct=True))
+
+    upcoming: list[tuple[date, Event]] = []
+    past: list[tuple[date | None, Event]] = []
+    for ev in qs:
+        resolved = ev.event_date or parse_event_date(ev.date, today=today)
+        is_upcoming = (resolved is not None and resolved >= today) or (
+            resolved is None and ev.status == "future"
+        )
+        if is_upcoming:
+            upcoming.append((resolved or date.max, ev))
+        else:
+            past.append((resolved, ev))
+
+    upcoming.sort(key=lambda pair: (pair[0], pair[1].id))
+    past.sort(key=lambda pair: (pair[0] or date.min, pair[1].id), reverse=True)
+
+    ordered = [ev for _, ev in upcoming] + [ev for _, ev in past]
+
+    items: list[dict[str, Any]] = []
+    for ev in ordered[:limit]:
+        resolved = ev.event_date or parse_event_date(ev.date, today=today)
+        items.append({
+            "id": ev.id,
+            "title": ev.title,
+            "date_iso": resolved.isoformat() if resolved else None,
+            "date_label": resolved.strftime("%d.%m.%Y") if resolved else (ev.date or ""),
+            "location": ev.location or "",
+            "status": ev.status or "future",
+            "is_external": bool(ev.is_external),
+            "fb_count": getattr(ev, "fb_count", 0) or 0,
+        })
+    return items
+
+
 def activity_feed(limit: int = ACTIVITY_LIMIT) -> list[dict[str, Any]]:
     """Unified activity stream aggregated from real entities.
 
@@ -307,6 +416,7 @@ def activity_feed(limit: int = ACTIVITY_LIMIT) -> list[dict[str, Any]]:
             "title": f"Новое мероприятие «{ev.title}»",
             "subtitle": ev.location or ev.topic or "",
             "speaker_id": None,
+            "event_id": ev.id,
         })
 
     items.sort(key=lambda row: row["timestamp"], reverse=True)
@@ -362,7 +472,23 @@ def data_version() -> str:
 # Top-level builder
 # ---------------------------------------------------------------------------
 
-def build_home(filters: HomeFilters) -> dict[str, Any]:
+def build_home(
+    filters: HomeFilters,
+    include_top_speakers: bool = True,
+    include_activity: bool = True,
+    viewer_speaker=None,
+) -> dict[str, Any]:
+    """Assemble the home dashboard payload.
+
+    Role gating happens at the view layer and is passed in here:
+    - ``include_top_speakers`` / ``include_activity`` — admin/devrel only; for
+      speakers these are omitted entirely (empty list), not just hidden client-side.
+    - ``viewer_speaker`` — when set (a speaker viewing their own dashboard), the
+      ``your_events`` panel is populated with that speaker's events.
+
+    Keys are always present (empty list when gated off) so the frontend and
+    existing tests don't need to special-case their absence.
+    """
     return {
         "version": data_version(),
         "generated_at": timezone.now().isoformat(),
@@ -375,6 +501,7 @@ def build_home(filters: HomeFilters) -> dict[str, Any]:
         "options": filter_options(),
         "kpis": compute_kpis(filters),
         "upcoming_events": upcoming_events(filters),
-        "top_speakers": top_speakers(filters),
-        "activity": activity_feed(),
+        "top_speakers": top_speakers(filters) if include_top_speakers else [],
+        "your_events": your_events(viewer_speaker) if viewer_speaker else [],
+        "activity": activity_feed() if include_activity else [],
     }

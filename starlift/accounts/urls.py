@@ -7,6 +7,7 @@ from .views import invite as invite_views
 from .views import password as pwd_views
 from .views import profile as profile_views
 from .views import register as register_views
+from .views import speaker_application as application_views
 
 app_name = "accounts"
 
@@ -41,4 +42,16 @@ urlpatterns = [
     path("console/audit/", console_views.audit_view, name="audit"),
     path("console/event-requests/", console_views.event_requests_view, name="event_requests"),
     path("console/event-requests/<int:request_id>/<str:action>/", console_views.event_request_action_view, name="event_request_action"),
+
+    path("console/events/<int:event_id>/invite/", console_views.event_invite_view, name="event_invite"),
+    path("console/event-invitations/<int:invitation_id>/cancel/", console_views.event_invitation_cancel_view, name="event_invitation_cancel"),
+
+    path("console/speaker-applications/<int:application_id>/", console_views.speaker_application_detail_view, name="speaker_application_detail"),
+    path("console/speaker-applications/<int:application_id>/<str:action>/", console_views.speaker_application_action_view, name="speaker_application_action"),
+
+    path("console/speaker-events/<int:event_id>/", console_views.speaker_event_detail_view, name="speaker_event_detail"),
+    path("console/speaker-events/<int:event_id>/<str:action>/", console_views.speaker_event_action_view, name="speaker_event_action"),
+
+    path("application/", application_views.speaker_application_form_view, name="speaker_application_form"),
+    path("application/pending/", application_views.application_pending_view, name="speaker_application_pending"),
 ]

@@ -16,7 +16,7 @@ class Speaker(models.Model):
 
     name = models.CharField(max_length=200)
     sub = models.CharField(max_length=200)
-    stack = models.CharField(max_length=200)
+    stack = models.TextField(blank=True, default="")
     city = models.CharField(max_length=100)
     status = models.CharField(
         max_length=50,
@@ -106,16 +106,23 @@ class Speaker(models.Model):
         return self.card_avatar_url
 
     def calculate_nps(self, event_id=None):
-        qs = self.feedbacks.all()
-        if event_id:
-            qs = qs.filter(event_id=event_id)
+        """Средняя оценка по всем отзывам зрителей + собственным оценкам мероприятий.
 
-        from django.db.models import Avg
-        result = qs.aggregate(avg=Avg('score'))
-        avg = result['avg']
-        if avg is None:
+        Оценка спикера за событие (`SpeakerEventRating`) учитывается наравне с отзывом
+        зрителя — это его взгляд на собственное участие/выступление.
+        """
+        fb_qs = self.feedbacks.all()
+        sr_qs = self.event_ratings.all()
+        if event_id:
+            fb_qs = fb_qs.filter(event_id=event_id)
+            sr_qs = sr_qs.filter(event_id=event_id)
+
+        scores = list(fb_qs.values_list("score", flat=True)) + list(
+            sr_qs.values_list("score", flat=True)
+        )
+        if not scores:
             return 0
-        return round(avg, 1)
+        return round(sum(scores) / len(scores), 1)
 
     def __str__(self):
         return self.name
@@ -134,6 +141,21 @@ class Event(models.Model):
         ('future', 'Предстоящее'),
     ]
 
+    VERIFICATION_PENDING = 'pending'
+    VERIFICATION_VERIFIED = 'verified'
+    VERIFICATION_REJECTED = 'rejected'
+    VERIFICATION_CHOICES = [
+        (VERIFICATION_PENDING, 'На верификации'),
+        (VERIFICATION_VERIFIED, 'Подтверждено'),
+        (VERIFICATION_REJECTED, 'Отклонено'),
+    ]
+
+    FORMAT_CHOICES = [
+        ('online', 'Онлайн'),
+        ('offline', 'Офлайн'),
+        ('hybrid', 'Гибрид'),
+    ]
+
     title = models.CharField(max_length=200)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='future')
     date = models.CharField(max_length=100, null=True, blank=True)
@@ -142,6 +164,12 @@ class Event(models.Model):
         blank=True,
         verbose_name="Дата события (машиночитаемая)",
         help_text="Используется для расчётов периода. Если не заполнено — берётся дата отзывов.",
+    )
+    application_deadline = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Дедлайн подачи заявок",
+        help_text="Если задан и не прошёл — спикеры могут подавать заявки сами. Иначе только через приглашение DevRel.",
     )
     location = models.CharField(max_length=200, null=True, blank=True)
     link = models.CharField(max_length=500, null=True, blank=True)
@@ -165,6 +193,35 @@ class Event(models.Model):
         verbose_name="Источник данных",
     )
     speakers = models.ManyToManyField(Speaker, related_name='events')
+
+    # Self-service: спикер загружает прошедшее мероприятие → pending; DevRel
+    # его компании одобряет → verified (показывается публично) или отклоняет.
+    verification_status = models.CharField(
+        max_length=16,
+        choices=VERIFICATION_CHOICES,
+        default=VERIFICATION_VERIFIED,
+        db_index=True,
+    )
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='submitted_events',
+    )
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='verified_events',
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, default='')
+
+    format = models.CharField(max_length=16, choices=FORMAT_CHOICES, blank=True, default='')
+    tags = models.CharField(max_length=300, blank=True, default='')
+    presentation = models.FileField(upload_to='events/presentations/', null=True, blank=True)
+    video_url = models.URLField(max_length=500, blank=True, default='')
+
     created_at = models.DateTimeField(
         auto_now_add=True,
         null=True,
@@ -177,6 +234,35 @@ class Event(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.status})"
+
+    def save(self, *args, **kwargs):
+        # Если дедлайн не задан, но известна дата события — ставим дедлайн
+        # за 14 дней до события. Так у спикеров всегда есть окно подачи без
+        # вмешательства DevRel; «только по приглашению» остаётся как режим
+        # для событий без даты.
+        if self.application_deadline is None and self.event_date is not None:
+            from datetime import timedelta
+            self.application_deadline = self.event_date - timedelta(days=14)
+        super().save(*args, **kwargs)
+
+    def can_self_submit(self) -> bool:
+        """Спикер может сам подать заявку, только если дедлайн задан и не прошёл."""
+        if self.application_deadline is None:
+            return False
+        from django.utils import timezone
+        return self.application_deadline >= timezone.localdate()
+
+
+class EventPhoto(models.Model):
+    """Фотографии события, загруженные спикером при self-submit."""
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='photos')
+    image = models.ImageField(upload_to='events/photos/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'starlift_event_photo'
+        ordering = ['uploaded_at']
 
 
 class Feedback(models.Model):
@@ -258,3 +344,181 @@ class EventRequest(models.Model):
 
     def __str__(self):
         return f"{self.get_kind_display()} от {self.speaker.name} ({self.status})"
+
+
+class EventInvitation(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_ACCEPTED = 'accepted'
+    STATUS_DECLINED = 'declined'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Ожидает ответа'),
+        (STATUS_ACCEPTED, 'Принято'),
+        (STATUS_DECLINED, 'Отклонено'),
+        (STATUS_CANCELLED, 'Отменено DevRel'),
+    ]
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='invitations')
+    speaker = models.ForeignKey(Speaker, on_delete=models.CASCADE, related_name='invitations')
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='sent_event_invitations',
+    )
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    message = models.TextField(blank=True, default='')
+    decline_reason = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'starlift_event_invitation'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['status', '-created_at'])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['event', 'speaker'],
+                condition=models.Q(status='pending'),
+                name='uniq_pending_event_invitation',
+            ),
+        ]
+
+    def __str__(self):
+        return f"EventInvitation<{self.event_id}/{self.speaker_id}/{self.status}>"
+
+
+class SpeakerApplication(models.Model):
+    """Заявка пользователя-гостя на получение роли спикера.
+
+    Создаётся после email-верификации, когда гость заполняет форму
+    профиля. Маршрутизируется DevRel'у по `company` (см. notifications_api
+    и event_requests_view). Approve → роль становится `speaker`, Speaker-
+    карточка создаётся/привязывается. Reject → пользователь остаётся
+    гостем и может переподать.
+    """
+
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'На рассмотрении'),
+        (STATUS_APPROVED, 'Одобрено'),
+        (STATUS_REJECTED, 'Отклонено'),
+    ]
+
+    applicant = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='speaker_application',
+    )
+    status = models.CharField(
+        max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True,
+    )
+    company = models.CharField(max_length=200, blank=True, default='')
+    city = models.CharField(max_length=100, blank=True, default='')
+    stack = models.CharField(max_length=200, blank=True, default='')
+    description = models.TextField(blank=True, default='')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reviewed_speaker_applications',
+    )
+    rejection_reason = models.TextField(blank=True, default='')
+    resulting_speaker = models.ForeignKey(
+        Speaker,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='+',
+    )
+
+    class Meta:
+        db_table = 'starlift_speaker_application'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['status', '-created_at'])]
+
+    def __str__(self):
+        return f"SpeakerApplication<{self.applicant.username} / {self.status}>"
+
+
+class SpeakerEventRating(models.Model):
+    """Спикер ставит оценку прошедшему мероприятию, в котором участвовал.
+
+    Не влияет на NPS спикеров (это отдельная метрика самого события глазами
+    выступавших). Одна оценка на пару (speaker, event); повторный сабмит
+    обновляет существующую запись.
+    """
+
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="speaker_ratings",
+        verbose_name="Мероприятие",
+    )
+    speaker = models.ForeignKey(
+        Speaker,
+        on_delete=models.CASCADE,
+        related_name="event_ratings",
+        verbose_name="Спикер",
+    )
+    score = models.IntegerField(
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+        verbose_name="Оценка (0–10)",
+    )
+    comment = models.TextField(blank=True, default="", verbose_name="Комментарий")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "starlift_speaker_event_rating"
+        unique_together = [("event", "speaker")]
+        indexes = [models.Index(fields=["event", "speaker"])]
+        verbose_name = "Оценка мероприятия от спикера"
+        verbose_name_plural = "Оценки мероприятий от спикеров"
+
+    def __str__(self):
+        return f"{self.speaker.name} → {self.event.title}: {self.score}/10"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        nps_value = self.speaker.calculate_nps()
+        if nps_value is not None:
+            self.speaker.nps = nps_value
+            self.speaker.save(update_fields=["nps"])
+
+    def delete(self, *args, **kwargs):
+        speaker = self.speaker
+        super().delete(*args, **kwargs)
+        nps_value = speaker.calculate_nps()
+        if nps_value is not None:
+            speaker.nps = nps_value
+            speaker.save(update_fields=["nps"])
+
+
+class SpeakerLike(models.Model):
+    """Per-user heart/favorite on a Speaker. Toggled from the speaker modal."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="speaker_likes",
+    )
+    speaker = models.ForeignKey(
+        Speaker,
+        on_delete=models.CASCADE,
+        related_name="likes",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "starlift_speaker_like"
+        unique_together = [("user", "speaker")]
+        indexes = [models.Index(fields=["user", "speaker"])]
+
+    def __str__(self):
+        return f"{self.user_id} ♥ {self.speaker_id}"

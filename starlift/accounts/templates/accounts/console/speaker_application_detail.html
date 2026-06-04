@@ -1,0 +1,72 @@
+{% extends 'accounts/console/_base.html' %}
+
+{% block title %}Заявка спикера — StarLift{% endblock %}
+
+{% block console_content %}
+<div class="content-block" style="padding:22px; display:grid; gap:16px;">
+    <div style="display:flex; gap:8px; align-items:center;">
+        <a href="{% url 'accounts:event_requests' %}" style="color:var(--text-muted); text-decoration:none; font-size:13px;"><i class="fa-solid fa-arrow-left"></i> К списку заявок</a>
+    </div>
+
+    {% if messages %}
+        {% for msg in messages %}
+        <div style="padding:10px 12px; border-radius:10px; font-size:13px;
+            {% if msg.tags == 'error' %}background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3);
+            {% else %}background:var(--light-green); color:var(--sber-green); border:1px solid rgba(10,128,59,0.25);{% endif %}">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <h2 style="margin:0; font-size:20px; font-weight:800;">
+        {{ application.applicant.get_full_name|default:application.applicant.username }}
+        <span class="chip {% if application.status == 'pending' %}chip-gray{% elif application.status == 'approved' %}chip-green{% else %}chip-red{% endif %}" style="margin-left:10px; font-size:11px;">
+            {{ application.get_status_display }}
+        </span>
+    </h2>
+
+    <div style="display:grid; gap:8px; padding:14px; background:var(--white); border:1px solid var(--border-color); border-radius:12px; font-size:13px;">
+        <div><span style="color:var(--text-muted);">Username:</span> @{{ application.applicant.username }}</div>
+        <div><span style="color:var(--text-muted);">Email:</span> {{ application.applicant.email }}</div>
+        <div><span style="color:var(--text-muted);">Компания:</span> {{ application.company|default:"— не указано —" }}</div>
+        <div><span style="color:var(--text-muted);">Город:</span> {{ application.city }}</div>
+        <div><span style="color:var(--text-muted);">Стек:</span> {{ application.stack }}</div>
+        <div><span style="color:var(--text-muted);">О себе:</span><br>{{ application.description|linebreaksbr }}</div>
+        <div style="color:var(--text-muted);">Подано: {{ application.submitted_at|date:"d.m.Y H:i" }}</div>
+    </div>
+
+    {% if application.status == 'pending' %}
+    <div class="content-block" style="padding:18px; display:grid; gap:14px; background:var(--white);">
+        <h3 style="margin:0; font-size:15px; font-weight:700;"><i class="fa-solid fa-check"></i> Одобрить</h3>
+        <form method="post" action="{% url 'accounts:speaker_application_action' application.id 'approve' %}" style="display:grid; gap:10px;">
+            {% csrf_token %}
+            <label style="display:flex; gap:8px; align-items:center; font-size:13px;">
+                <input type="radio" name="mode" value="create" checked> Создать новую карточку спикера
+            </label>
+            <label style="display:flex; gap:8px; align-items:center; font-size:13px;">
+                <input type="radio" name="mode" value="link"> Привязать существующую:
+                <select name="speaker_id" class="select-compact">
+                    <option value="">— выберите —</option>
+                    {% for s in available_speakers %}
+                    <option value="{{ s.pk }}">{{ s.name }}{% if s.sub %} ({{ s.sub }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button type="submit" class="btn-action btn-contact" style="justify-self:start;"><i class="fa-solid fa-check"></i> Одобрить</button>
+        </form>
+    </div>
+
+    <div class="content-block" style="padding:18px; display:grid; gap:10px; background:var(--white);">
+        <h3 style="margin:0; font-size:15px; font-weight:700; color:#D93E4E;"><i class="fa-solid fa-xmark"></i> Отклонить</h3>
+        <form method="post" action="{% url 'accounts:speaker_application_action' application.id 'reject' %}" style="display:grid; gap:10px;">
+            {% csrf_token %}
+            <textarea name="rejection_reason" required placeholder="Причина отклонения (увидит пользователь)" rows="3" style="width:100%; padding:8px; border:1px solid var(--border-color); border-radius:8px; font-family:inherit; font-size:13px;"></textarea>
+            <button type="submit" class="btn-action btn-danger" style="justify-self:start;"><i class="fa-solid fa-xmark"></i> Отклонить</button>
+        </form>
+    </div>
+    {% else %}
+    <div style="padding:12px 14px; border-radius:10px; background:var(--light-green); font-size:13px;">
+        Рассмотрено: {{ application.reviewed_at|date:"d.m.Y H:i" }} · {{ application.reviewed_by.username|default:"—" }}
+        {% if application.rejection_reason %}<div style="margin-top:6px; color:#D93E4E;">Причина: {{ application.rejection_reason }}</div>{% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

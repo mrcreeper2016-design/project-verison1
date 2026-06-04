@@ -1,0 +1,65 @@
+{% comment %}
+Chip-style company picker. Renders a row of clickable pills, one per
+allowed company plus a "no company" option. Backed by hidden radios so
+the form submission stays plain HTML.
+
+Required context:
+  - name:     form field name (usually "company")
+  - selected: current value (string; "" means no company)
+  - options:  iterable of company strings (e.g. ALLOWED_COMPANIES)
+
+Optional:
+  - blank_label: label for the "no company" chip (default "Без компании")
+{% endcomment %}
+<style>
+    .company-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+    .company-picker .cp-option { position: relative; }
+    .company-picker .cp-option input { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+    .company-picker .cp-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 16px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        background: var(--white);
+        color: var(--text-main);
+        border: 1.5px solid var(--border-color);
+        cursor: pointer;
+        transition: var(--transition);
+        user-select: none;
+        line-height: 1;
+    }
+    .company-picker .cp-chip:hover {
+        border-color: var(--sber-green);
+        color: var(--sber-green);
+        background: var(--light-green);
+    }
+    .company-picker .cp-chip .cp-icon { font-size: 12px; opacity: 0.5; }
+    .company-picker .cp-option input:checked + .cp-chip {
+        background: var(--sber-green);
+        color: #fff;
+        border-color: var(--sber-green);
+        box-shadow: 0 4px 14px rgba(10,128,59,0.25);
+    }
+    .company-picker .cp-option input:checked + .cp-chip .cp-icon { opacity: 1; }
+    .company-picker .cp-option input:focus-visible + .cp-chip {
+        outline: 2px solid var(--sber-green);
+        outline-offset: 2px;
+    }
+    .company-picker .cp-chip.cp-none { font-style: italic; opacity: 0.85; }
+    .company-picker .cp-option input:checked + .cp-chip.cp-none { font-style: normal; opacity: 1; }
+</style>
+<div class="company-picker" role="radiogroup" aria-label="Выбор компании">
+    <label class="cp-option">
+        <input type="radio" name="{{ name }}" value="" {% if not selected %}checked{% endif %}>
+        <span class="cp-chip cp-none"><i class="fa-solid fa-circle-minus cp-icon"></i> {{ blank_label|default:"Без компании" }}</span>
+    </label>
+    {% for c in options %}
+    <label class="cp-option">
+        <input type="radio" name="{{ name }}" value="{{ c }}" {% if selected == c %}checked{% endif %}>
+        <span class="cp-chip"><i class="fa-solid fa-check cp-icon"></i> {{ c }}</span>
+    </label>
+    {% endfor %}
+</div>

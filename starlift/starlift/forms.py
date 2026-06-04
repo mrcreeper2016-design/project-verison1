@@ -107,9 +107,9 @@ class SpeakerForm(forms.ModelForm):
 
             except Exception as e:
                 raise ValidationError(f"Ошибка при обработке изображения: {str(e)}")
-        elif not img_field and not getattr(self.instance, "img", "") and not getattr(self.instance, "avatar", None):
-            import random
-            cleaned_data['img'] = str(random.randint(1, 70))
+        # No image supplied → leave ``img`` empty. The card then has no avatar
+        # and the frontend renders an initials placeholder. We must NOT invent a
+        # random i.pravatar.cc id here.
 
         return cleaned_data
 
@@ -145,4 +145,120 @@ class SpeakerSelfEditForm(SpeakerForm):
             'bio': forms.Textarea(attrs={'class': 'search-box', 'style': 'width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--glass-border); min-height: 120px;'}),
             'img': forms.HiddenInput(),
         }
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Self-submitted past event (portfolio entry) — verified by DevRel.
+# ─────────────────────────────────────────────────────────────────────
+
+import re
+from datetime import date as _date_cls
+
+from django.utils import timezone
+
+
+_VIDEO_HOST_RE = re.compile(
+    r"^(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be|vk\.com|vkvideo\.ru|rutube\.ru)/",
+    re.IGNORECASE,
+)
+_PRESENTATION_EXTS = ('.pdf', '.ppt', '.pptx')
+_PRESENTATION_TYPES = {
+    'application/pdf',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+}
+_PHOTO_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+
+MAX_PRESENTATION_BYTES = 50 * 1024 * 1024  # 50 MB
+MAX_PHOTO_BYTES = 10 * 1024 * 1024  # 10 MB
+MAX_PHOTOS = 10
+
+
+class SpeakerEventUploadForm(forms.Form):
+    """Форма «загрузить мероприятие» в личном кабинете спикера.
+
+    Сценарий — портфолио: спикер заполняет прошедшее выступление, опционально
+    прикрепляет слайды, фото и ссылку на видео. После submit Event создаётся
+    в статусе `verification_status='pending'` и ждёт одобрения DevRel.
+    """
+
+    title = forms.CharField(label="Название", max_length=200, required=True)
+    event_date = forms.DateField(label="Дата", required=True)
+    location = forms.CharField(label="Место", max_length=200, required=False)
+    link = forms.URLField(label="Ссылка на анонс / страницу", max_length=500, required=False)
+    topic = forms.CharField(label="Тема доклада", max_length=100, required=False)
+    format = forms.ChoiceField(
+        label="Формат",
+        required=False,
+        choices=[
+            ('', 'Не выбрано'),
+            ('online', 'Онлайн'),
+            ('offline', 'Офлайн'),
+            ('hybrid', 'Гибрид'),
+        ],
+    )
+    tags = forms.CharField(
+        label="Теги / стек",
+        max_length=300,
+        required=False,
+        help_text="Через запятую: python, django, ml",
+    )
+    description = forms.CharField(
+        label="Описание выступления",
+        required=True,
+        widget=forms.Textarea(attrs={'rows': 5}),
+    )
+    video_url = forms.URLField(
+        label="Ссылка на видео",
+        max_length=500,
+        required=False,
+        help_text="YouTube, VK Video, RuTube",
+    )
+    presentation = forms.FileField(label="Презентация (PDF/PPTX, ≤50 МБ)", required=False)
+
+    def clean_event_date(self):
+        d = self.cleaned_data.get('event_date')
+        if d and d > timezone.localdate():
+            raise ValidationError("Можно загружать только прошедшие мероприятия.")
+        return d
+
+    def clean_presentation(self):
+        f = self.cleaned_data.get('presentation')
+        if not f:
+            return f
+        if f.size > MAX_PRESENTATION_BYTES:
+            raise ValidationError("Презентация не должна превышать 50 МБ.")
+        name_lower = (getattr(f, 'name', '') or '').lower()
+        if not name_lower.endswith(_PRESENTATION_EXTS):
+            raise ValidationError("Допустимые форматы: PDF, PPT, PPTX.")
+        ct = getattr(f, 'content_type', '')
+        if ct and ct not in _PRESENTATION_TYPES:
+            # Браузеры иногда отдают пустой content_type, поэтому extension — приоритет.
+            pass
+        return f
+
+    def clean_video_url(self):
+        url = (self.cleaned_data.get('video_url') or '').strip()
+        if not url:
+            return url
+        if not _VIDEO_HOST_RE.match(url):
+            raise ValidationError("Только YouTube, VK Video или RuTube.")
+        return url
+
+    def clean_tags(self):
+        return (self.cleaned_data.get('tags') or '').strip()
+
+    @classmethod
+    def validate_photos(cls, files):
+        """Валидируем список фото (`request.FILES.getlist('photos')`)."""
+        files = list(files or [])
+        if len(files) > MAX_PHOTOS:
+            raise ValidationError(f"Можно загрузить не более {MAX_PHOTOS} фотографий.")
+        for f in files:
+            if f.size > MAX_PHOTO_BYTES:
+                raise ValidationError(f"Фото «{f.name}» больше 10 МБ.")
+            ct = getattr(f, 'content_type', '')
+            if ct and ct not in _PHOTO_TYPES:
+                raise ValidationError(f"Фото «{f.name}»: допустимы JPEG, PNG, WebP.")
+        return files
 

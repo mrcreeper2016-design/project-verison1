@@ -1,0 +1,104 @@
+{% extends 'me/_base.html' %}
+
+{% block title %}Приглашения — StarLift{% endblock %}
+
+{% block me_title %}Приглашения от DevRel{% endblock %}
+{% block me_subtitle %}Здесь появляются приглашения на мероприятия от DevRel вашей компании.{% endblock %}
+
+{% block me_content %}
+<style>
+    .inv-card { padding: 16px 18px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--white); display: grid; gap: 10px; }
+    .inv-card.pending { border-left: 4px solid var(--sber-green); }
+    .inv-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+    .inv-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; gap: 8px; align-items: center; }
+    .inv-meta { font-size: 12px; color: var(--text-muted); }
+    .inv-message { padding: 10px 12px; background: var(--light-green); border-radius: 10px; font-size: 13px; color: var(--text-main); line-height: 1.5; border-left: 3px solid var(--sber-green); }
+    .inv-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .inv-decline-form { display: none; margin-top: 8px; }
+    .inv-decline-form.active { display: block; }
+    .inv-decline-form textarea { width: 100%; min-height: 70px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-family: inherit; font-size: 13px; resize: vertical; }
+    .inv-history-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--white); font-size: 13px; }
+    .inv-history-reason { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-style: italic; }
+</style>
+
+<div style="display:grid; gap:22px;">
+    <section>
+        <h3 class="me-section-title"><i class="fa-solid fa-envelope-open-text"></i> Ожидают вашего ответа <span class="chip chip-green">{{ pending|length }}</span></h3>
+        {% if pending %}
+        <div style="display:grid; gap:10px;">
+            {% for inv in pending %}
+            <div class="inv-card pending">
+                <div class="inv-head">
+                    <div style="min-width:0;">
+                        <p class="inv-title">{{ inv.event.title }}</p>
+                        <div class="inv-meta">
+                            {% if inv.event.event_date %}{{ inv.event.event_date|date:"d.m.Y" }}{% elif inv.event.date %}{{ inv.event.date }}{% endif %}
+                            {% if inv.event.location %} · {{ inv.event.location }}{% endif %}
+                        </div>
+                        {% if inv.invited_by %}
+                        <div class="inv-meta" style="margin-top:4px;">От: {{ inv.invited_by.get_full_name|default:inv.invited_by.username }}</div>
+                        {% endif %}
+                    </div>
+                    <span class="chip chip-gray">Ожидает</span>
+                </div>
+                {% if inv.message %}
+                <div class="inv-message">{{ inv.message|linebreaksbr }}</div>
+                {% endif %}
+                <div class="inv-actions">
+                    <form method="post" action="{% url 'me_invitation_accept' inv.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-check"></i> Принять</button>
+                    </form>
+                    <button type="button" class="btn-action" onclick="document.getElementById('decline-{{ inv.id }}').classList.toggle('active');"><i class="fa-solid fa-xmark"></i> Отклонить</button>
+                </div>
+                <form method="post" action="{% url 'me_invitation_decline' inv.id %}" class="inv-decline-form" id="decline-{{ inv.id }}">
+                    {% csrf_token %}
+                    <textarea name="decline_reason" placeholder="Причина отказа (необязательно)"></textarea>
+                    <div style="margin-top:8px; display:flex; gap:8px;">
+                        <button type="submit" class="btn-action"><i class="fa-solid fa-paper-plane"></i> Отправить отказ</button>
+                        <button type="button" class="btn-action" onclick="document.getElementById('decline-{{ inv.id }}').classList.remove('active');">Отмена</button>
+                    </div>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="me-empty">Активных приглашений нет.</div>
+        {% endif %}
+    </section>
+
+    {% if history %}
+    <section>
+        <h3 class="me-section-title"><i class="fa-solid fa-clock-rotate-left"></i> История <span class="chip">{{ history|length }}</span></h3>
+        <div style="display:grid; gap:8px;">
+            {% for inv in history %}
+            <div class="inv-history-row">
+                <div style="min-width:0; flex:1;">
+                    <div style="font-weight:600;">{{ inv.event.title }}</div>
+                    <div class="inv-meta">
+                        {% if inv.responded_at %}{{ inv.responded_at|date:"d.m.Y H:i" }}{% else %}{{ inv.created_at|date:"d.m.Y H:i" }}{% endif %}
+                    </div>
+                    {% if inv.decline_reason %}
+                    <div class="inv-history-reason">Причина: {{ inv.decline_reason }}</div>
+                    {% endif %}
+                </div>
+                {% if inv.status == 'accepted' %}
+                <span class="chip chip-green">Принято</span>
+                {% elif inv.status == 'declined' %}
+                <span class="chip chip-red">Отклонено</span>
+                {% elif inv.status == 'cancelled' %}
+                <span class="chip chip-red">Отменено DevRel</span>
+                {% else %}
+                <span class="chip chip-gray">{{ inv.get_status_display }}</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if not pending and not history %}
+    <div class="me-empty">Приглашений пока нет.</div>
+    {% endif %}
+</div>
+{% endblock %}

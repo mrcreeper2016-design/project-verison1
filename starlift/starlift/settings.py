@@ -11,29 +11,66 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+import warnings
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load environment variables from .env file
-load_dotenv(os.path.join(BASE_DIR, '.env'))
+# Pick which .env file to load:
+#   1. Explicit ENV_FILE=/path/to/file  — wins if set.
+#   2. DJANGO_ENV=production            — loads .env.production.
+#   3. Fallback                         — loads .env.
+# Existing OS environment variables always override what's in the file.
+_explicit = os.environ.get('ENV_FILE')
+_env_name = os.environ.get('DJANGO_ENV', '').lower()
+if _explicit:
+    _env_path = _explicit
+elif _env_name == 'production' and (BASE_DIR / '.env.production').exists():
+    _env_path = str(BASE_DIR / '.env.production')
+else:
+    _env_path = str(BASE_DIR / '.env')
+load_dotenv(_env_path)
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-$!y7q&gyioy-19s!8_5+vlbf@czrczz^v!w8#bd35!f)%(bxh!')
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-_default_hosts = "127.0.0.1,localhost,192.168.1.126,.ngrok-free.app,.ngrok-free.dev"
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', _default_hosts).split(',') if h.strip()]
+# SECURITY WARNING: keep the secret key used in production secret!
+# Development falls back to a built-in insecure key (with a warning). In
+# production (DEBUG=False) we refuse to start unless SECRET_KEY is provided,
+# so a real deployment can never silently run on the shared insecure key.
+_INSECURE_SECRET_KEY = 'django-insecure-$!y7q&gyioy-19s!8_5+vlbf@czrczz^v!w8#bd35!f)%(bxh!'
+SECRET_KEY = os.environ.get('SECRET_KEY', '').strip() or _INSECURE_SECRET_KEY
+if SECRET_KEY == _INSECURE_SECRET_KEY:
+    if DEBUG:
+        warnings.warn(
+            "SECRET_KEY is not set; using the insecure built-in development key. "
+            "Set SECRET_KEY in the environment before deploying to production.",
+            stacklevel=2,
+        )
+    else:
+        raise ImproperlyConfigured(
+            "SECRET_KEY environment variable must be set when DEBUG=False. "
+            "Refusing to start with the insecure built-in development key."
+        )
 
-_default_csrf = "https://*.ngrok-free.app,https://*.ngrok-free.dev"
+# Hosts / CSRF: permissive dev defaults (localhost, ngrok) apply only in DEBUG.
+# In production require ALLOWED_HOSTS / CSRF_TRUSTED_ORIGINS to be set explicitly
+# (empty default → Django itself rejects requests with an unknown Host).
+if DEBUG:
+    _default_hosts = "127.0.0.1,localhost,192.168.1.126,.ngrok-free.app,.ngrok-free.dev"
+    _default_csrf = "https://*.ngrok-free.app,https://*.ngrok-free.dev"
+else:
+    _default_hosts = ""
+    _default_csrf = ""
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', _default_hosts).split(',') if h.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get('CSRF_TRUSTED_ORIGINS', _default_csrf).split(',') if o.strip()]
 
 
@@ -48,6 +85,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'accounts',
     'starlift',
+    'assistant',
+    'support',
 ]
 
 USE_OBJECT_STORAGE = os.getenv("USE_OBJECT_STORAGE", "false").lower() == "true"
@@ -61,6 +100,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'accounts.middleware.GuestApplicationRedirectMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -143,6 +183,18 @@ _secure_cookies_default = 'False' if DEBUG else 'True'
 SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', _secure_cookies_default).lower() == 'true'
 CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', _secure_cookies_default).lower() == 'true'
 
+# Trust nginx's X-Forwarded-Proto header — without this Django thinks every
+# request is plain HTTP (the container only speaks HTTP to the proxy).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Optional HTTPS hardening — off by default so HTTP-only/dev setups keep working;
+# enable in .env.production once TLS is terminated at the proxy.
+SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False').lower() == 'true'
+SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'False').lower() == 'true'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '25'))
@@ -188,6 +240,7 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+
 if USE_OBJECT_STORAGE:
     STORAGE_ENDPOINT_URL = os.getenv("STORAGE_ENDPOINT_URL", "").strip()
     STORAGE_BUCKET_NAME = os.getenv("STORAGE_BUCKET_NAME", "").strip()
@@ -230,4 +283,38 @@ else:
 
 # Legal documents
 LEGAL_DOC_VERSION = "2026-05-10"
+
+# ---------------------------------------------------------------------------
+# AI Assistant (GigaChat)
+# ---------------------------------------------------------------------------
+GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY", "").strip()
+GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS").strip()
+GIGACHAT_MODEL = os.getenv("GIGACHAT_MODEL", "GigaChat-Pro").strip()
+# Defaults to false because GigaChat uses the Russian Trusted Sub CA, which is
+# often missing from the system trust store. For production prefer "true" with
+# the Минцифры root CA installed; see docs/setup.md.
+GIGACHAT_VERIFY_SSL = os.getenv("GIGACHAT_VERIFY_SSL", "false").lower() == "true"
+
+ASSISTANT_ENABLED = os.getenv("ASSISTANT_ENABLED", "true").lower() == "true"
+ASSISTANT_RATE_LIMIT_PER_USER = int(os.getenv("ASSISTANT_RATE_LIMIT_PER_USER", "30"))
+ASSISTANT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("ASSISTANT_RATE_LIMIT_WINDOW_SECONDS", "900"))
+ASSISTANT_MAX_TOOL_ITERATIONS = int(os.getenv("ASSISTANT_MAX_TOOL_ITERATIONS", "8"))
+ASSISTANT_MAX_OUTPUT_TOKENS_PER_TURN = int(os.getenv("ASSISTANT_MAX_OUTPUT_TOKENS_PER_TURN", "1500"))
+ASSISTANT_MAX_INPUT_TOKENS_PER_TURN = int(os.getenv("ASSISTANT_MAX_INPUT_TOKENS_PER_TURN", "12000"))
+ASSISTANT_MAX_TOKENS_PER_USER_MESSAGE = int(os.getenv("ASSISTANT_MAX_TOKENS_PER_USER_MESSAGE", "25000"))
+ASSISTANT_MAX_TOKENS_PER_CONVERSATION = int(os.getenv("ASSISTANT_MAX_TOKENS_PER_CONVERSATION", "200000"))
+ASSISTANT_CONTEXT_HISTORY_MESSAGES = int(os.getenv("ASSISTANT_CONTEXT_HISTORY_MESSAGES", "20"))
+ASSISTANT_CONTEXT_TOOL_RESULTS_MESSAGES = int(os.getenv("ASSISTANT_CONTEXT_TOOL_RESULTS_MESSAGES", "5"))
+ASSISTANT_DAILY_TOKEN_BUDGET_ADMIN = int(os.getenv("ASSISTANT_DAILY_TOKEN_BUDGET_ADMIN", "500000"))
+ASSISTANT_DAILY_TOKEN_BUDGET_SPEAKER = int(os.getenv("ASSISTANT_DAILY_TOKEN_BUDGET_SPEAKER", "100000"))
+ASSISTANT_DAILY_BUDGET_ACTION = os.getenv("ASSISTANT_DAILY_BUDGET_ACTION", "warn").lower()
+ASSISTANT_DAILY_GLOBAL_BUDGET = int(os.getenv("ASSISTANT_DAILY_GLOBAL_BUDGET", "2000000"))
+ASSISTANT_TOOL_RESULT_MAX_BYTES = int(os.getenv("ASSISTANT_TOOL_RESULT_MAX_BYTES", "4096"))
+
+# ---------------------------------------------------------------------------
+# Support chat
+# ---------------------------------------------------------------------------
+SUPPORT_RATE_LIMIT_PER_USER = int(os.getenv("SUPPORT_RATE_LIMIT_PER_USER", "30"))
+SUPPORT_RATE_LIMIT_PER_GUEST = int(os.getenv("SUPPORT_RATE_LIMIT_PER_GUEST", "5"))
+SUPPORT_RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("SUPPORT_RATE_LIMIT_WINDOW_SECONDS", "300"))
 

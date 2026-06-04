@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}Заявка спикера — StarLift{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper" style="max-width:680px; margin:40px auto; padding:0 20px;">
+    <div class="content-block animate-fade" style="padding:30px; display:grid; gap:18px;">
+        <div>
+            <h1 style="margin:0; font-size:24px; font-weight:800;">Заполните карточку спикера</h1>
+            <p style="margin:6px 0 0; color:var(--text-muted); font-size:14px;">
+                После отправки заявку рассмотрит DevRel. Если указана компания — заявка пойдёт DevRel'у этой компании; иначе — всем DevRel.
+            </p>
+        </div>
+
+        {% if messages %}
+            {% for msg in messages %}
+            <div style="padding:10px 12px; border-radius:10px; font-size:13px;
+                {% if msg.tags == 'error' %}background:rgba(217,62,78,0.1); color:#D93E4E; border:1px solid rgba(217,62,78,0.3);
+                {% else %}background:var(--light-green); color:var(--sber-green); border:1px solid rgba(10,128,59,0.25);{% endif %}">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+
+        {% if is_resubmit and existing.rejection_reason %}
+        <div style="padding:12px 14px; border-radius:12px; background:rgba(224,165,0,0.15); border:1px solid rgba(224,165,0,0.3);">
+            <div style="font-weight:700; color:#B87C00; margin-bottom:4px;"><i class="fa-solid fa-triangle-exclamation"></i> Заявка была отклонена</div>
+            <div style="color:var(--text-main); font-size:13px;">Причина: {{ existing.rejection_reason }}</div>
+            <div style="color:var(--text-muted); font-size:12px; margin-top:6px;">Исправьте данные и отправьте заявку повторно.</div>
+        </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" style="display:grid; gap:14px;">
+            {% csrf_token %}
+
+            <div style="display:grid; gap:8px;">
+                <label style="font-size:13px; font-weight:700; color:var(--text-muted);">Компания (опционально)</label>
+                {% include "accounts/_company_picker.html" with name="company" selected=form.company.value options=allowed_companies %}
+                {% if form.company.errors %}<div style="color:#D93E4E; font-size:12px;">{{ form.company.errors|join:" " }}</div>{% endif %}
+            </div>
+
+            <div style="display:grid; gap:6px;">
+                <label style="font-size:13px; font-weight:700; color:var(--text-muted);">Город *</label>
+                {{ form.city }}
+                {% if form.city.errors %}<div style="color:#D93E4E; font-size:12px;">{{ form.city.errors|join:" " }}</div>{% endif %}
+            </div>
+
+            <div style="display:grid; gap:6px;">
+                <label style="font-size:13px; font-weight:700; color:var(--text-muted);">Стек / темы *</label>
+                {{ form.stack }}
+                {% if form.stack.errors %}<div style="color:#D93E4E; font-size:12px;">{{ form.stack.errors|join:" " }}</div>{% endif %}
+            </div>
+
+            <div style="display:grid; gap:6px;">
+                <label style="font-size:13px; font-weight:700; color:var(--text-muted);">О себе *</label>
+                {{ form.description }}
+                {% if form.description.errors %}<div style="color:#D93E4E; font-size:12px;">{{ form.description.errors|join:" " }}</div>{% endif %}
+            </div>
+
+            <div style="display:grid; gap:6px;">
+                <label style="font-size:13px; font-weight:700; color:var(--text-muted);">Аватар (опционально)</label>
+                {{ form.avatar }}
+                {% if form.avatar.errors %}<div style="color:#D93E4E; font-size:12px;">{{ form.avatar.errors|join:" " }}</div>{% endif %}
+            </div>
+
+            <div style="display:flex; gap:10px; align-items:center; margin-top:6px;">
+                <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-paper-plane"></i> Отправить заявку</button>
+            </div>
+        </form>
+
+        <form method="post" action="{% url 'accounts:logout' %}" style="margin:0;">
+            {% csrf_token %}
+            <button type="submit" class="btn-action" style="background:transparent; color:var(--text-muted);"><i class="fa-solid fa-right-from-bracket"></i> Выйти</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

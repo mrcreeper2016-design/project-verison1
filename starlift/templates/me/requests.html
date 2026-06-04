@@ -1,0 +1,54 @@
+{% extends 'me/_base.html' %}
+
+{% block title %}Мои заявки — StarLift{% endblock %}
+
+{% block me_content %}
+<style>
+    .req-card { padding: 16px 18px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--white); display: grid; gap: 10px; }
+    .req-card.pending { border-left: 4px solid #E0A500; }
+    .req-card.approved { border-left: 4px solid var(--sber-green); }
+    .req-card.rejected { border-left: 4px solid #D93E4E; }
+    .req-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
+    .req-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--text-main); display: flex; gap: 8px; align-items: center; }
+    .req-meta { font-size: 12px; color: var(--text-muted); }
+    .req-body { font-size: 13px; color: var(--text-main); line-height: 1.5; }
+    .req-body dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; }
+    .req-body dt { color: var(--text-muted); }
+    .req-rejection { padding: 10px 12px; background: rgba(217,62,78,0.07); border: 1px solid rgba(217,62,78,0.2); border-radius: 10px; font-size: 12px; color: #D93E4E; }
+</style>
+
+<div style="display:grid; gap:22px;">
+    <section>
+        <h3 class="me-section-title"><i class="fa-solid fa-hourglass-half"></i> На рассмотрении <span class="chip chip-amber">{{ pending|length }}</span></h3>
+        {% if pending %}
+        <div style="display:grid; gap:10px;">
+            {% for r in pending %}{% include 'me/_request_card.html' with r=r status='pending' %}{% endfor %}
+        </div>
+        {% else %}
+        <div class="me-empty">Нет заявок на рассмотрении.</div>
+        {% endif %}
+    </section>
+
+    <section>
+        <h3 class="me-section-title"><i class="fa-solid fa-circle-check"></i> Одобренные <span class="chip chip-green">{{ approved|length }}</span></h3>
+        {% if approved %}
+        <div style="display:grid; gap:10px;">
+            {% for r in approved %}{% include 'me/_request_card.html' with r=r status='approved' %}{% endfor %}
+        </div>
+        {% else %}
+        <div class="me-empty">Одобренных заявок пока нет.</div>
+        {% endif %}
+    </section>
+
+    <section>
+        <h3 class="me-section-title"><i class="fa-solid fa-circle-xmark"></i> Отклонённые <span class="chip chip-red">{{ rejected|length }}</span></h3>
+        {% if rejected %}
+        <div style="display:grid; gap:10px;">
+            {% for r in rejected %}{% include 'me/_request_card.html' with r=r status='rejected' %}{% endfor %}
+        </div>
+        {% else %}
+        <div class="me-empty">Отклонённых заявок нет.</div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

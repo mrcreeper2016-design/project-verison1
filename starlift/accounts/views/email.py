@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 
 from django.contrib import messages
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, login as auth_login
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -77,6 +77,17 @@ def verify_email_view(request: HttpRequest, token: str) -> HttpResponse:
     if request.user.is_authenticated and request.user.pk == user.pk:
         messages.success(request, "Email подтверждён и обновлён.")
         return redirect(reverse("accounts:profile"))
+
+    if was_initial_verification:
+        # Auto-login the freshly verified guest and send them straight to the
+        # speaker-application form — that's the next required step before
+        # they can do anything member-level.
+        user.backend = "accounts.auth_backends.UsernameOrEmailBackend"
+        auth_login(request, user)
+        if profile.role == profile.ROLE_GUEST:
+            messages.success(request, "Email подтверждён. Заполните профиль спикера для отправки заявки.")
+            return redirect(reverse("accounts:speaker_application_form"))
+        return redirect("/")
     return render(
         request,
         "accounts/verify_email_done.html",

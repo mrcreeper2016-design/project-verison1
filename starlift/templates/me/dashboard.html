@@ -1,0 +1,210 @@
+{% extends 'me/_base.html' %}
+
+{% block title %}Моя статистика — StarLift{% endblock %}
+
+{% block me_content %}
+<style>
+    .nps-card { padding: 22px 24px; display: grid; gap: 14px; }
+    .nps-row { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+    .nps-big { font-size: 52px; font-weight: 800; line-height: 1; }
+    .nps-big.positive { color: var(--sber-green); }
+    .nps-big.negative { color: #D93E4E; }
+    .nps-big.neutral { color: var(--text-muted); }
+    .nps-explain { color: var(--text-muted); font-size: 13px; max-width: 360px; }
+
+    .dist-row { display: grid; grid-template-columns: 32px 1fr 40px; align-items: center; gap: 10px; }
+    .dist-score { font-weight: 700; font-size: 13px; color: var(--text-main); text-align: right; }
+    .dist-bar { height: 10px; background: var(--light-green); border-radius: 6px; overflow: hidden; }
+    .dist-bar-fill { height: 100%; background: linear-gradient(90deg, var(--sber-green), var(--sber-green-hover)); border-radius: 6px; }
+    .dist-bar-fill.detractor { background: linear-gradient(90deg, #D93E4E, #B8313F); }
+    .dist-bar-fill.passive { background: linear-gradient(90deg, #E0A500, #B87C00); }
+    .dist-count { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+    .trend-bars { display: flex; align-items: flex-end; gap: 8px; height: 140px; padding: 8px 4px 4px; border-bottom: 1px solid var(--border-color); }
+    .trend-bar { flex: 1; min-width: 18px; background: linear-gradient(180deg, var(--sber-green), var(--sber-green-hover)); border-radius: 6px 6px 0 0; position: relative; cursor: default; transition: opacity .2s; }
+    .trend-bar:hover { opacity: 0.85; }
+    .trend-bar[data-empty="1"] { background: var(--border-color); }
+    .trend-labels { display: flex; gap: 8px; padding-top: 6px; }
+    .trend-label { flex: 1; min-width: 18px; text-align: center; font-size: 10px; color: var(--text-muted); }
+
+    .comment-card { padding: 12px 14px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--white); }
+    .comment-head { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; font-size: 12px; color: var(--text-muted); }
+    .comment-score { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-weight: 800; font-size: 12px; color: #fff; flex-shrink: 0; }
+    .comment-score.promoter { background: var(--sber-green); }
+    .comment-score.passive { background: #E0A500; }
+    .comment-score.detractor { background: #D93E4E; }
+    .comment-body { font-size: 13px; line-height: 1.5; color: var(--text-main); }
+
+    /* «Моя оценка мероприятий» — выделенный (золотой) блок */
+    .my-rating-card {
+        padding: 22px 24px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, rgba(255, 209, 102, 0.28), rgba(255, 231, 163, 0.15));
+        border: 1px solid rgba(180, 130, 0, 0.4);
+        box-shadow: 0 8px 24px rgba(255, 209, 102, 0.18);
+        display: grid;
+        gap: 14px;
+    }
+    [data-theme="dark"] .my-rating-card {
+        background: linear-gradient(135deg, rgba(255, 209, 102, 0.12), rgba(255, 209, 102, 0.04));
+        border-color: rgba(255, 209, 102, 0.35);
+    }
+    .my-rating-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .my-rating-icon {
+        width: 52px; height: 52px; flex-shrink: 0;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #FFD166, #FFB347);
+        color: #6B4F00;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 22px;
+        box-shadow: 0 6px 14px rgba(255, 180, 71, 0.35);
+    }
+    .my-rating-val { font-size: 42px; font-weight: 800; color: var(--text-main); line-height: 1; }
+    .my-rating-val .of { font-size: 16px; color: var(--text-muted); font-weight: 600; margin-left: 4px; }
+    .my-rating-meta { display: flex; flex-direction: column; gap: 2px; }
+    .my-rating-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .my-rating-sub { font-size: 12px; color: var(--text-muted); }
+    .my-rating-empty { color: var(--text-muted); font-size: 13px; }
+    .my-rating-recent { display: grid; gap: 8px; }
+    .my-rating-row {
+        display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+        background: var(--panel-bg); border-radius: 12px;
+        border: 1px solid var(--border-color);
+    }
+    .my-rating-row strong { font-size: 13px; color: var(--text-main); flex: 1; min-width: 0; }
+    .my-rating-row .badge-score {
+        font-weight: 800; font-size: 13px; color: #B07A00;
+        background: rgba(255, 209, 102, 0.3);
+        padding: 2px 10px; border-radius: 999px;
+    }
+    [data-theme="dark"] .my-rating-row .badge-score { color: #FFD166; background: rgba(255, 209, 102, 0.14); }
+</style>
+
+<div style="display:grid; gap:18px;">
+    <div class="me-grid-4">
+        <div class="content-block me-stat">
+            <span class="me-stat-label">Текущий NPS</span>
+            <span class="me-stat-value {% if nps_total is not None and nps_total >= 5 %}positive{% elif nps_total is not None %}negative{% endif %}">
+                {% if nps_total is not None %}{{ nps_total }}<span style="font-size:14px; color:var(--text-muted); font-weight:600;"> / 10</span>{% else %}—{% endif %}
+            </span>
+            <span class="me-stat-sub">по всем отзывам</span>
+        </div>
+        <div class="content-block me-stat">
+            <span class="me-stat-label">Отзывов всего</span>
+            <span class="me-stat-value">{{ feedback_count }}</span>
+            <span class="me-stat-sub">средняя оценка {% if avg_score is not None %}{{ avg_score }}{% else %}—{% endif %}</span>
+        </div>
+        <div class="content-block me-stat">
+            <span class="me-stat-label">Мероприятий</span>
+            <span class="me-stat-value">{{ event_count }}</span>
+            <span class="me-stat-sub">прошедших и будущих</span>
+        </div>
+        <div class="content-block me-stat">
+            <span class="me-stat-label">За 30 дней</span>
+            <span class="me-stat-value {% if nps_30 is not None and nps_30 >= 5 %}positive{% elif nps_30 is not None %}negative{% endif %}">
+                {% if nps_30 is not None %}{{ nps_30 }}<span style="font-size:14px; color:var(--text-muted); font-weight:600;"> / 10</span>{% else %}—{% endif %}
+            </span>
+            <span class="me-stat-sub">{{ feedback_30 }} новых отзывов</span>
+        </div>
+    </div>
+
+    <div class="my-rating-card">
+        <div class="my-rating-head">
+            <div class="my-rating-icon"><i class="fa-solid fa-star"></i></div>
+            <div class="my-rating-meta">
+                <span class="my-rating-label">Моя оценка мероприятий</span>
+                {% if my_event_rating_avg is not None %}
+                <span class="my-rating-val">{{ my_event_rating_avg }}<span class="of">/ 10</span></span>
+                <span class="my-rating-sub">общие оценки за выступления ({{ my_event_rating_count }})</span>
+                {% else %}
+                <span class="my-rating-empty">Пока не поставлено ни одной общей оценки за выступление. Перейдите в «Мои мероприятия» и оцените прошедшие — это самая важная обратная связь, она выделяется отдельным блоком в карточке события.</span>
+                {% endif %}
+            </div>
+            <a href="{% url 'me_events' %}" class="btn-action" style="margin-left:auto;"><i class="fa-solid fa-arrow-right"></i> К мероприятиям</a>
+        </div>
+        {% if my_recent_event_ratings %}
+        <div class="my-rating-recent">
+            {% for r in my_recent_event_ratings %}
+            <div class="my-rating-row">
+                <strong>{{ r.event.title }}</strong>
+                <span class="badge-score">{{ r.score }}/10</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:18px;">
+        <div class="content-block" style="padding:22px;">
+            <h3 class="me-section-title"><i class="fa-solid fa-chart-bar"></i> Распределение оценок</h3>
+            {% if feedback_count %}
+            <div style="display:grid; gap:6px; margin-top:10px;">
+                {% for score, cnt in distribution_rows %}
+                <div class="dist-row">
+                    <div class="dist-score">{{ score }}</div>
+                    <div class="dist-bar">
+                        <div class="dist-bar-fill {% if score >= 9 %}{% elif score >= 7 %}passive{% else %}detractor{% endif %}"
+                             style="width: {% if max_bar %}{% widthratio cnt max_bar 100 %}{% else %}0{% endif %}%;"></div>
+                    </div>
+                    <div class="dist-count">{{ cnt }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            <p style="margin:14px 0 0; font-size:12px; color:var(--text-muted);">
+                <span style="color:var(--sber-green); font-weight:700;">9–10</span> промоутеры ·
+                <span style="color:#B87C00; font-weight:700;">7–8</span> нейтральные ·
+                <span style="color:#D93E4E; font-weight:700;">0–6</span> детракторы
+            </p>
+            {% else %}
+            <div class="me-empty" style="margin-top:10px;">Отзывов пока нет.</div>
+            {% endif %}
+        </div>
+
+        <div class="content-block" style="padding:22px;">
+            <h3 class="me-section-title"><i class="fa-solid fa-chart-line"></i> Динамика по месяцам</h3>
+            {% if trend %}
+            {% with max_trend=trend|length %}
+            <div class="trend-bars">
+                {% for t in trend %}
+                <div class="trend-bar"
+                     style="height: {% widthratio t.total feedback_count 100 %}%; min-height: 4px;"
+                     title="{{ t.month|date:'M Y' }}: {{ t.total }} отзывов, средняя {{ t.avg }}"></div>
+                {% endfor %}
+            </div>
+            <div class="trend-labels">
+                {% for t in trend %}
+                <div class="trend-label">{{ t.month|date:'m.y' }}</div>
+                {% endfor %}
+            </div>
+            {% endwith %}
+            {% else %}
+            <div class="me-empty" style="margin-top:10px;">Недостаточно данных для тренда.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="content-block" style="padding:22px;">
+        <h3 class="me-section-title"><i class="fa-solid fa-quote-left"></i> Последние комментарии</h3>
+        {% if recent_comments %}
+        <div style="display:grid; gap:10px; margin-top:10px;">
+            {% for f in recent_comments %}
+            <div class="comment-card">
+                <div class="comment-head">
+                    <div class="comment-score {% if f.score >= 9 %}promoter{% elif f.score >= 7 %}passive{% else %}detractor{% endif %}">{{ f.score }}</div>
+                    <span>{{ f.event.title }}</span>
+                    <span>·</span>
+                    <span>{{ f.created_at|date:'d.m.Y' }}</span>
+                </div>
+                <div class="comment-body">{{ f.comment }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        <div style="margin-top:12px;">
+            <a href="{% url 'me_feedback' %}" class="btn-action"><i class="fa-solid fa-list"></i> Все отзывы</a>
+        </div>
+        {% else %}
+        <div class="me-empty" style="margin-top:10px;">Комментариев пока нет.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

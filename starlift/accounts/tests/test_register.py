@@ -205,7 +205,10 @@ class RegisterActivationTests(TestCase):
         raw = m.group(1)
 
         resp = self.client.get(reverse("accounts:verify_email", args=[raw]))
-        self.assertEqual(resp.status_code, 200)
+        # New flow: verification auto-logs in the user and redirects to the
+        # speaker-application form.
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/application/", resp["Location"])
 
         user.refresh_from_db()
         self.assertTrue(user.is_active)
@@ -214,6 +217,7 @@ class RegisterActivationTests(TestCase):
         self.assertIsNotNone(rec.used_at)
 
         # Now login works.
+        self.client.logout()
         self.assertTrue(self.client.login(username="gleb", password="MyStrongPass!9"))
 
     def test_audit_logs_email_verified_for_registration_flow(self):
@@ -248,11 +252,11 @@ class GuestAccessTests(TestCase):
         cls.guest.profile.email_verified = True
         cls.guest.profile.save()
 
-    def test_guest_redirected_from_home_to_explore(self):
+    def test_guest_redirected_from_home_to_application(self):
         self.client.login(username="g1", password="GuestPass!9")
         resp = self.client.get(reverse("home"), follow=False)
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(resp["Location"], "/explore/")
+        self.assertIn("/application/", resp["Location"])
 
     def test_guest_can_access_explore(self):
         self.client.login(username="g1", password="GuestPass!9")
@@ -264,7 +268,7 @@ class GuestAccessTests(TestCase):
         self.client.login(username="g1", password="GuestPass!9")
         resp = self.client.get(reverse("speakers"), follow=False)
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(resp["Location"], "/explore/")
+        self.assertIn("/application/", resp["Location"])
 
     def test_guest_redirected_from_analytics(self):
         self.client.login(username="g1", password="GuestPass!9")
@@ -273,8 +277,11 @@ class GuestAccessTests(TestCase):
 
     def test_guest_cannot_see_console(self):
         self.client.login(username="g1", password="GuestPass!9")
-        resp = self.client.get(reverse("accounts:users"))
-        self.assertEqual(resp.status_code, 403)
+        resp = self.client.get(reverse("accounts:users"), follow=False)
+        # Middleware intercepts guests with no submitted application and
+        # redirects them to the application form before role-check kicks in.
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/application/", resp["Location"])
 
     def test_anonymous_redirected_from_explore_to_login(self):
         resp = self.client.get(reverse("explore"), follow=False)

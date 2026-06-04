@@ -16,22 +16,6 @@
         margin: 6px 0 0; color: var(--text-muted);
         font-size: 14px; line-height: 1.5;
     }
-    .home-live {
-        display: inline-flex; align-items: center; gap: 10px;
-        font-size: 12px; font-weight: 600; color: var(--text-muted);
-        padding: 8px 14px; border-radius: 999px;
-        background: var(--glass-bg); border: 1px solid var(--glass-border);
-        backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    }
-    .home-live .pulse {
-        width: 8px; height: 8px; border-radius: 50%;
-        background: var(--sber-green);
-        box-shadow: 0 0 0 0 rgba(10, 128, 59, 0.4);
-        animation: homePulse 2s infinite;
-    }
-    .home-live[data-state="error"] .pulse { background: #EB5757; box-shadow: 0 0 0 0 rgba(235, 87, 87, 0.4); }
-    .home-live[data-state="error"] { color: #B53030; }
-    [data-theme="dark"] .home-live[data-state="error"] { color: #EB5757; }
     @keyframes homePulse {
         0%   { box-shadow: 0 0 0 0 rgba(10, 128, 59, 0.35); }
         70%  { box-shadow: 0 0 0 10px rgba(10, 128, 59, 0); }
@@ -140,7 +124,10 @@
         display: flex; flex-direction: column; gap: 6px; min-width: 0;
         backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         transition: var(--transition);
+        color: var(--text-main); text-decoration: none;
     }
+    a.home-kpi-card { cursor: pointer; }
+    a.home-kpi-card:hover { text-decoration: none; color: var(--text-main); }
     .home-kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
     .home-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .home-kpi-icon {
@@ -167,9 +154,11 @@
     /* ---------- Dashboard grid ---------- */
     .home-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
-        gap: 20px; align-items: start;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px; align-items: stretch;
     }
+    .home-grid > .home-panel { min-width: 0; }
+    .home-grid > .home-panel-wide { grid-column: 1 / -1; }
     @media (max-width: 1100px) { .home-grid { grid-template-columns: 1fr; } }
 
     .home-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
@@ -200,40 +189,44 @@
     /* ---------- Events ---------- */
     .home-event-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 14px;
+        grid-template-columns: 1fr;
+        gap: 8px;
     }
-    @media (max-width: 720px) { .home-event-grid { grid-template-columns: 1fr; } }
+    a.home-event-card, a.home-speaker-row { text-decoration: none; color: inherit; }
+    a.home-event-card:focus-visible, a.home-speaker-row:focus-visible {
+        outline: 2px solid var(--sber-green); outline-offset: 2px;
+    }
+    a.home-timeline-item { text-decoration: none; color: inherit; display: block; cursor: pointer; }
+    a.home-timeline-item:hover .home-timeline-title { color: var(--sber-green); }
     .home-event-card {
-        position: relative; padding: 16px; border-radius: 18px;
+        position: relative; padding: 10px 12px; border-radius: 14px;
         border: 1px solid var(--border-color); background: var(--panel-bg);
         transition: var(--transition);
-        display: flex; flex-direction: column; gap: 10px; min-width: 0;
+        display: flex; flex-direction: column; gap: 6px; min-width: 0;
     }
     .home-event-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 14px 28px rgba(10, 128, 59, 0.08);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(10, 128, 59, 0.08);
         border-color: rgba(10, 128, 59, 0.22);
     }
     .home-event-meta {
         display: flex; justify-content: space-between; align-items: center; gap: 10px;
     }
     .home-event-date {
-        font-size: 12px; font-weight: 700; color: var(--sber-green);
+        font-size: 11px; font-weight: 700; color: var(--sber-green);
         text-transform: uppercase; letter-spacing: 0.06em;
     }
     .home-event-name {
-        margin: 0; font-size: 16px; line-height: 1.3;
+        margin: 0; font-size: 14px; line-height: 1.25;
         font-weight: 700; color: var(--text-main);
         word-break: break-word;
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+        overflow: hidden;
     }
-    .home-event-desc {
-        margin: 0; color: var(--text-muted); font-size: 13px;
-        line-height: 1.55;
-    }
+    .home-event-desc { display: none; }
     .home-event-footer {
         display: flex; justify-content: space-between; gap: 10px;
-        align-items: center; font-size: 12px; color: var(--text-muted);
+        align-items: center; font-size: 11px; color: var(--text-muted);
         margin-top: auto;
     }
     .home-event-footer .loc {
@@ -241,6 +234,7 @@
         min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .badge-future { background: var(--status-future-bg); color: var(--status-future-color); border: 1px solid var(--status-future-color); padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .badge-past { background: var(--status-past-bg); color: var(--status-past-color); border: 1px solid var(--status-past-color); padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
     .badge-external { background: var(--light-green); color: var(--sber-green-hover); border: 1px solid var(--sber-green); padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
 
     /* ---------- Speakers ---------- */
@@ -352,60 +346,249 @@
             <img class="hero-logo" src="data:image/svg+xml;charset=utf-8,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='50,5 61,35 95,35 68,55 78,85 50,65 22,85 32,55 5,35 39,35' fill='%230A803B'/%3E%3Cpath d='M20,80 L55,45 L65,55 L90,20' fill='none' stroke='white' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E" alt="Starlift Logo">
             STARLIFT
         </h1>
-        <p class="hero-subtitle">Оперативный центр по спикерам, ближайшим мероприятиям и активности команды</p>
+        <p class="hero-subtitle">Единая система скаутинга спикерских талантов</p>
 
-        <div class="prompt-container">
-            <input type="text" class="prompt-input" placeholder="Добавьте свои данные или задайте вопрос..." aria-label="Будущий ввод для чата">
-            <button class="voice-btn" type="button" aria-label="Голосовой ввод">
-                <i class="fa-solid fa-microphone"></i>
-            </button>
-        </div>
+        {% if user.is_authenticated and user.profile.is_member %}
+        <section class="home-chat-card home-chat-card--collapsed animate-fade" id="home-chat-card">
+            <div class="assistant-chat-root"
+                 data-csrf="{{ csrf_token }}"
+                 data-user-avatar="{{ header_avatar_url }}"
+                 data-user-initial="{{ user.first_name|default:user.username|slice:':1'|upper }}"
+                 data-hydrate="lazy">
 
-        <div class="home-live" id="home-live" data-state="idle" title="Статус подключения к данным" style="margin-top: 16px;">
-            <span class="pulse"></span>
-            <span id="home-live-label">Подключение…</span>
-        </div>
+                <div class="home-chat-thread-wrap" id="home-chat-thread-wrap">
+                    <div class="home-chat-thread-inner">
+                        <div class="home-chat-thread-header">
+                            <div class="home-chat-thread-title">
+                                <div class="chat-header-avatar"><i class="fa-solid fa-robot"></i></div>
+                                <span class="assistant-drawer-name">Агент STARLIFT</span>
+                            </div>
+                            <div class="home-chat-thread-actions">
+                                <button type="button" class="assistant-drawer-action" data-chat-clear-proxy title="Очистить беседу">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                                <button type="button" class="assistant-drawer-action" id="home-chat-collapse" title="Свернуть">
+                                    <i class="fa-solid fa-chevron-up"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div data-chat-thread class="chat-thread home-chat-thread"></div>
+                    </div>
+                </div>
+
+                <div class="chat-composer home-chat-composer">
+                    <div class="chat-composer-row">
+                        <textarea data-chat-input class="chat-input" rows="1"
+                                  placeholder="Напишите ваш вопрос…" autocomplete="off"></textarea>
+                        <button data-chat-send class="chat-send" type="button" aria-label="Отправить">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    <div class="chat-composer-hint" hidden>
+                        <span data-chat-status></span>
+                    </div>
+                </div>
+
+                <button type="button" class="home-chat-clear-real" data-chat-clear hidden></button>
+            </div>
+        </section>
+
+        <script>
+        (function () {
+            const card = document.getElementById('home-chat-card');
+            if (!card) return;
+            const input = card.querySelector('[data-chat-input]');
+            const sendBtn = card.querySelector('[data-chat-send]');
+            const collapseBtn = document.getElementById('home-chat-collapse');
+            const proxyClear = card.querySelector('[data-chat-clear-proxy]');
+            const realClear = card.querySelector('.home-chat-clear-real');
+
+            function setCollapsed(collapsed) {
+                card.classList.toggle('home-chat-card--collapsed', collapsed);
+            }
+
+            function expandIfNeeded() {
+                if (card.classList.contains('home-chat-card--collapsed')) {
+                    setCollapsed(false);
+                }
+                // Гидратация делается самим widget.send() при отсутствии conversationId,
+                // не дублируем тут — иначе вторая hydrate-резолюция стирает thread.innerHTML
+                // и убивает только что появившиеся пузыри сообщений.
+            }
+
+            // Раскрытие при первой отправке (Enter без Shift или клик по самолётику)
+            if (input) {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && (input.value || '').trim()) {
+                        expandIfNeeded();
+                    }
+                });
+            }
+            if (sendBtn) {
+                sendBtn.addEventListener('click', () => {
+                    if ((input && input.value.trim())) expandIfNeeded();
+                });
+            }
+
+            // «Свернуть» возвращает компактный вид
+            if (collapseBtn) {
+                collapseBtn.addEventListener('click', () => setCollapsed(true));
+            }
+
+            // Прокси на скрытую кнопку очистки виджета
+            if (proxyClear && realClear) {
+                proxyClear.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    realClear.click();
+                });
+            }
+        })();
+        </script>
+
+        <style>
+            .home-chat-card {
+                width: 100%;
+                max-width: 760px;
+                margin: 22px auto 0;
+                background: var(--white);
+                -webkit-backdrop-filter: blur(14px);
+                backdrop-filter: blur(14px);
+                border: 1px solid var(--border-color);
+                border-radius: 20px;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                box-shadow: 0 10px 28px rgba(10, 128, 59, 0.08);
+                text-align: left;
+                transition: box-shadow 0.25s ease, border-color 0.25s ease;
+            }
+            .home-chat-card > .assistant-chat-root {
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+            }
+
+            /* Лента сообщений сворачивается через grid-rows 0fr ↔ 1fr */
+            .home-chat-thread-wrap {
+                display: grid;
+                grid-template-rows: 1fr;
+                transition: grid-template-rows 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+                min-height: 0;
+            }
+            .home-chat-card--collapsed .home-chat-thread-wrap {
+                grid-template-rows: 0fr;
+            }
+            .home-chat-thread-inner {
+                min-height: 0;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                opacity: 1;
+                transition: opacity 0.22s ease;
+            }
+            .home-chat-card--collapsed .home-chat-thread-inner {
+                opacity: 0;
+                pointer-events: none;
+            }
+
+            .home-chat-thread-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                padding: 12px 16px;
+                border-bottom: 1px solid var(--border-color);
+                flex-shrink: 0;
+            }
+            .home-chat-thread-title {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-width: 0;
+            }
+            .home-chat-thread-actions { display: flex; gap: 6px; }
+
+            .home-chat-thread.home-chat-thread {
+                flex: 1;
+                min-height: 260px;
+                max-height: 460px;
+                padding: 18px 20px 8px;
+                overflow-y: auto;
+            }
+
+            /* Composer — всегда видимый, в collapsed-режиме это и есть точка входа */
+            .home-chat-composer.home-chat-composer {
+                flex-shrink: 0;
+                padding: 12px 14px 14px;
+                background: transparent;
+                border-top: 1px solid var(--border-color);
+                transition: border-top-color 0.25s ease;
+            }
+            .home-chat-card--collapsed .home-chat-composer.home-chat-composer {
+                border-top-color: transparent;
+            }
+
+            @media (max-width: 700px) {
+                .home-chat-card { margin: 16px 8px 0; border-radius: 16px; }
+                .home-chat-thread.home-chat-thread { max-height: 60vh; }
+            }
+        </style>
+        {% endif %}
+
     </div>
 
     <div class="home-kpi-grid" id="home-kpi-grid"></div>
 
     <div class="home-grid">
-        <div class="home-col">
-            <section class="home-panel" aria-live="polite">
-                <div class="home-panel-header">
-                    <div>
-                        <h2 class="home-panel-title"><i class="fa-regular fa-calendar-days"></i> Ближайшие мероприятия</h2>
-                        <p class="home-panel-sub">События на горизонте, отсортированы по дате</p>
-                    </div>
-                    <span class="home-panel-tag" id="home-upcoming-tag">—</span>
+        <section class="home-panel" aria-live="polite">
+            <div class="home-panel-header">
+                <div>
+                    <h2 class="home-panel-title"><i class="fa-regular fa-calendar-days"></i> Ближайшие мероприятия</h2>
+                    <p class="home-panel-sub">События на горизонте, отсортированы по дате</p>
                 </div>
-                <div id="home-upcoming" class="home-event-grid"></div>
-            </section>
+                <span class="home-panel-tag" id="home-upcoming-tag">—</span>
+            </div>
+            <div id="home-upcoming" class="home-event-grid"></div>
+        </section>
 
-            <section class="home-panel" aria-live="polite">
-                <div class="home-panel-header">
-                    <div>
-                        <h2 class="home-panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Лента активности</h2>
-                        <p class="home-panel-sub">Отзывы, новые спикеры и мероприятия за последние 60 дней</p>
-                    </div>
-                    <span class="home-panel-tag" id="home-activity-tag">—</span>
+        {% if show_top_speakers %}
+        <section class="home-panel" aria-live="polite">
+            <div class="home-panel-header">
+                <div>
+                    <h2 class="home-panel-title"><i class="fa-solid fa-medal"></i> Топ спикеров</h2>
+                    <p class="home-panel-sub">Сортировка: средний балл → количество отзывов</p>
                 </div>
-                <div id="home-activity" class="home-timeline"></div>
-            </section>
-        </div>
+                <span class="home-panel-tag" id="home-top-tag">—</span>
+            </div>
+            <div id="home-top-speakers" class="home-speaker-list"></div>
+        </section>
+        {% endif %}
 
-        <div class="home-col">
-            <section class="home-panel" aria-live="polite">
-                <div class="home-panel-header">
-                    <div>
-                        <h2 class="home-panel-title"><i class="fa-solid fa-medal"></i> Топ спикеров</h2>
-                        <p class="home-panel-sub">Сортировка: средний балл → количество отзывов</p>
-                    </div>
-                    <span class="home-panel-tag" id="home-top-tag">—</span>
+        {% if show_your_events %}
+        <section class="home-panel" aria-live="polite">
+            <div class="home-panel-header">
+                <div>
+                    <h2 class="home-panel-title"><i class="fa-regular fa-calendar-check"></i> Ваши мероприятия</h2>
+                    <p class="home-panel-sub">Ваши предстоящие и прошедшие выступления</p>
                 </div>
-                <div id="home-top-speakers" class="home-speaker-list"></div>
-            </section>
-        </div>
+                <span class="home-panel-tag" id="home-your-events-tag">—</span>
+            </div>
+            <div id="home-your-events" class="home-event-grid"></div>
+        </section>
+        {% endif %}
+
+        {% if show_activity %}
+        <section class="home-panel home-panel-wide" aria-live="polite">
+            <div class="home-panel-header">
+                <div>
+                    <h2 class="home-panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Лента активности</h2>
+                    <p class="home-panel-sub">Отзывы, новые спикеры и мероприятия за последние 60 дней</p>
+                </div>
+                <span class="home-panel-tag" id="home-activity-tag">—</span>
+            </div>
+            <div id="home-activity" class="home-timeline"></div>
+        </section>
+        {% endif %}
     </div>
 </div>
 
@@ -452,6 +635,8 @@
         upcomingTag: document.getElementById('home-upcoming-tag'),
         top: document.getElementById('home-top-speakers'),
         topTag: document.getElementById('home-top-tag'),
+        yourEvents: document.getElementById('home-your-events'),
+        yourEventsTag: document.getElementById('home-your-events-tag'),
         activity: document.getElementById('home-activity'),
         activityTag: document.getElementById('home-activity-tag'),
         live: document.getElementById('home-live'),
@@ -523,28 +708,31 @@
                 icon: 'fa-users', label: 'Всего спикеров',
                 value: fmtCount(k.total_speakers),
                 hint: 'В базе StarLift',
+                href: '/speakers/',
             },
             {
                 icon: 'fa-bolt', label: 'Активных спикеров',
                 value: fmtCount(k.active_speakers),
                 hint: `С отзывами за последние ${windowDays} дн.`,
                 accent: true,
+                href: '/speakers/?filter=active',
             },
             {
                 icon: 'fa-user-plus', label: 'Новые спикеры',
                 value: fmtCount(k.new_speakers),
                 hint: 'За последние 30 дней',
+                href: '/speakers/?filter=new',
             },
         ];
         els.kpi.innerHTML = cards.map(c => `
-            <div class="home-kpi-card ${c.accent ? 'accent' : ''}">
+            <a class="home-kpi-card ${c.accent ? 'accent' : ''}" href="${escapeHtml(c.href)}">
                 <div class="home-kpi-top">
                     <span class="home-kpi-label">${escapeHtml(c.label)}</span>
                     <span class="home-kpi-icon"><i class="fa-solid ${c.icon}"></i></span>
                 </div>
                 <div class="home-kpi-value">${escapeHtml(String(c.value))}</div>
                 <div class="home-kpi-hint">${escapeHtml(c.hint || '')}</div>
-            </div>
+            </a>
         `).join('');
     }
 
@@ -574,8 +762,9 @@
             const speakers = ev.speakers_count
                 ? `<span><i class="fa-solid fa-people-group"></i> ${fmtCount(ev.speakers_count)}</span>`
                 : '';
+            const href = ev.id ? `/events/#event-${ev.id}` : '/events/';
             return `
-                <article class="home-event-card">
+                <a class="home-event-card" href="${href}">
                     <div class="home-event-meta">
                         <span class="home-event-date"><i class="fa-regular fa-clock"></i> ${dateLabel}</span>
                         <span class="badge-future">Планируется</span>
@@ -589,12 +778,13 @@
                             ${externalBadge}
                         </span>
                     </div>
-                </article>`;
+                </a>`;
         }).join('');
         els.upcomingTag.textContent = `${events.length} ${plural(events.length, ['событие', 'события', 'событий'])}`;
     }
 
     function renderTopSpeakers(speakers) {
+        if (!els.top) return;  // panel hidden for non-admin/devrel roles
         if (!speakers || !speakers.length) {
             els.top.innerHTML = `
                 <div class="home-empty">
@@ -613,8 +803,9 @@
                 ? '<span class="recommended-flag-inline" title="DevRel рекомендует">★</span>'
                 : '';
             const subParts = [sp.stack, sp.city].filter(Boolean).map(escapeHtml).join(' · ');
+            const href = sp.id ? `/speakers/#open-speaker-${sp.id}` : '/speakers/';
             return `
-                <div class="home-speaker-row">
+                <a class="home-speaker-row" href="${href}">
                     ${avatar}
                     <div class="home-speaker-meta">
                         <div class="home-speaker-name">
@@ -628,12 +819,61 @@
                         <span class="home-nps-pill"><i class="fa-solid fa-star"></i> ${escapeHtml(avg)}</span>
                         <small>${fmtCount(sp.feedbacks_count)} ${plural(sp.feedbacks_count, ['отзыв','отзыва','отзывов'])} · ${fmtCount(sp.events_count)} ${plural(sp.events_count, ['событие','события','событий'])}</small>
                     </div>
-                </div>`;
+                </a>`;
         }).join('');
         els.topTag.textContent = `TOP ${speakers.length}`;
     }
 
+    function renderYourEvents(events) {
+        if (!els.yourEvents) return;  // panel shown only to speakers with a linked card
+        if (!events || !events.length) {
+            els.yourEvents.innerHTML = `
+                <div class="home-empty" style="grid-column: 1 / -1;">
+                    <i class="fa-regular fa-calendar"></i>
+                    У вас пока нет мероприятий.
+                    <div style="margin-top:4px; font-size:12px;">Подайте заявку или дождитесь, пока вас добавят к событию.</div>
+                </div>`;
+            els.yourEventsTag.textContent = '0 событий';
+            return;
+        }
+        els.yourEvents.innerHTML = events.map(ev => {
+            const title = escapeHtml(ev.title || 'Без названия');
+            const dateLabel = escapeHtml(fmtEventDate(ev.date_iso, ev.date_label));
+            const isPast = ev.status === 'past';
+            const statusBadge = isPast
+                ? '<span class="badge-past">Прошло</span>'
+                : '<span class="badge-future">Планируется</span>';
+            const location = ev.location
+                ? `<span class="loc"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(ev.location)}</span>`
+                : '<span class="loc"><i class="fa-solid fa-globe"></i> Онлайн / место уточняется</span>';
+            const externalBadge = ev.is_external
+                ? '<span class="badge-external"><i class="fa-solid fa-arrow-up-right-from-square"></i> Внешнее</span>'
+                : '';
+            const feedbacks = ev.fb_count
+                ? `<span><i class="fa-solid fa-comment-dots"></i> ${fmtCount(ev.fb_count)} ${plural(ev.fb_count, ['отзыв','отзыва','отзывов'])}</span>`
+                : '';
+            const href = ev.id ? `/events/#event-${ev.id}` : '/events/';
+            return `
+                <a class="home-event-card" href="${href}">
+                    <div class="home-event-meta">
+                        <span class="home-event-date"><i class="fa-regular fa-clock"></i> ${dateLabel}</span>
+                        ${statusBadge}
+                    </div>
+                    <h3 class="home-event-name">${title}</h3>
+                    <div class="home-event-footer">
+                        ${location}
+                        <span style="display:inline-flex; gap:10px; align-items:center;">
+                            ${feedbacks}
+                            ${externalBadge}
+                        </span>
+                    </div>
+                </a>`;
+        }).join('');
+        els.yourEventsTag.textContent = `${events.length} ${plural(events.length, ['событие', 'события', 'событий'])}`;
+    }
+
     function renderActivity(items) {
+        if (!els.activity) return;  // activity feed hidden for non-admin/devrel roles
         if (!items || !items.length) {
             els.activity.innerHTML = `
                 <div class="home-empty">
@@ -645,8 +885,14 @@
             return;
         }
         els.activity.classList.add('home-timeline');
-        els.activity.innerHTML = items.map(it => `
-            <div class="home-timeline-item home-timeline-type-${escapeHtml(it.type)}">
+        els.activity.innerHTML = items.map(it => {
+            let href = null;
+            if (it.event_id) href = `/events/#event-${it.event_id}`;
+            else if (it.speaker_id) href = `/speakers/#open-speaker-${it.speaker_id}`;
+            const tag = href ? 'a' : 'div';
+            const hrefAttr = href ? ` href="${href}"` : '';
+            return `
+            <${tag} class="home-timeline-item home-timeline-type-${escapeHtml(it.type)}"${hrefAttr}>
                 <span class="home-timeline-dot"></span>
                 <div class="home-timeline-time">${escapeHtml(fmtRelTime(it.timestamp))}</div>
                 <div class="home-timeline-title">
@@ -654,7 +900,8 @@
                     ${escapeHtml(it.title)}
                 </div>
                 ${it.subtitle ? `<div class="home-timeline-sub">${escapeHtml(it.subtitle)}</div>` : ''}
-            </div>`).join('');
+            </${tag}>`;
+        }).join('');
         els.activityTag.textContent = `${items.length} ${plural(items.length, ['событие', 'события', 'событий'])}`;
     }
 
@@ -675,7 +922,8 @@
                 <div class="skeleton skeleton-row" style="width:80%;">.</div>
                 <div class="skeleton skeleton-row" style="width:55%;">.</div>
             </div>`).join('');
-        els.top.innerHTML = Array.from({ length: 4 }).map(() => `
+        if (els.top) {
+            els.top.innerHTML = Array.from({ length: 4 }).map(() => `
             <div class="home-speaker-row">
                 <div class="skeleton" style="width:44px; height:44px; border-radius:50%;">.</div>
                 <div style="display:flex; flex-direction:column; gap:6px;">
@@ -684,18 +932,30 @@
                 </div>
                 <div class="skeleton" style="width:60px; height:26px; border-radius:999px;">.</div>
             </div>`).join('');
-        els.activity.classList.remove('home-timeline');
-        els.activity.innerHTML = Array.from({ length: 5 }).map(() => `
+        }
+        if (els.yourEvents) {
+            els.yourEvents.innerHTML = Array.from({ length: 4 }).map(() => `
+            <div class="home-event-card">
+                <div class="skeleton skeleton-row" style="width:40%;">.</div>
+                <div class="skeleton" style="height:20px; width:90%;">.</div>
+                <div class="skeleton skeleton-row" style="width:55%;">.</div>
+            </div>`).join('');
+        }
+        if (els.activity) {
+            els.activity.classList.remove('home-timeline');
+            els.activity.innerHTML = Array.from({ length: 5 }).map(() => `
             <div style="padding:6px 0;">
                 <div class="skeleton skeleton-row" style="width:25%; height:10px; margin-bottom:6px;">.</div>
                 <div class="skeleton skeleton-row" style="width:80%;">.</div>
             </div>`).join('');
+        }
     }
 
     function applyData(data) {
         renderKpis(data.kpis || {}, state.filters);
         renderUpcoming(data.upcoming_events || []);
         renderTopSpeakers(data.top_speakers || []);
+        renderYourEvents(data.your_events || []);
         renderActivity(data.activity || []);
         state.rendered = true;
     }

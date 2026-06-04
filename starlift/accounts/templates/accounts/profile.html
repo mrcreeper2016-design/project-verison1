@@ -1,11 +1,12 @@
-{% extends 'base.html' %}
+{% extends 'me/_base.html' %}
 
-{% block content %}
+{% block me_subtitle %}{% if speaker_card_linked %}Имя, фото и описание — как в списке спикеров на платформе.{% elif is_speaker_role %}Имя, фото и текст о себе. После привязки карточки спикера поле «Описание» появится здесь же.{% else %}Имя, фамилия, email, пароль и краткая информация. Изменения сохраняются сразу.{% endif %}{% endblock %}
+
+{% block me_header_extra %}<span class="role-badge"><i class="fa-solid fa-id-badge"></i> {{ profile.get_role_display }}</span>{% endblock %}
+
+{% block me_content %}
 <style>
     .profile-page { display: grid; gap: 20px; max-width: 980px; }
-    .profile-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
-    .profile-title { margin: 0; font-size: clamp(26px, 3vw, 36px); font-weight: 800; letter-spacing: -0.03em; color: var(--text-main); }
-    .profile-subtitle { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; line-height: 1.5; }
     .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
     @media (max-width: 900px) { .profile-grid { grid-template-columns: 1fr; } }
     .profile-card { display: grid; gap: 16px; padding: 24px; }
@@ -23,25 +24,16 @@
     .alert-error { background: rgba(217,62,78,0.1); color: #D93E4E; border-color: rgba(217,62,78,0.3); }
     .readonly-box { padding: 12px 14px; background: var(--white); border: 1px solid var(--border-color); border-radius: 12px; font-size: 14px; color: var(--text-main); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
     .role-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 700; background: var(--light-green); color: var(--sber-green); border: 1px solid var(--border-color); }
+    .avatar-file-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .avatar-upload { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .avatar-upload-btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 12px; background: var(--white); color: var(--text-main); border: 1px solid var(--border-color); font-size: 13px; font-weight: 600; cursor: pointer; transition: var(--transition); user-select: none; }
+    .avatar-upload-btn:hover { border-color: var(--sber-green); background: var(--light-green); color: var(--sber-green); }
+    .avatar-upload-btn i { color: var(--sber-green); }
+    .avatar-file-name { font-size: 12px; color: var(--text-muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .avatar-file-name.has-file { color: var(--sber-green); font-weight: 600; }
 </style>
 
 <div class="profile-page">
-    <div class="profile-header animate-fade">
-        <div>
-            <h1 class="profile-title">Личный кабинет</h1>
-            <p class="profile-subtitle">
-                {% if speaker_card_linked %}
-                Имя, фото и описание — как в списке спикеров на платформе.
-                {% elif is_speaker_role %}
-                Имя, фото и текст о себе. После привязки карточки спикера поле «Описание» появится здесь же.
-                {% else %}
-                Имя, фамилия, email, пароль и краткая информация. Изменения сохраняются сразу.
-                {% endif %}
-            </p>
-        </div>
-        <span class="role-badge"><i class="fa-solid fa-id-badge"></i> {{ profile.get_role_display }}</span>
-    </div>
-
     {% if messages %}
         {% for msg in messages %}
         <div class="alert-inline {% if msg.tags == 'error' %}alert-error{% elif msg.tags == 'success' %}alert-success{% else %}alert-warning{% endif %}">{{ msg }}</div>
@@ -69,7 +61,21 @@
                         </div>
                         {% endif %}
                         <div style="display:grid; gap:6px;">
-                            {{ form.avatar }}
+                            <div class="avatar-upload">
+                                {{ form.avatar }}
+                                <label for="{{ form.avatar.id_for_label }}" class="avatar-upload-btn">
+                                    {% if profile.avatar_url or linked_speaker.card_avatar_url %}
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> Заменить фото
+                                    {% else %}
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> Выбрать файл
+                                    {% endif %}
+                                </label>
+                                {% if profile.avatar_url or linked_speaker.card_avatar_url %}
+                                <span class="avatar-file-name has-file" id="avatarFileName" data-empty="Текущее фото загружено">Текущее фото загружено</span>
+                                {% else %}
+                                <span class="avatar-file-name" id="avatarFileName" data-empty="Файл не выбран">Файл не выбран</span>
+                                {% endif %}
+                            </div>
                             <span style="font-size:12px; color:var(--text-muted);">JPG/PNG/WEBP, до 10 МБ — одно фото для аккаунта и карточки спикера.</span>
                         </div>
                     </div>
@@ -97,13 +103,11 @@
                     Карточка спикера в базе ещё не привязана. Обратитесь к администратору — после привязки здесь же появится поле «Описание» для ленты спикеров.
                 </div>
                 {% endif %}
-                {% if speaker_card_linked %}
                 <div class="form-row">
-                    <label for="{{ form.company.id_for_label }}">{{ form.company.label }}</label>
-                    {{ form.company }}
+                    <label>{{ form.company.label }}</label>
+                    {% include "accounts/_company_picker.html" with name="company" selected=form.company.value options=allowed_companies %}
                     {% if form.company.errors %}<div class="field-errors">{% for e in form.company.errors %}<p>{{ e }}</p>{% endfor %}</div>{% endif %}
                 </div>
-                {% endif %}
                 <div class="form-row">
                     {% if speaker_card_linked %}
                     <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
@@ -119,6 +123,23 @@
                     <button type="submit" class="btn-action btn-contact"><i class="fa-solid fa-floppy-disk"></i> Сохранить</button>
                 </div>
             </form>
+            <script>
+            (function() {
+                const input = document.getElementById('{{ form.avatar.id_for_label }}');
+                const label = document.getElementById('avatarFileName');
+                if (!input || !label) return;
+                input.addEventListener('change', () => {
+                    const file = input.files && input.files[0];
+                    if (file) {
+                        label.textContent = file.name;
+                        label.classList.add('has-file');
+                    } else {
+                        label.textContent = label.dataset.empty || 'Файл не выбран';
+                        label.classList.remove('has-file');
+                    }
+                });
+            })();
+            </script>
         </div>
         </div>
 
@@ -157,56 +178,11 @@
             {% if profile.role == 'speaker' %}
             <div class="content-block profile-card animate-fade" style="animation-delay:0.20s;">
                 <div class="section-title"><i class="fa-solid fa-inbox"></i> Мои заявки</div>
-                <div id="myRequestsList" style="display:grid; gap:10px; font-size:13px;">
-                    <p style="margin:0; color:var(--text-muted);">Загрузка…</p>
+                <p style="margin:0; color:var(--text-muted); font-size:13px;">Подача заявок на участие и просмотр их статусов вынесены в отдельный раздел.</p>
+                <div>
+                    <a href="{% url 'me_requests' %}" class="btn-action btn-contact" style="text-decoration:none;"><i class="fa-solid fa-paper-plane"></i> Открыть мои заявки</a>
                 </div>
             </div>
-            <script>
-            (function() {
-                const STATUS_CHIP = {
-                    pending: '<span style="display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; background:rgba(224,165,0,0.15); color:#B87C00;">На рассмотрении</span>',
-                    approved: '<span style="display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; background:var(--light-green); color:var(--sber-green);">Одобрено</span>',
-                    rejected: '<span style="display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; background:rgba(217,62,78,0.1); color:#D93E4E;">Отклонено</span>',
-                };
-                function escapeHtml(s) {
-                    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-                }
-                fetch('/api/my-event-requests/', { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                    .then(r => r.ok ? r.json() : { requests: [] })
-                    .then(data => {
-                        const list = document.getElementById('myRequestsList');
-                        if (!list) return;
-                        const items = data.requests || [];
-                        if (!items.length) {
-                            list.innerHTML = '<p style="margin:0; color:var(--text-muted);">Заявок пока нет.</p>';
-                            return;
-                        }
-                        list.innerHTML = items.map(r => {
-                            const head = r.kind === 'create'
-                                ? `<i class="fa-solid fa-plus-circle" style="color:var(--sber-green);"></i> ${escapeHtml(r.proposed_title)}`
-                                : `<i class="fa-solid fa-user-plus" style="color:var(--sber-green);"></i> ${escapeHtml(r.event ? r.event.title : '—')}`;
-                            const meta = [];
-                            if (r.topic) meta.push('Тема: ' + escapeHtml(r.topic));
-                            if (r.proposed_event_date) meta.push('Дата: ' + escapeHtml(r.proposed_event_date));
-                            if (r.proposed_location) meta.push(escapeHtml(r.proposed_location));
-                            const rejected = r.status === 'rejected' && r.rejection_reason
-                                ? `<div style="margin-top:6px; padding:8px; border-radius:8px; background:rgba(217,62,78,0.07); color:#D93E4E; font-size:12px;"><strong>Причина отказа:</strong> ${escapeHtml(r.rejection_reason)}</div>`
-                                : '';
-                            return `<div style="padding:10px 12px; border:1px solid var(--border-color); border-radius:12px;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-                                    <strong>${head}</strong>${STATUS_CHIP[r.status] || ''}
-                                </div>
-                                ${meta.length ? `<div style="margin-top:4px; color:var(--text-muted); font-size:12px;">${meta.join(' · ')}</div>` : ''}
-                                ${rejected}
-                            </div>`;
-                        }).join('');
-                    })
-                    .catch(() => {
-                        const list = document.getElementById('myRequestsList');
-                        if (list) list.innerHTML = '<p style="margin:0; color:#D93E4E;">Не удалось загрузить заявки.</p>';
-                    });
-            })();
-            </script>
             {% endif %}
         </div>
     </div>

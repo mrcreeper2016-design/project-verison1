@@ -1,6 +1,7 @@
-﻿import base64
+import base64
 import json
 import logging
+import os
 import re
 from datetime import date
 from io import BytesIO
@@ -21,7 +22,12 @@ from accounts.services.speaker_avatar import mirror_speaker_uploaded_avatar_to_p
 from . import analytics as analytics_lib
 from . import home_metrics
 from .forms import FeedbackForm, SpeakerForm, SpeakerSelfEditForm
-from .models import Event, EventRequest, Feedback, Speaker
+from .models import Event, EventInvitation, EventRequest, Feedback, Speaker, SpeakerApplication, SpeakerEventRating, SpeakerLike
+from .permissions import get_speaker_for_user, is_platform_admin
+
+# Backwards-compatible local aliases (kept so existing call sites stay unchanged).
+_is_platform_admin = is_platform_admin
+_get_speaker_for_user = get_speaker_for_user
 
 RU_MONTHS_GEN = {
     "января": 1,
@@ -262,17 +268,21 @@ def explore_view(request):
 def index_view(request):
     """Home dashboard shell.
 
-    The page is fully data-driven via ``home_api``; we only hand the template
-    initial filter options so the dropdowns are usable before the first poll
-    finishes.
+    The page is fully data-driven via ``home_api``. A compact prompt input
+    sits in the hero section as a quick launcher for the floating assistant
+    chat (which also renders globally via base.html).
     """
     options = home_metrics.filter_options()
+    is_admin = _is_platform_admin(request.user)
     context = {
         "home_period_presets": home_metrics.ALLOWED_PERIODS,
         "home_default_period": home_metrics.DEFAULT_PERIOD_DAYS,
         "home_cities": options["cities"],
         "home_topics": options["topics"],
         "home_poll_interval_ms": 15000,
+        "show_top_speakers": is_admin,
+        "show_activity": is_admin,
+        "show_your_events": (not is_admin) and _get_speaker_for_user(request.user) is not None,
     }
     return render(request, 'index.html', context)
 
@@ -288,10 +298,49 @@ def home_api(request):
     re-rendering when the version hasn't changed.
     """
     filters = home_metrics.parse_filters(request.GET)
-    payload = home_metrics.build_home(filters)
+    is_admin = _is_platform_admin(request.user)
+    viewer_speaker = None if is_admin else _get_speaker_for_user(request.user)
+    payload = home_metrics.build_home(
+        filters,
+        include_top_speakers=is_admin,
+        include_activity=is_admin,
+        viewer_speaker=viewer_speaker,
+    )
     response = JsonResponse(payload)
     response["Cache-Control"] = "no-store"
     return response
+
+def _serialize_speaker_feedbacks(speaker):
+    """Объединённая лента для модалки спикера: отзывы зрителей (audience) +
+    собственные оценки спикера за мероприятия (self_event), помечены
+    через `kind` для отрисовки золотым в шаблоне.
+    """
+    items = []
+    for f in speaker.feedbacks.all():
+        items.append(
+            {
+                "kind": "audience",
+                "score": f.score,
+                "comment": f.comment or "",
+                "date": f.created_at.strftime("%d.%m.%Y %H:%M"),
+                "date_iso": f.created_at.isoformat(),
+                "event_title": f.event.title if f.event else "",
+            }
+        )
+    for r in speaker.event_ratings.all():
+        items.append(
+            {
+                "kind": "self_event",
+                "score": r.score,
+                "comment": r.comment or "",
+                "date": r.created_at.strftime("%d.%m.%Y %H:%M"),
+                "date_iso": r.created_at.isoformat(),
+                "event_title": r.event.title if r.event else "",
+            }
+        )
+    items.sort(key=lambda x: x["date_iso"], reverse=True)
+    return items
+
 
 @member_required
 def speakers_view(request):
@@ -301,20 +350,13 @@ def speakers_view(request):
     speakers = Speaker.objects.prefetch_related(
         "events",
         Prefetch("feedbacks", queryset=Feedback.objects.select_related("event").order_by("-created_at")),
+        Prefetch("event_ratings", queryset=SpeakerEventRating.objects.select_related("event").order_by("-created_at")),
         Prefetch("user__profile", queryset=UserProfile.objects.only("user_id", "avatar")),
     ).all()
 
     speakers_data = []
     for speaker in speakers:
-        feedbacks_data = [
-            {
-                "score": f.score,
-                "comment": f.comment,
-                "date": f.created_at.strftime("%d.%m.%Y %H:%M"),
-                "event_title": f.event.title,
-            }
-            for f in speaker.feedbacks.all()
-        ]
+        feedbacks_data = _serialize_speaker_feedbacks(speaker)
         ev_list = []
         for e in speaker.events.all():
             st = (e.status or "").lower()
@@ -344,6 +386,7 @@ def speakers_view(request):
             "nps": round(float(speaker.nps), 1) if speaker.nps else 0,
             "img": speaker.img,
             "avatar": avatar,
+            "created_at": speaker.created_at.isoformat() if speaker.created_at else None,
             "events": ev_list,
             "feedbacks": feedbacks_data,
         })
@@ -354,7 +397,7 @@ def speakers_view(request):
 def events_view(request):
     return render(request, 'events.html')
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def analytics_view(request):
     filters = analytics_lib.parse_filters(request.GET)
     dashboard = analytics_lib.build_dashboard(filters)
@@ -379,26 +422,28 @@ def analytics_view(request):
 @member_required
 def speakers_api(request):
     try:
-        from django.db.models import Prefetch
+        from django.db.models import Count, Prefetch
         from accounts.models import UserProfile
 
+        # Только подтверждённые мероприятия — pending/rejected self-submissions
+        # не показываются в публичных списках спикеров.
+        verified_events_qs = Event.objects.filter(verification_status=Event.VERIFICATION_VERIFIED)
         speakers = Speaker.objects.prefetch_related(
-            "events",
+            Prefetch("events", queryset=verified_events_qs),
             Prefetch("feedbacks", queryset=Feedback.objects.select_related("event").order_by("-created_at")),
+            Prefetch("event_ratings", queryset=SpeakerEventRating.objects.select_related("event").order_by("-created_at")),
             Prefetch("user__profile", queryset=UserProfile.objects.only("user_id", "avatar")),
-        ).all()
+        ).annotate(like_count=Count("likes", distinct=True)).all()
+
+        liked_ids = set()
+        if getattr(request.user, "is_authenticated", False):
+            liked_ids = set(
+                SpeakerLike.objects.filter(user=request.user).values_list("speaker_id", flat=True)
+            )
 
         speakers_data = []
         for speaker in speakers:
-            feedbacks_data = [
-                {
-                    "score": f.score,
-                    "comment": f.comment,
-                    "date": f.created_at.strftime("%d.%m.%Y %H:%M"),
-                    "event_title": f.event.title,
-                }
-                for f in speaker.feedbacks.all()
-            ]
+            feedbacks_data = _serialize_speaker_feedbacks(speaker)
 
             ev_list = []
             for e in speaker.events.all():
@@ -436,8 +481,12 @@ def speakers_api(request):
                 "nps": round(float(speaker.nps), 1) if speaker.nps else 0,
                 "img": speaker.img,
                 "avatar": avatar,
+                "created_at": speaker.created_at.isoformat() if speaker.created_at else None,
                 "events": ev_list,
-                "feedbacks": feedbacks_data
+                "feedbacks": feedbacks_data,
+                "like_count": getattr(speaker, "like_count", 0),
+                "liked": speaker.id in liked_ids,
+                "recommended": bool(speaker.recommended),
             })
         return JsonResponse(speakers_data, safe=False)
     except Exception:
@@ -448,7 +497,14 @@ def speakers_api(request):
 def events_api(request):
     try:
         today = timezone.now().date()
-        events = Event.objects.prefetch_related("speakers").all()
+        events = Event.objects.filter(verification_status=Event.VERIFICATION_VERIFIED).prefetch_related("speakers").all()
+        # Подтягиваем оценки от спикеров одним запросом, группируем по event_id.
+        ratings_by_event: dict[int, list[SpeakerEventRating]] = {}
+        for r in (
+            SpeakerEventRating.objects.select_related("speaker")
+            .order_by("-updated_at")
+        ):
+            ratings_by_event.setdefault(r.event_id, []).append(r)
         events_data = []
         for event in events:
             desc = (event.description or "").strip()
@@ -485,6 +541,23 @@ def events_api(request):
             )
             display_status = "past" if is_past else (event.status or "future")
 
+            ratings = ratings_by_event.get(event.id, [])
+            if ratings:
+                avg_score = round(sum(r.score for r in ratings) / len(ratings), 1)
+                rating_items = [
+                    {
+                        "speaker_id": r.speaker_id,
+                        "speaker_name": r.speaker.name,
+                        "speaker_avatar": r.speaker.avatar_url,
+                        "score": r.score,
+                        "comment": r.comment or "",
+                    }
+                    for r in ratings
+                ]
+            else:
+                avg_score = None
+                rating_items = []
+
             events_data.append(
                 {
                     "id": event.id,
@@ -498,6 +571,13 @@ def events_api(request):
                     "description": event.description,
                     "schedule": event.schedule,
                     "speakers": speakers_data,
+                    "speaker_ratings": {
+                        "avg": avg_score,
+                        "count": len(ratings),
+                        "items": rating_items,
+                    },
+                    "application_deadline": event.application_deadline.isoformat() if event.application_deadline else None,
+                    "can_self_submit": event.can_self_submit(),
                 }
             )
 
@@ -519,7 +599,7 @@ def events_api(request):
         logger.exception("Error fetching events")
         return JsonResponse({"error": "Internal server error"}, status=500)
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def speaker_add(request):
     if request.method == 'POST':
         form = SpeakerForm(request.POST, request.FILES)
@@ -534,7 +614,7 @@ def speaker_add(request):
 def speaker_edit(request, pk):
     speaker = get_object_or_404(Speaker, pk=pk)
     profile = getattr(request.user, "profile", None)
-    is_admin = bool(request.user.is_superuser or (profile and profile.role == "admin"))
+    is_admin = bool(request.user.is_superuser or (profile and profile.role in ("admin", "devrel")))
     is_own_speaker = bool(profile and profile.role == "speaker" and speaker.user_id == request.user.id)
 
     if not is_admin and not is_own_speaker:
@@ -556,7 +636,7 @@ def speaker_edit(request, pk):
         form = form_cls(instance=speaker)
     return render(request, 'speaker_form.html', {'form': form, 'title': 'Редактировать спикера'})
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def speaker_delete(request, pk):
     speaker = get_object_or_404(Speaker, pk=pk)
     if request.method == 'POST':
@@ -564,72 +644,105 @@ def speaker_delete(request, pk):
         return redirect('speakers')
     return render(request, 'speaker_confirm_delete.html', {'speaker': speaker})
 
-def _is_platform_admin(user) -> bool:
-    if user.is_superuser:
-        return True
-    profile = getattr(user, "profile", None)
-    return bool(profile and profile.role == "admin")
-
 
 @member_required
 def qr_generator_view(request):
+    """QR generator with mutually-filtering speaker ↔ event comboboxes.
+
+    Pairs are restricted to actual M2M membership. Admin sees the full list;
+    a speaker sees only their own card. Data is embedded as JSON so the
+    client can autocomplete and cross-filter without extra round-trips.
+    """
     linked = Speaker.objects.filter(user=request.user).first()
-    if _is_platform_admin(request.user):
-        speakers = Speaker.objects.all().order_by("name")
-        events = Event.objects.all().order_by("title")
-        qr_self_only = False
-        qr_speaker_id = None
+    is_admin = _is_platform_admin(request.user)
+
+    if is_admin:
+        speaker_qs = Speaker.objects.all().prefetch_related("events").order_by("name")
     else:
-        speakers = []
-        qr_self_only = True
-        qr_speaker_id = linked.id if linked else None
-        events = (
-            linked.events.all().order_by("title")
+        speaker_qs = (
+            Speaker.objects.filter(pk=linked.pk).prefetch_related("events")
             if linked
-            else Event.objects.none()
+            else Speaker.objects.none()
         )
+
+    speakers_payload = []
+    event_index: dict[int, dict] = {}
+    for sp in speaker_qs:
+        sp_events = []
+        for ev in sp.events.all():
+            sp_events.append({"id": ev.id, "title": ev.title})
+            bucket = event_index.setdefault(
+                ev.id,
+                {"id": ev.id, "title": ev.title, "speakers": []},
+            )
+            bucket["speakers"].append({"id": sp.id, "name": sp.name, "sub": sp.sub})
+        sp_events.sort(key=lambda e: e["title"].lower())
+        speakers_payload.append(
+            {
+                "id": sp.id,
+                "name": sp.name,
+                "sub": sp.sub,
+                "events": sp_events,
+            }
+        )
+
+    events_payload = sorted(event_index.values(), key=lambda e: e["title"].lower())
+
     return render(
         request,
         "qr_generator.html",
         {
-            "speakers": speakers,
-            "events": events,
-            "qr_self_only": qr_self_only,
-            "qr_speaker_id": qr_speaker_id,
+            "is_admin": is_admin,
             "linked_speaker": linked,
+            "speakers_json": json.dumps(speakers_payload, ensure_ascii=False),
+            "events_json": json.dumps(events_payload, ensure_ascii=False),
+            "has_data": bool(speakers_payload and events_payload),
         },
     )
 
 
-@member_required
-def generate_qr_view(request, speaker_id, event_id):
+def _qr_access_check(request, speaker_id, event_id):
+    """Shared guard for QR display + poster download. Returns (speaker, event)
+    on success, or (None, HttpResponseForbidden) on failure.
+    """
     speaker = get_object_or_404(Speaker, id=speaker_id)
     event = get_object_or_404(Event, id=event_id)
 
     if not _is_platform_admin(request.user):
         linked = Speaker.objects.filter(user=request.user).first()
         if not linked or linked.id != speaker.id:
-            return HttpResponseForbidden("Доступ запрещён")
-        if not speaker.events.filter(pk=event.id).exists():
-            return HttpResponseForbidden("Доступ запрещён")
+            return None, None, HttpResponseForbidden("Доступ запрещён")
 
-    # Формируем URL для страницы оценки
-    rate_url = f"/rate/{event_id}/{speaker_id}/"
-    full_url = request.build_absolute_uri(rate_url)
+    if not speaker.events.filter(pk=event.id).exists():
+        return None, None, HttpResponseForbidden(
+            f"Спикер «{speaker.name}» не участвует в мероприятии «{event.title}»."
+        )
+    return speaker, event, None
 
-    # Генерируем QR-код
+
+def _build_qr_png(url: str, box_size: int = 10, border: int = 4):
+    """Return a PIL.Image of a black-on-white QR encoding ``url``."""
     qr = qrcode.QRCode(
         version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=box_size,
+        border=border,
     )
-    qr.add_data(full_url)
+    qr.add_data(url)
     qr.make(fit=True)
+    return qr.make_image(fill_color="black", back_color="white").convert("RGB")
 
-    img = qr.make_image(fill_color="black", back_color="white")
-    
-    # Сохраняем в base64
+
+@member_required
+def generate_qr_view(request, speaker_id, event_id):
+    speaker, event, denied = _qr_access_check(request, speaker_id, event_id)
+    if denied is not None:
+        return denied
+
+    rate_url = f"/rate/{event_id}/{speaker_id}/"
+    full_url = request.build_absolute_uri(rate_url)
+    img = _build_qr_png(full_url)
+
     buffer = BytesIO()
     img.save(buffer, format="PNG")
     img_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
@@ -642,9 +755,236 @@ def generate_qr_view(request, speaker_id, event_id):
     return render(request, 'qr_display.html', context)
 
 
-def _get_speaker_for_user(user):
-    """Returns Speaker linked to user, or None."""
-    return Speaker.objects.filter(user=user).first()
+# --- Poster download (print-ready PNG) -------------------------------------
+
+# Fonts bundled with the repo so the poster always has Cyrillic glyphs,
+# regardless of OS / container (system fonts are an unreliable fallback).
+_BUNDLED_FONTS_DIR = os.path.join(os.path.dirname(__file__), "assets", "fonts")
+_BUNDLED_FONT_REGULAR = os.path.join(_BUNDLED_FONTS_DIR, "DejaVuSans.ttf")
+_BUNDLED_FONT_BOLD = os.path.join(_BUNDLED_FONTS_DIR, "DejaVuSans-Bold.ttf")
+
+_POSTER_FONT_CANDIDATES = (
+    # Windows
+    r"C:\Windows\Fonts\segoeuib.ttf",  # Segoe UI Bold
+    r"C:\Windows\Fonts\segoeui.ttf",
+    r"C:\Windows\Fonts\arialbd.ttf",
+    r"C:\Windows\Fonts\arial.ttf",
+    # Debian/Ubuntu
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+    # Fedora / RHEL
+    "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/google-noto/NotoSans-Bold.ttf",
+    "/usr/share/fonts/google-noto/NotoSans-Regular.ttf",
+    # Alpine
+    "/usr/share/fonts/ttf-dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf",
+    # macOS
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/Library/Fonts/Arial Bold.ttf",
+    "/Library/Fonts/Arial.ttf",
+)
+
+
+def _font_supports_cyrillic(font) -> bool:
+    """Probe whether the font actually carries Cyrillic glyphs.
+
+    Pillow happily loads any TTF (and its built-in default) even when the
+    glyphs requested are missing — they then render as a .notdef box (▢).
+    Compare the rasterized mask of 'Я' against a PUA codepoint guaranteed
+    to fall back to .notdef: if they match, the font has no Cyrillic.
+    """
+    try:
+        cyr = bytes(font.getmask("Я"))
+        pua = bytes(font.getmask("\uE000"))
+        return bool(cyr) and cyr != pua
+    except Exception:
+        return False
+
+
+def _load_font(size: int, bold_only: bool = False):
+    """Best-effort TrueType loader with Cyrillic-capable fallbacks.
+
+    Honors ``QR_POSTER_FONT_PATH`` / ``QR_POSTER_FONT_BOLD_PATH`` env vars
+    for explicit overrides in deployments without standard system fonts.
+    """
+    from PIL import ImageFont
+
+    env_path = os.environ.get(
+        "QR_POSTER_FONT_BOLD_PATH" if bold_only else "QR_POSTER_FONT_PATH"
+    )
+    candidates = list(_POSTER_FONT_CANDIDATES)
+    if bold_only:
+        candidates = [
+            p for p in candidates
+            if "bd" in p.lower() or "bold" in p.lower()
+        ]
+
+    # Bundled DejaVu always carries Cyrillic — try it before system fonts so
+    # the poster renders correctly even in minimal containers. An explicit env
+    # override wins over everything.
+    bundled = _BUNDLED_FONT_BOLD if bold_only else _BUNDLED_FONT_REGULAR
+    candidates = [p for p in (env_path, bundled) if p] + candidates
+
+    for path in candidates:
+        if not path or not os.path.exists(path):
+            continue
+        try:
+            font = ImageFont.truetype(path, size)
+        except (OSError, IOError):
+            continue
+        if _font_supports_cyrillic(font):
+            return font
+
+    # Last resort: try Pillow's sized default (DejaVu subset on Pillow ≥ 10.1).
+    # Only used when nothing else worked — its glyph set is limited but it's
+    # better than the bitmap default.
+    try:
+        default = ImageFont.load_default(size=size)
+        if _font_supports_cyrillic(default):
+            return default
+    except TypeError:
+        pass
+    return ImageFont.load_default()
+
+
+def _wrap_text(draw, text: str, font, max_width: int) -> list[str]:
+    """Greedy word-wrap that respects pixel width."""
+    words = (text or "").split()
+    if not words:
+        return [""]
+    lines, current = [], words[0]
+    for w in words[1:]:
+        trial = current + " " + w
+        if draw.textlength(trial, font=font) <= max_width:
+            current = trial
+        else:
+            lines.append(current)
+            current = w
+    lines.append(current)
+    return lines
+
+
+@member_required
+def qr_poster_view(request, speaker_id, event_id):
+    """Renders a print-ready PNG poster with brand strip, names and a big QR."""
+    from PIL import Image, ImageDraw
+
+    speaker, event, denied = _qr_access_check(request, speaker_id, event_id)
+    if denied is not None:
+        return denied
+
+    rate_url = f"/rate/{event_id}/{speaker_id}/"
+    full_url = request.build_absolute_uri(rate_url)
+    qr_img = _build_qr_png(full_url, box_size=20, border=2)
+
+    # Canvas — portrait, A-series-ish 1080x1500.
+    W, H = 1080, 1500
+    BG = (230, 240, 235)  # matches --bg-color light
+    SBER = (10, 128, 59)
+    DARK = (20, 44, 30)
+    MUTED = (91, 117, 101)
+
+    poster = Image.new("RGB", (W, H), BG)
+    draw = ImageDraw.Draw(poster)
+
+    # Top brand strip
+    strip_h = 90
+    draw.rectangle((0, 0, W, strip_h), fill=SBER)
+    brand_font = _load_font(46, bold_only=True)
+    brand = "STARLIFT"
+    bw = draw.textlength(brand, font=brand_font)
+    draw.text(((W - bw) / 2, strip_h / 2 - 28), brand, font=brand_font, fill=(255, 255, 255))
+
+    # Title
+    title_font = _load_font(58, bold_only=True)
+    title = "Оцените выступление"
+    tw = draw.textlength(title, font=title_font)
+    draw.text(((W - tw) / 2, strip_h + 50), title, font=title_font, fill=DARK)
+
+    # Speaker name (wrapped)
+    name_font = _load_font(72, bold_only=True)
+    name_lines = _wrap_text(draw, speaker.name, name_font, W - 120)
+    y = strip_h + 140
+    for line in name_lines:
+        lw = draw.textlength(line, font=name_font)
+        draw.text(((W - lw) / 2, y), line, font=name_font, fill=SBER)
+        y += 84
+    if speaker.sub:
+        sub_font = _load_font(34)
+        sw = draw.textlength(speaker.sub, font=sub_font)
+        draw.text(((W - sw) / 2, y + 6), speaker.sub, font=sub_font, fill=MUTED)
+        y += 56
+
+    # QR card
+    qr_target = 640
+    qr_img = qr_img.resize((qr_target, qr_target), Image.LANCZOS)
+    card_pad = 30
+    card_size = qr_target + card_pad * 2
+    card_x = (W - card_size) // 2
+    card_y = max(y + 30, H - card_size - 220)
+    # White rounded card via two rectangles + corner circles (Pillow lacks rounded rect on older versions)
+    try:
+        draw.rounded_rectangle(
+            (card_x, card_y, card_x + card_size, card_y + card_size),
+            radius=28, fill=(255, 255, 255), outline=(210, 220, 215), width=2,
+        )
+    except AttributeError:
+        draw.rectangle(
+            (card_x, card_y, card_x + card_size, card_y + card_size),
+            fill=(255, 255, 255), outline=(210, 220, 215), width=2,
+        )
+    poster.paste(qr_img, (card_x + card_pad, card_y + card_pad))
+
+    # Footer call-to-action
+    cta_font = _load_font(32)
+    cta = "Наведите камеру смартфона, чтобы оставить отзыв"
+    cw = draw.textlength(cta, font=cta_font)
+    draw.text(((W - cw) / 2, card_y + card_size + 30), cta, font=cta_font, fill=MUTED)
+
+    # Event pill
+    pill_font = _load_font(28, bold_only=True)
+    event_text = event.title
+    et_w = draw.textlength(event_text, font=pill_font)
+    pill_pad_x, pill_pad_y = 28, 14
+    pill_w = et_w + pill_pad_x * 2
+    pill_h = 28 + pill_pad_y * 2
+    pill_x = (W - pill_w) / 2
+    pill_y = card_y + card_size + 90
+    try:
+        draw.rounded_rectangle(
+            (pill_x, pill_y, pill_x + pill_w, pill_y + pill_h),
+            radius=pill_h / 2, fill=SBER,
+        )
+    except AttributeError:
+        draw.rectangle((pill_x, pill_y, pill_x + pill_w, pill_y + pill_h), fill=SBER)
+    draw.text((pill_x + pill_pad_x, pill_y + pill_pad_y - 4), event_text, font=pill_font, fill=(255, 255, 255))
+
+    # Serialize
+    out = BytesIO()
+    poster.save(out, format="PNG", optimize=True)
+    out.seek(0)
+
+    from django.http import HttpResponse
+
+    import re as _re
+
+    def _slug(s: str) -> str:
+        s = _re.sub(r"[^\w\-]+", "_", s, flags=_re.UNICODE).strip("_")
+        return s[:60] or "qr"
+
+    filename = f"qr_{_slug(speaker.name)}_{_slug(event.title)}.png"
+    response = HttpResponse(out.getvalue(), content_type="image/png")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
 
 
 @member_required
@@ -704,6 +1044,9 @@ def submit_join_request_view(request, event_id):
     ).exists():
         return JsonResponse({'error': 'already_pending'}, status=400)
 
+    if not event.can_self_submit():
+        return JsonResponse({'error': 'submissions_closed'}, status=400)
+
     topic = (request.POST.get('topic') or '').strip()
     if not topic:
         return JsonResponse({'error': 'topic_required'}, status=400)
@@ -739,6 +1082,13 @@ def _parse_event_post(request):
             human_date = f"{parsed_date.day} {_RU_MONTHS_GEN_BY_NUM[parsed_date.month]} {parsed_date.year}"
         except (ValueError, KeyError):
             raise ValueError('bad_date')
+    raw_deadline = (request.POST.get('application_deadline') or '').strip()
+    parsed_deadline = None
+    if raw_deadline:
+        try:
+            parsed_deadline = datetime.strptime(raw_deadline, '%Y-%m-%d').date()
+        except ValueError:
+            raise ValueError('bad_deadline')
     return {
         'title': title,
         'description': (request.POST.get('description') or '').strip() or None,
@@ -748,10 +1098,11 @@ def _parse_event_post(request):
         'link': (request.POST.get('link') or '').strip() or None,
         'topic': (request.POST.get('topic') or '').strip() or None,
         'schedule': (request.POST.get('schedule') or '').strip() or None,
+        'application_deadline': parsed_deadline,
     }
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def admin_event_create(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -768,7 +1119,7 @@ def admin_event_create(request):
     return JsonResponse({'ok': True, 'id': ev.id})
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def admin_event_edit(request, event_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -789,7 +1140,7 @@ def admin_event_edit(request, event_id):
     return JsonResponse({'ok': True, 'id': ev.id})
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def admin_event_remove_speaker(request, event_id, speaker_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -799,7 +1150,7 @@ def admin_event_remove_speaker(request, event_id, speaker_id):
     return JsonResponse({'ok': True})
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def admin_event_delete(request, event_id):
     if request.method != 'POST':
         return JsonResponse({'error': 'method_not_allowed'}, status=405)
@@ -808,7 +1159,7 @@ def admin_event_delete(request, event_id):
     return JsonResponse({'ok': True})
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
 def admin_pending_requests_api(request):
     """Список pending заявок для уведомлений админа."""
     qs = EventRequest.objects.filter(
@@ -828,7 +1179,157 @@ def admin_pending_requests_api(request):
     return JsonResponse({'count': total, 'requests': items})
 
 
-@role_required('admin')
+@role_required('admin', 'devrel')
+def speaker_recommend_toggle(request, speaker_id):
+    """Admin-only: toggle Speaker.recommended flag."""
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    speaker = get_object_or_404(Speaker, pk=speaker_id)
+    speaker.recommended = not speaker.recommended
+    speaker.save(update_fields=["recommended"])
+    return JsonResponse({"recommended": speaker.recommended})
+
+
+@member_required
+def speaker_like_toggle(request, speaker_id):
+    """Toggle like for the current authenticated member on a speaker."""
+    if request.method != "POST":
+        return JsonResponse({"error": "method_not_allowed"}, status=405)
+    speaker = get_object_or_404(Speaker, pk=speaker_id)
+    qs = SpeakerLike.objects.filter(user=request.user, speaker=speaker)
+    if qs.exists():
+        qs.delete()
+        liked = False
+    else:
+        SpeakerLike.objects.create(user=request.user, speaker=speaker)
+        liked = True
+    like_count = SpeakerLike.objects.filter(speaker=speaker).count()
+    return JsonResponse({"liked": liked, "like_count": like_count})
+
+
+@member_required
+def notifications_api(request):
+    """Aggregated bell payload: event-requests (admin/devrel) + support tickets.
+
+    Speakers/devrel see only their own support; admin/devrel additionally see
+    pending event-requests. Guests cannot reach this view.
+    """
+    from support.services import notifications as support_notif
+
+    user = request.user
+    profile = getattr(user, 'profile', None)
+    is_admin = user.is_superuser or (profile and profile.role in ('admin', 'devrel'))
+
+    event_items = []
+    event_count = 0
+    application_items = []
+    application_count = 0
+    speaker_event_items = []
+    speaker_event_count = 0
+    if is_admin:
+        qs = EventRequest.objects.filter(
+            status=EventRequest.STATUS_PENDING
+        ).select_related('speaker', 'event').order_by('-created_at')[:10]
+        for r in qs:
+            event_items.append({
+                'id': r.id,
+                'kind': r.kind,
+                'speaker_name': r.speaker.name,
+                'event_title': r.event.title if r.event else r.proposed_title,
+                'topic': r.topic,
+                'created_at': r.created_at.isoformat(),
+            })
+        event_count = EventRequest.objects.filter(status=EventRequest.STATUS_PENDING).count()
+
+        from accounts.views.console import _devrel_visible_applications
+        app_qs = (
+            _devrel_visible_applications(user)
+            .filter(status=SpeakerApplication.STATUS_PENDING)
+            .select_related('applicant')[:10]
+        )
+        for a in app_qs:
+            name = (f"{a.applicant.first_name} {a.applicant.last_name}".strip() or a.applicant.username)
+            application_items.append({
+                'id': a.id,
+                'applicant_name': name,
+                'company': a.company,
+                'city': a.city,
+                'created_at': a.created_at.isoformat(),
+                'url': f'/console/speaker-applications/{a.id}/',
+            })
+        application_count = _devrel_visible_applications(user).filter(
+            status=SpeakerApplication.STATUS_PENDING
+        ).count()
+
+        from accounts.views.console import _devrel_visible_speaker_events
+        se_qs = _devrel_visible_speaker_events(user)[:10]
+        for ev in se_qs:
+            submitter = ev.submitted_by
+            submitter_name = ''
+            company = ''
+            if submitter is not None:
+                submitter_name = (f"{submitter.first_name} {submitter.last_name}".strip()) or submitter.username
+                try:
+                    company = (submitter.profile.company or '')
+                except Exception:
+                    company = ''
+            speaker_event_items.append({
+                'id': ev.id,
+                'title': ev.title,
+                'submitter_name': submitter_name,
+                'company': company,
+                'created_at': ev.created_at.isoformat() if ev.created_at else None,
+                'url': f'/console/speaker-events/{ev.id}/',
+            })
+        speaker_event_count = _devrel_visible_speaker_events(user).count()
+
+    support_tickets = list(support_notif.unread_tickets(user)[:10])
+    support_items = []
+    for t in support_tickets:
+        support_items.append({
+            'id': t.id,
+            'subject': t.subject,
+            'author': t.author_label,
+            'last_message_at': t.last_message_at.isoformat() if t.last_message_at else None,
+            'url': f'/assistant/support/t/{t.id}/',
+        })
+    support_count = support_notif.unread_count(user)
+
+    invitation_items = []
+    invitation_count = 0
+    if profile and profile.role == 'speaker':
+        speaker = Speaker.objects.filter(user=user).first()
+        if speaker:
+            inv_qs = (
+                EventInvitation.objects.filter(speaker=speaker, status=EventInvitation.STATUS_PENDING)
+                .select_related("event", "invited_by")
+                .order_by("-created_at")[:10]
+            )
+            for inv in inv_qs:
+                invited_by_name = inv.invited_by.get_full_name() if inv.invited_by else "DevRel"
+                invitation_items.append({
+                    'id': inv.id,
+                    'event_title': inv.event.title,
+                    'event_date': inv.event.event_date.isoformat() if inv.event.event_date else (inv.event.date or ''),
+                    'invited_by_name': invited_by_name or (inv.invited_by.username if inv.invited_by else "DevRel"),
+                    'created_at': inv.created_at.isoformat(),
+                    'url': '/me/invitations/',
+                })
+            invitation_count = EventInvitation.objects.filter(
+                speaker=speaker, status=EventInvitation.STATUS_PENDING,
+            ).count()
+
+    return JsonResponse({
+        'total': event_count + support_count + application_count + invitation_count + speaker_event_count,
+        'event_requests': {'count': event_count, 'items': event_items},
+        'speaker_applications': {'count': application_count, 'items': application_items},
+        'speaker_events': {'count': speaker_event_count, 'items': speaker_event_items},
+        'support': {'count': support_count, 'items': support_items},
+        'event_invitations': {'count': invitation_count, 'items': invitation_items},
+    })
+
+
+@role_required('admin', 'devrel')
 def admin_quick_approve(request, request_id):
     """Быстрое одобрение из колокольчика."""
     if request.method != 'POST':

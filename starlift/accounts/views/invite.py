@@ -31,15 +31,15 @@ from ..services.speaker_avatar import seed_user_profile_avatar_from_linked_speak
 User = get_user_model()
 
 
-@role_required("admin")
+@role_required("admin", "devrel")
 @never_cache
 @csrf_protect
 @require_http_methods(["GET", "POST"])
 def invites_view(request: HttpRequest) -> HttpResponse:
-    """List + create invites (admin only)."""
+    """List + create invites (admin / devrel)."""
     now = timezone.now()
     if request.method == "POST":
-        form = InviteCreateForm(request.POST)
+        form = InviteCreateForm(request.POST, actor=request.user)
         if form.is_valid():
             ttl_days = getattr(settings, "ACCOUNTS_INVITE_TTL_DAYS", 7)
             raw = token_svc.make_token()
@@ -79,7 +79,7 @@ def invites_view(request: HttpRequest) -> HttpResponse:
                 )
             return redirect(reverse("accounts:invites"))
     else:
-        form = InviteCreateForm()
+        form = InviteCreateForm(actor=request.user)
 
     status_filter = request.GET.get("status", "active")
     qs = Invite.objects.select_related("created_by", "speaker", "consumed_by").order_by("-created_at")
@@ -104,7 +104,7 @@ def invites_view(request: HttpRequest) -> HttpResponse:
     )
 
 
-@role_required("admin")
+@role_required("admin", "devrel")
 @require_http_methods(["POST"])
 def invite_revoke_view(request: HttpRequest, invite_id) -> HttpResponse:
     invite = get_object_or_404(Invite, pk=invite_id)

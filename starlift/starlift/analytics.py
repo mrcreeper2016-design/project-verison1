@@ -162,7 +162,14 @@ def event_queryset(filters: AnalyticsFilters) -> QuerySet[Event]:
 # ---------------------------------------------------------------------------
 
 def compute_nps(feedbacks: Iterable[Feedback] | QuerySet[Feedback]) -> dict[str, Any]:
-    """Standard NPS: (promoters% - detractors%) * 100.
+    """Score breakdown for a set of feedbacks.
+
+    Note on naming: the returned ``nps`` key is the **average score on the
+    0–10 scale** (the value the dashboards display and what the ``nps_threshold``
+    filter, e.g. 9.4, compares against) — *not* the classic Net Promoter Score
+    percentage. Promoter/detractor counts and percentages (from which a classic
+    NPS could be derived as ``promoter_pct - detractor_pct``) are returned
+    alongside as separate keys.
 
     Accepts either a queryset (preferred, uses a single aggregate query) or any
     iterable of feedback-like objects with a ``score`` attribute.
@@ -530,8 +537,14 @@ def _topic_counts(filters: AnalyticsFilters) -> dict[str, dict[str, Any]]:
 def _split_topics(stack: str | None) -> list[str]:
     if not stack:
         return []
-    parts = [p.strip() for p in stack.replace(";", ",").split(",")]
-    return [p for p in parts if p]
+    if "|" in stack:
+        sep = "|"
+    elif ";" in stack:
+        sep = ";"
+    else:
+        sep = ","
+    parts = [p.strip() for p in stack.split(sep)]
+    return [p for p in parts if len(p) >= 3 and any(ch.isalpha() for ch in p)]
 
 
 def thematic_profile(filters: AnalyticsFilters) -> list[dict[str, Any]]:

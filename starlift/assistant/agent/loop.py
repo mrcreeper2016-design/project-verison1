@@ -1,0 +1,209 @@
+"""Single-turn agent loop.
+
+The loop drives one user message to completion:
+- Builds context from conversation history.
+- Calls the LLM, streaming chunks back as ``AgentEvent`` objects.
+- When the model emits a function call, executes the matching tool, records
+  a ``Message(role='tool')``, and feeds the result back into the model.
+- Stops when the model emits final text, when the iteration cap is hit, or
+  when a tool errors out / a budget check fails.
+
+The loop is **provider-agnostic**: any object exposing ``stream_chat`` with
+the same signature as ``GigaChatClient`` works. Tests inject a fake.
+"""
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from typing import Any, Iterator
+
+from django.conf import settings
+
+from assistant.agent.budget import (
+    BudgetExceeded,
+    check_conversation_budget,
+    check_daily_budget,
+    check_global_budget,
+)
+from assistant.agent.prompts import build_context_messages, build_system_prompt
+from assistant.agent.safety import FENCE_CLOSE, FENCE_OPEN, sanitize_tool_result
+from assistant.agent.tools import TOOL_REGISTRY, ToolResultTooLargeError
+from assistant.models import Conversation, Message
+
+
+import re as _re
+
+_FENCE_LEAK_RE = _re.compile(
+    r"\[/?USER[_\s]?CONTENT\]",  # [USER_CONTENT], [/USER_CONTENT], [USER CONTENT], [/USER CONTENT]
+    _re.IGNORECASE,
+)
+
+
+def _strip_fence_markers(text: str) -> str:
+    """Drop safety fence markers from streamed assistant text.
+
+    Weaker GigaChat models sometimes leak the [USER_CONTENT] / [/USER_CONTENT]
+    markers we use to mark untrusted DB fields. Strip them on the wire so
+    the end user never sees the internal scaffolding.
+
+    Tolerates slight variations: underscore vs space, with or without slash,
+    case-insensitive — the model often paraphrases the marker.
+    """
+    if not text:
+        return text
+    return _FENCE_LEAK_RE.sub("", text)
+
+
+@dataclass
+class AgentEvent:
+    kind: str       # "delta" | "tool_start" | "tool_end" | "done" | "error"
+    payload: dict
+
+
+def _tool_schemas() -> list[dict]:
+    return [t.schema for t in TOOL_REGISTRY.values()]
+
+
+def run_turn(conversation: Conversation, *, client) -> Iterator[AgentEvent]:
+    user = conversation.user
+
+    try:
+        check_global_budget()
+        check_daily_budget(user)
+        check_conversation_budget(conversation)
+    except BudgetExceeded as e:
+        yield AgentEvent("error", {"reason": "budget_exceeded", "scope": e.scope})
+        return
+
+    messages = [{"role": "system", "content": build_system_prompt(user)}]
+    messages.extend(build_context_messages(conversation))
+
+    assistant_text = ""
+    turn_token_in = 0
+    turn_token_out = 0
+    iterations = 0
+    max_iter = settings.ASSISTANT_MAX_TOOL_ITERATIONS
+
+    while True:
+        iterations += 1
+        if iterations > max_iter:
+            yield AgentEvent("error", {"reason": "max_tools_exceeded"})
+            return
+
+        pending_tool_name = ""
+        pending_tool_args: dict = {}
+        chunk_in = chunk_out = 0
+        try:
+            for chunk in client.stream_chat(
+                messages=messages,
+                tools=_tool_schemas(),
+                max_output_tokens=settings.ASSISTANT_MAX_OUTPUT_TOKENS_PER_TURN,
+            ):
+                chunk_in = chunk.prompt_tokens or chunk_in
+                chunk_out = chunk.completion_tokens or chunk_out
+                if chunk.delta_text:
+                    cleaned = _strip_fence_markers(chunk.delta_text)
+                    assistant_text += cleaned
+                    if cleaned:
+                        yield AgentEvent("delta", {"text": cleaned})
+                if chunk.tool_call_name:
+                    pending_tool_name = chunk.tool_call_name
+                    if chunk.tool_call_args:
+                        pending_tool_args.update(chunk.tool_call_args)
+        except Exception as exc:  # noqa: BLE001 — surface provider errors as SSE events
+            yield AgentEvent("error", {"reason": "provider_error", "detail": str(exc)[:300]})
+            return
+        turn_token_in += chunk_in
+        turn_token_out += chunk_out
+
+        if pending_tool_name:
+            entry = TOOL_REGISTRY.get(pending_tool_name)
+            args = _sanitize_args(pending_tool_args, entry)
+            if not entry:
+                yield AgentEvent("error", {"reason": "unknown_tool", "tool": pending_tool_name})
+                return
+            yield AgentEvent("tool_start", {"name": pending_tool_name, "args": args})
+            try:
+                result = entry.invoke(args, _user=user)
+            except ToolResultTooLargeError:
+                result = {"error": "result_too_large", "hint": "narrow your query"}
+            except Exception as exc:  # noqa: BLE001 — tools are sandboxed by us
+                result = {"error": "tool_failed", "detail": str(exc)[:200]}
+            tool_msg = Message.objects.create(
+                conversation=conversation,
+                role=Message.ROLE_TOOL,
+                tool_name=pending_tool_name,
+                tool_args=args,
+                tool_result=result,
+                token_in=chunk_in,
+                token_out=chunk_out,
+            )
+            summary = _summarize_tool_result(pending_tool_name, result)
+            yield AgentEvent("tool_end", {"id": tool_msg.id, "summary": summary})
+            # GigaChat requires the assistant's function_call to appear in
+            # history before the corresponding function-role result.
+            messages.append({
+                "role": "assistant",
+                "content": "",
+                "function_call": {"name": pending_tool_name, "arguments": args},
+            })
+            # Sanitize before sending to the LLM: wrap untrusted user-content
+            # fields with fences, redact PII, cap lengths.
+            safe_result = sanitize_tool_result(result)
+            messages.append({
+                "role": "function",
+                "name": pending_tool_name,
+                "content": json.dumps(safe_result, ensure_ascii=False),
+            })
+            continue
+
+        # final assistant message
+        final_msg = Message.objects.create(
+            conversation=conversation,
+            role=Message.ROLE_ASSISTANT,
+            content=assistant_text,
+            token_in=turn_token_in,
+            token_out=turn_token_out,
+        )
+        yield AgentEvent("done", {"message_id": final_msg.id})
+        return
+
+
+def _sanitize_args(raw: dict, entry) -> dict:
+    """Clean up arguments produced by the LLM.
+
+    GigaChat sometimes emits keys with stray whitespace (``' stack'``) or
+    placeholder-looking values (``'{}'``, ``'{},\n'``). Filter both:
+
+    * strip whitespace from every key,
+    * drop keys that are not in the tool's JSON-schema ``properties``,
+    * drop string values that are empty or look like JSON-syntax fragments,
+    * keep all other values as-is so the tool decides what's valid.
+    """
+    if not isinstance(raw, dict) or not entry:
+        return raw if isinstance(raw, dict) else {}
+    allowed = set((entry.schema.get("parameters") or {}).get("properties", {}).keys())
+    out: dict = {}
+    for key, value in raw.items():
+        clean_key = key.strip() if isinstance(key, str) else key
+        if clean_key not in allowed:
+            continue
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                continue
+            if stripped in ("{}", "[]", "null") or stripped.startswith("{}"):
+                continue
+            value = stripped
+        out[clean_key] = value
+    return out
+
+
+def _summarize_tool_result(name: str, result: Any) -> str:
+    if isinstance(result, dict):
+        for key in ("speakers", "events"):
+            if key in result and isinstance(result[key], list):
+                return f"{len(result[key])} {key}"
+        if "error" in result:
+            return f"error: {result['error']}"
+    return name
