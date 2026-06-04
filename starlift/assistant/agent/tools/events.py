@@ -14,10 +14,11 @@ from . import assistant_tool
 @assistant_tool(
     name="find_events",
     description=(
-        "Поиск мероприятий. По умолчанию возвращает будущие, отсортированные по дате. "
-        "Для поиска ВСЕХ мероприятий конкретного спикера (включая прошедшие) — "
-        "сначала найди спикера через search_speakers, затем передай его id в "
-        "speaker_id, и установи include_past=true."
+        "Поиск мероприятий и связей «спикер → мероприятия». "
+        "Чтобы узнать, на каких мероприятиях выступает спикер, передай его ИМЯ "
+        "в speaker_name (например speaker_name='Дмитрий Быков') — за ОДИН вызов "
+        "вернутся все его мероприятия, включая прошедшие. Шаг через search_speakers "
+        "НЕ обязателен. Без фильтра по спикеру возвращает будущие мероприятия по дате."
     ),
     parameters={
         "type": "object",
@@ -28,17 +29,28 @@ from . import assistant_tool
             },
             "location": {"type": "string"},
             "is_external": {"type": "boolean"},
+            "speaker_name": {
+                "type": "string",
+                "description": (
+                    "Имя спикера (или его часть) для поиска ЕГО мероприятий. "
+                    "Самый простой способ: 'Дмитрий Быков', 'Быков'. "
+                    "Прошедшие мероприятия включаются автоматически."
+                ),
+            },
             "speaker_id": {
                 "type": "integer",
                 "description": (
-                    "ID спикера для поиска ЕГО мероприятий. Сначала вызови "
-                    "search_speakers чтобы получить id."
+                    "ID спикера для поиска ЕГО мероприятий, если он уже известен из "
+                    "предыдущего результата. Иначе используй speaker_name."
                 ),
             },
             "include_past": {
                 "type": "boolean",
-                "description": "Если true — включает прошедшие события. По умолчанию false.",
-                "default": False,
+                "description": (
+                    "Если true — включает прошедшие события. По умолчанию false, но "
+                    "при поиске по конкретному спикеру (speaker_name/speaker_id) "
+                    "прошедшие включаются автоматически."
+                ),
             },
             "period_days": {
                 "type": "integer",
@@ -52,13 +64,22 @@ from . import assistant_tool
     },
 )
 def find_events(*, topic="", location="", is_external=None, speaker_id=None,
-                include_past=False, period_days=0, limit=10, _user=None):
+                speaker_name="", include_past=None, period_days=0, limit=10, _user=None):
     today = timezone.now().date()
+    speaker_name = (speaker_name or "").strip()
+    targeting_speaker = bool(speaker_id) or bool(speaker_name)
+    # When the question is about one speaker's appearances, default to showing
+    # ALL of them (past + upcoming). Weak models rarely pass include_past, so we
+    # infer intent from the speaker filter instead of relying on the model.
+    if include_past is None:
+        include_past = targeting_speaker
     qs = Event.objects.all()
     if not include_past:
         qs = qs.filter(Q(event_date__gte=today) | Q(event_date__isnull=True, status="future"))
     if speaker_id:
         qs = qs.filter(speakers__id=speaker_id)
+    if speaker_name:
+        qs = qs.filter(speakers__name__icontains=speaker_name)
     if topic:
         qs = qs.filter(Q(topic__icontains=topic) | Q(speakers__stack__icontains=topic))
     if location:
@@ -68,7 +89,7 @@ def find_events(*, topic="", location="", is_external=None, speaker_id=None,
     if period_days:
         qs = qs.filter(event_date__lte=today + timedelta(days=period_days))
     # When filtering by speaker, order by date DESC so recent past events show up first.
-    order = ["-event_date", "-id"] if speaker_id and include_past else ["event_date", "id"]
+    order = ["-event_date", "-id"] if targeting_speaker and include_past else ["event_date", "id"]
     qs = qs.distinct().order_by(*order)[: max(1, min(int(limit), 10))]
     return {
         "events": [

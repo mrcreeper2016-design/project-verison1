@@ -51,6 +51,43 @@ class FindEventsTests(TestCase):
         self.assertEqual(titles, ["Future Conf"])
 
 
+class FindEventsBySpeakerNameTests(TestCase):
+    """The single-call speaker→events link that weak models can reach reliably."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = _admin_user("u3")
+        today = date.today()
+        cls.speaker = Speaker.objects.create(name="Дмитрий Быков", stack="ML", nps=90)
+        # A speaker whose only appearance is in the PAST — the case that used to
+        # return nothing because the model never passed include_past=true.
+        cls.past_talk = Event.objects.create(
+            title="ML-планировщик", event_date=today - timedelta(days=20), status="past",
+        )
+        cls.past_talk.speakers.add(cls.speaker)
+        # An unrelated event that must NOT leak into the speaker's schedule.
+        cls.other = Event.objects.create(
+            title="Unrelated", event_date=today + timedelta(days=5), status="future",
+        )
+
+    def test_speaker_name_returns_past_events_without_include_past(self):
+        tool = TOOL_REGISTRY["find_events"]
+        result = tool.invoke({"speaker_name": "Дмитрий Быков"}, _user=self.user)
+        titles = [e["title"] for e in result["events"]]
+        self.assertEqual(titles, ["ML-планировщик"])
+
+    def test_partial_name_match(self):
+        tool = TOOL_REGISTRY["find_events"]
+        result = tool.invoke({"speaker_name": "Быков"}, _user=self.user)
+        titles = [e["title"] for e in result["events"]]
+        self.assertIn("ML-планировщик", titles)
+
+    def test_unknown_speaker_returns_empty(self):
+        tool = TOOL_REGISTRY["find_events"]
+        result = tool.invoke({"speaker_name": "Никого Нет"}, _user=self.user)
+        self.assertEqual(result["events"], [])
+
+
 class GetEventDetailsTests(TestCase):
     @classmethod
     def setUpTestData(cls):
