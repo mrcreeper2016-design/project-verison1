@@ -1647,30 +1647,43 @@
         // --- Свайп для открытия/закрытия бокового меню (только мобильные) ---
         (function () {
             if (!sidebar) return;
-            const EDGE = 30;        // зона у левого края для старта открытия
-            const THRESHOLD = 55;   // минимальный горизонтальный сдвиг
-            let startX = 0, startY = 0, tracking = false, fromEdge = false;
+            const THRESHOLD = 60;   // минимальный горизонтальный сдвиг
+            let startX = 0, startY = 0, tracking = false, blocked = false;
+
+            // Жест отдаём горизонтально прокручиваемому элементу (таблица, лента),
+            // если он ещё может прокрутиться в сторону свайпа вправо (scrollLeft > 0).
+            function inHorizontalScroller(node) {
+                let el = node;
+                while (el && el !== document.body) {
+                    if (el.scrollWidth > el.clientWidth + 2) {
+                        const ov = getComputedStyle(el).overflowX;
+                        if ((ov === 'auto' || ov === 'scroll') && el.scrollLeft > 0) return true;
+                    }
+                    el = el.parentElement;
+                }
+                return false;
+            }
 
             document.addEventListener('touchstart', (e) => {
-                if (window.innerWidth > 768 || e.touches.length !== 1) return;
+                if (window.innerWidth > 768 || e.touches.length !== 1) { tracking = false; return; }
                 const t = e.touches[0];
                 startX = t.clientX; startY = t.clientY;
-                const open = sidebar.classList.contains('open');
-                fromEdge = startX <= EDGE;
-                // Отслеживаем жест, если меню открыто (для закрытия) или палец
-                // стартовал у левого края при закрытом меню (для открытия).
-                tracking = open || fromEdge;
+                tracking = true;
+                // При закрытом меню не перехватываем свайп у таблиц, которые сами
+                // умеют прокручиваться вправо — иначе сломаем их горизонтальный скролл.
+                blocked = !sidebar.classList.contains('open') && inHorizontalScroller(e.target);
             }, { passive: true });
 
             document.addEventListener('touchmove', (e) => {
-                if (!tracking || window.innerWidth > 768) return;
+                if (!tracking || blocked || window.innerWidth > 768) return;
                 const t = e.touches[0];
                 const dx = t.clientX - startX;
                 const dy = t.clientY - startY;
                 // Вертикальный скролл — не наш жест.
                 if (Math.abs(dy) > Math.abs(dx)) { tracking = false; return; }
                 const open = sidebar.classList.contains('open');
-                if (!open && fromEdge && dx > THRESHOLD) {
+                // Открытие — свайп слева-направо в любом месте экрана.
+                if (!open && dx > THRESHOLD) {
                     setDrawerOpen(true); tracking = false;
                 } else if (open && dx < -THRESHOLD) {
                     setDrawerOpen(false); tracking = false;
