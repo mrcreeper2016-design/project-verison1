@@ -55,6 +55,7 @@ def _load_builtin_tools() -> None:
     from . import speakers   # noqa: F401
     from . import events     # noqa: F401
     from . import analytics  # noqa: F401
+    from . import me         # noqa: F401
 
 
 _load_builtin_tools()

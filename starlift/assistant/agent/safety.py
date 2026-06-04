@@ -45,6 +45,8 @@ UNTRUSTED_TEXT_FIELDS = frozenset({
     "link",
     "summary",
     "snippet",
+    "comment",   # feedback text — authored by event attendees (untrusted public)
+    "message",   # invitation message from DevRel (semi-trusted, still fenced)
 })
 
 # Hard cap per leaf string. Prevents a 100 KB bio from dominating context.
