@@ -72,6 +72,7 @@
     z-index: 1499;
     width: min(420px, calc(100vw - 32px));
     height: min(640px, calc(100vh - 130px));
+    height: min(640px, calc(100dvh - 130px));
     background: var(--white);
     -webkit-backdrop-filter: blur(18px);
     backdrop-filter: blur(18px);
@@ -105,6 +106,7 @@
         bottom: 84px;
         width: auto;
         height: min(72vh, 640px);
+        height: min(72dvh, 640px);
         border-radius: 18px;
     }
     .assistant-fab { right: 14px; bottom: 14px; }

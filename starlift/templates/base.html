@@ -225,7 +225,7 @@
             animation: pageLeave 0.18s cubic-bezier(0.4, 0, 1, 1) forwards;
         }
 
-        aside {
+        #sidebar {
             width: 250px;
             flex-shrink: 0;
             background-color: var(--glass-bg);
@@ -242,21 +242,21 @@
             position: relative;
         }
 
-        aside.collapsed {
+        #sidebar.collapsed {
             width: 80px;
             padding: 24px 10px;
         }
 
-        aside.collapsed .logo-text, 
-        aside.collapsed .nav-item span {
+        #sidebar.collapsed .logo-text, 
+        #sidebar.collapsed .nav-item span {
             display: none;
         }
 
-        aside.collapsed .nav-item {
+        #sidebar.collapsed .nav-item {
             justify-content: center;
         }
 
-        aside.collapsed .sidebar-bottom-logo {
+        #sidebar.collapsed .sidebar-bottom-logo {
             display: none;
         }
 
@@ -286,7 +286,7 @@
             transform: scale(1.1);
         }
         
-        aside.collapsed .sidebar-toggle-btn i {
+        #sidebar.collapsed .sidebar-toggle-btn i {
             transform: rotate(180deg);
         }
 
@@ -385,8 +385,8 @@
 
         /* В свёрнутом сайдбаре скрываем стрелку и подменю.
            Клик по иконке аккаунта в свёрнутом виде ведёт на профиль (fallback). */
-        aside.collapsed .nav-group-chevron { display: none; }
-        aside.collapsed .nav-submenu { display: none; }
+        #sidebar.collapsed .nav-group-chevron { display: none; }
+        #sidebar.collapsed .nav-submenu { display: none; }
 
         main { flex: 1 1 auto; min-width: 0; padding: 30px 40px; overflow-y: auto; overflow-x: auto; background: transparent !important; position: relative; }
 
@@ -1230,14 +1230,14 @@
 
         /* Tablets / small laptops — collapse sidebar to icons */
         @media (max-width: 1024px) {
-            aside:not(.collapsed) { width: 80px; padding: 24px 10px; }
-            aside:not(.collapsed) .logo-text,
-            aside:not(.collapsed) .nav-item span { display: none; }
-            aside:not(.collapsed) .nav-item { justify-content: center; }
-            aside:not(.collapsed) .sidebar-bottom-logo { display: none; }
-            aside:not(.collapsed) .sidebar-toggle-btn { display: none; }
-            aside:not(.collapsed) .nav-group-chevron { display: none; }
-            aside:not(.collapsed) .nav-submenu { display: none; }
+            #sidebar:not(.collapsed) { width: 80px; padding: 24px 10px; }
+            #sidebar:not(.collapsed) .logo-text,
+            #sidebar:not(.collapsed) .nav-item span { display: none; }
+            #sidebar:not(.collapsed) .nav-item { justify-content: center; }
+            #sidebar:not(.collapsed) .sidebar-bottom-logo { display: none; }
+            #sidebar:not(.collapsed) .sidebar-toggle-btn { display: none; }
+            #sidebar:not(.collapsed) .nav-group-chevron { display: none; }
+            #sidebar:not(.collapsed) .nav-submenu { display: none; }
             main { padding: 24px 24px; }
         }
 
@@ -1283,7 +1283,7 @@
             /* Возвращаем клики самим контролам — пустая зона шапки кликабельной не нужна */
             .main-header > * { pointer-events: auto; }
 
-            aside {
+            #sidebar {
                 position: fixed;
                 top: 0; left: 0;
                 height: 100vh;
@@ -1297,14 +1297,14 @@
                 /* Force full nav back on mobile drawer */
                 width: 78% !important;
             }
-            aside.open { transform: translateX(0); }
-            aside .logo-text,
-            aside .nav-item span { display: inline !important; }
-            aside .nav-item { justify-content: flex-start !important; }
-            aside .sidebar-bottom-logo { display: block !important; }
-            aside .sidebar-toggle-btn { display: none !important; }
-            aside .nav-group-chevron { display: inline-block !important; }
-            aside .nav-submenu { display: grid !important; }
+            #sidebar.open { transform: translateX(0); }
+            #sidebar .logo-text,
+            #sidebar .nav-item span { display: inline !important; }
+            #sidebar .nav-item { justify-content: flex-start !important; }
+            #sidebar .sidebar-bottom-logo { display: block !important; }
+            #sidebar .sidebar-toggle-btn { display: none !important; }
+            #sidebar .nav-group-chevron { display: inline-block !important; }
+            #sidebar .nav-submenu { display: grid !important; }
 
             /* Modals → full-screen */
             .modal-content {
@@ -1511,9 +1511,6 @@
                 <a href="{% url 'accounts:login' %}" class="nav-item"><i class="fa-solid fa-right-to-bracket"></i> <span>Вход</span></a>
                 {% endif %}
             </nav>
-        </div>
-        <div class="sidebar-bottom-logo animate-fade" style="animation-delay: 0.5s;">
-            <div class="logo-text" style="font-size: 15px; opacity: 0.5;">STARLIFT TEAM</div>
         </div>
     </aside>
 
