@@ -971,6 +971,62 @@
                 }
             });
 
+            /* Поиск и фильтры — тоже через делегирование (узлы пересоздаются при
+               каждой SPA‑вставке, прямой addEventListener после перехода
+               «иногда не срабатывал»). Слушатели на document живут постоянно. */
+            const _onSpeakersPage = (t) =>
+                document.querySelector('.speakers-page') &&
+                document.getElementById('page-content') &&
+                document.getElementById('page-content').contains(t);
+
+            document.addEventListener('input', (e) => {
+                const t = e.target;
+                if (!t || !t.id || !_onSpeakersPage(t)) return;
+                if (t.id === 'searchInput') {
+                    applyFiltersAndRender();
+                } else if (t.id === 'companyFilter') {
+                    const sberBtn = document.getElementById('sberOnlyBtn');
+                    if (sberBtn) sberBtn.classList.toggle('active', normalizeText(t.value) === normalizeText('Сбер'));
+                    applyFiltersAndRender();
+                } else if (t.id === 'npsMin' || t.id === 'npsMax') {
+                    const npsMin = document.getElementById('npsMin');
+                    const npsMax = document.getElementById('npsMax');
+                    const mn = parseNps(npsMin && npsMin.value);
+                    const mx = parseNps(npsMax && npsMax.value);
+                    if (mn != null && mx != null && mn > mx) {
+                        if (t.id === 'npsMin') { npsMin.value = mx; } else { npsMax.value = mn; }
+                    }
+                    applyFiltersAndRender();
+                }
+            });
+
+            document.addEventListener('change', (e) => {
+                const t = e.target;
+                if (!t || !_onSpeakersPage(t)) return;
+                if (t.id === 'statusFilter') applyFiltersAndRender();
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!document.querySelector('.speakers-page')) return;
+                const sberBtn = e.target.closest('#sberOnlyBtn');
+                if (sberBtn) {
+                    const companyFilter = document.getElementById('companyFilter');
+                    if (companyFilter) {
+                        const isSberActive = normalizeText(companyFilter.value) === normalizeText('Сбер');
+                        companyFilter.value = isSberActive ? '' : 'Сбер';
+                        sberBtn.classList.toggle('active', !isSberActive);
+                        applyFiltersAndRender();
+                    }
+                    return;
+                }
+                const stepBtn = e.target.closest('[data-step-target][data-step-dir]');
+                if (stepBtn) {
+                    const target = document.getElementById(stepBtn.dataset.stepTarget);
+                    const dir = stepBtn.dataset.stepDir === 'down' ? -1 : 1;
+                    stepNumericInput(target, dir);
+                }
+            });
+
             document.addEventListener('keydown', (e) => {
                 const filterPanel = document.getElementById('filtersPanel');
                 const toggleFiltersBtn = document.getElementById('filtersToggle');
@@ -996,59 +1052,9 @@
             applyFiltersAndRender();
         }
 
-        // Attach event listeners for filters & search (на новых узлах после каждой SPA‑вставки)
-        const searchInput = document.getElementById('searchInput');
-        slBindOnce(searchInput, 'input', applyFiltersAndRender);
-
-        ['statusFilter', 'npsMin', 'npsMax'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) slBindOnce(el, 'change', applyFiltersAndRender);
-        });
-
-        const companyFilter = document.getElementById('companyFilter');
-        slBindOnce(companyFilter, 'input', applyFiltersAndRender);
-
-        const sberBtn = document.getElementById('sberOnlyBtn');
-        if (sberBtn) {
-            slBindOnce(sberBtn, 'click', () => {
-                if (!companyFilter) return;
-                const isSberActive = companyFilter.value.toLowerCase() === 'сбер';
-                companyFilter.value = isSberActive ? '' : 'Сбер';
-                sberBtn.classList.toggle('active', !isSberActive);
-                applyFiltersAndRender();
-            });
-            // Синхронизировать состояние кнопки при ручном вводе
-            slBindOnce(companyFilter, 'input', () => {
-                if (sberBtn) sberBtn.classList.toggle('active', normalizeText(companyFilter.value) === normalizeText('Сбер'));
-            });
-        }
-
-        const npsMin = document.getElementById('npsMin');
-        const npsMax = document.getElementById('npsMax');
-        if (npsMin && npsMax) {
-            [npsMin, npsMax].forEach(el => {
-                slBindOnce(el, 'input', () => {
-                    let min = parseNps(npsMin.value);
-                    let max = parseNps(npsMax.value);
-                    if (min != null && max != null && min > max) {
-                        if (el === npsMin) {
-                            npsMin.value = max;
-                        } else {
-                            npsMax.value = min;
-                        }
-                    }
-                    applyFiltersAndRender();
-                });
-            });
-        }
-
-        document.querySelectorAll('[data-step-target][data-step-dir]').forEach(btn => {
-            slBindOnce(btn, 'click', () => {
-                const target = document.getElementById(btn.dataset.stepTarget);
-                const dir = btn.dataset.stepDir === 'down' ? -1 : 1;
-                stepNumericInput(target, dir);
-            });
-        });
+        // Поиск, фильтры, кнопка «Сбер» и шаговые кнопки NPS обрабатываются
+        // делегированными слушателями на document (см. блок выше) — они
+        // переживают SPA‑пересоздание узлов, поэтому здесь их привязывать не нужно.
 
         const modalClose = document.getElementById('modalClose');
         if (modalClose) {
