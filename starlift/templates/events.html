@@ -674,7 +674,16 @@
         .events-page { padding: 0; }
         .events-header { flex-direction: column; align-items: flex-start; gap: 12px; }
         .events-title { font-size: 22px !important; }
-        .event-card { padding: 14px; }
+
+        /* Карточка мероприятия — компактнее на телефонах */
+        .events-grid { gap: 12px; }
+        .event-card-large { padding: 14px; border-radius: 16px; }
+        .event-card-top { margin-bottom: 10px; }
+        .event-date-main { font-size: 15px; }
+        .event-title-card { font-size: 16px; line-height: 1.3; margin-bottom: 6px; }
+        .event-description-card { font-size: 13px; line-height: 1.5; margin-bottom: 12px; }
+        .event-card-bottom { margin-top: 12px; }
+        .stacked-avatars .avatar { width: 32px; height: 32px; margin-left: -8px; }
 
         /* Фуллскрин-модалка мероприятия: убираем внешние отступы у контейнера */
         #eventModalOverlay.modal-overlay {
@@ -751,6 +760,10 @@
     }
 
     @media (max-width: 480px) {
+        .event-card-large { padding: 12px; border-radius: 14px; }
+        .event-title-card { font-size: 15px; }
+        .event-description-card { font-size: 12px; margin-bottom: 10px; }
+
         .schedule-item {
             grid-template-columns: 60px 1fr !important;
             gap: 8px !important;

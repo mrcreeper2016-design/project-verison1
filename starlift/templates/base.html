@@ -1270,15 +1270,18 @@
                 top: 0;
                 left: 0;
                 right: 0;
-                margin: -16px -14px 14px -14px;
-                padding: 10px 14px;
-                background: var(--bg-color);
-                border-bottom: 1px solid var(--border-color);
+                margin: -16px -14px 10px -14px;
+                padding: 8px 14px;
+                /* Прозрачная шапка — без сплошного «прямоугольника» сверху.
+                   Кнопки (бургер, колокольчик, тема, профиль) имеют свой фон и
+                   остаются читаемыми поверх фона страницы. */
+                background: transparent;
+                border-bottom: none;
                 z-index: 150;
+                pointer-events: none;
             }
-            [data-theme="dark"] .main-header {
-                background: #0E1512;
-            }
+            /* Возвращаем клики самим контролам — пустая зона шапки кликабельной не нужна */
+            .main-header > * { pointer-events: auto; }
 
             aside {
                 position: fixed;
@@ -1322,8 +1325,16 @@
             .btn-action,
             .admin-profile { min-height: 44px; }
 
-            /* Dropdowns full-width-ish */
-            .notif-dropdown { width: calc(100vw - 28px); right: -8px; }
+            /* Уведомления: фиксируем к вьюпорту, чтобы панель не вылезала за экран */
+            .notif-dropdown {
+                position: fixed;
+                top: 60px;
+                left: 12px;
+                right: 12px;
+                width: auto;
+                max-height: 72vh;
+                max-height: 72dvh;
+            }
             .dropdown-menu { right: 0; }
 
             /* Admin profile compaction */
@@ -1632,6 +1643,42 @@
                 setDrawerOpen(false);
             }
         });
+
+        // --- Свайп для открытия/закрытия бокового меню (только мобильные) ---
+        (function () {
+            if (!sidebar) return;
+            const EDGE = 30;        // зона у левого края для старта открытия
+            const THRESHOLD = 55;   // минимальный горизонтальный сдвиг
+            let startX = 0, startY = 0, tracking = false, fromEdge = false;
+
+            document.addEventListener('touchstart', (e) => {
+                if (window.innerWidth > 768 || e.touches.length !== 1) return;
+                const t = e.touches[0];
+                startX = t.clientX; startY = t.clientY;
+                const open = sidebar.classList.contains('open');
+                fromEdge = startX <= EDGE;
+                // Отслеживаем жест, если меню открыто (для закрытия) или палец
+                // стартовал у левого края при закрытом меню (для открытия).
+                tracking = open || fromEdge;
+            }, { passive: true });
+
+            document.addEventListener('touchmove', (e) => {
+                if (!tracking || window.innerWidth > 768) return;
+                const t = e.touches[0];
+                const dx = t.clientX - startX;
+                const dy = t.clientY - startY;
+                // Вертикальный скролл — не наш жест.
+                if (Math.abs(dy) > Math.abs(dx)) { tracking = false; return; }
+                const open = sidebar.classList.contains('open');
+                if (!open && fromEdge && dx > THRESHOLD) {
+                    setDrawerOpen(true); tracking = false;
+                } else if (open && dx < -THRESHOLD) {
+                    setDrawerOpen(false); tracking = false;
+                }
+            }, { passive: true });
+
+            document.addEventListener('touchend', () => { tracking = false; });
+        })();
         
         function setTheme(theme) {
             document.documentElement.setAttribute('data-theme', theme);
