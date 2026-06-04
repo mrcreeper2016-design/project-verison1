@@ -11,7 +11,10 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+import warnings
 from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -36,16 +39,38 @@ load_dotenv(_env_path)
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-$!y7q&gyioy-19s!8_5+vlbf@czrczz^v!w8#bd35!f)%(bxh!')
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-_default_hosts = "127.0.0.1,localhost,192.168.1.126,.ngrok-free.app,.ngrok-free.dev"
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', _default_hosts).split(',') if h.strip()]
+# SECURITY WARNING: keep the secret key used in production secret!
+# Development falls back to a built-in insecure key (with a warning). In
+# production (DEBUG=False) we refuse to start unless SECRET_KEY is provided,
+# so a real deployment can never silently run on the shared insecure key.
+_INSECURE_SECRET_KEY = 'django-insecure-$!y7q&gyioy-19s!8_5+vlbf@czrczz^v!w8#bd35!f)%(bxh!'
+SECRET_KEY = os.environ.get('SECRET_KEY', '').strip() or _INSECURE_SECRET_KEY
+if SECRET_KEY == _INSECURE_SECRET_KEY:
+    if DEBUG:
+        warnings.warn(
+            "SECRET_KEY is not set; using the insecure built-in development key. "
+            "Set SECRET_KEY in the environment before deploying to production.",
+            stacklevel=2,
+        )
+    else:
+        raise ImproperlyConfigured(
+            "SECRET_KEY environment variable must be set when DEBUG=False. "
+            "Refusing to start with the insecure built-in development key."
+        )
 
-_default_csrf = "https://*.ngrok-free.app,https://*.ngrok-free.dev"
+# Hosts / CSRF: permissive dev defaults (localhost, ngrok) apply only in DEBUG.
+# In production require ALLOWED_HOSTS / CSRF_TRUSTED_ORIGINS to be set explicitly
+# (empty default → Django itself rejects requests with an unknown Host).
+if DEBUG:
+    _default_hosts = "127.0.0.1,localhost,192.168.1.126,.ngrok-free.app,.ngrok-free.dev"
+    _default_csrf = "https://*.ngrok-free.app,https://*.ngrok-free.dev"
+else:
+    _default_hosts = ""
+    _default_csrf = ""
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', _default_hosts).split(',') if h.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get('CSRF_TRUSTED_ORIGINS', _default_csrf).split(',') if o.strip()]
 
 
@@ -162,6 +187,14 @@ CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', _secure_cookies_defaul
 # request is plain HTTP (the container only speaks HTTP to the proxy).
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# Optional HTTPS hardening — off by default so HTTP-only/dev setups keep working;
+# enable in .env.production once TLS is terminated at the proxy.
+SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = os.environ.get('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'False').lower() == 'true'
+SECURE_HSTS_PRELOAD = os.environ.get('SECURE_HSTS_PRELOAD', 'False').lower() == 'true'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', '25'))
@@ -257,6 +290,9 @@ LEGAL_DOC_VERSION = "2026-05-10"
 GIGACHAT_AUTH_KEY = os.getenv("GIGACHAT_AUTH_KEY", "").strip()
 GIGACHAT_SCOPE = os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS").strip()
 GIGACHAT_MODEL = os.getenv("GIGACHAT_MODEL", "GigaChat-Pro").strip()
+# Defaults to false because GigaChat uses the Russian Trusted Sub CA, which is
+# often missing from the system trust store. For production prefer "true" with
+# the Минцифры root CA installed; see docs/setup.md.
 GIGACHAT_VERIFY_SSL = os.getenv("GIGACHAT_VERIFY_SSL", "false").lower() == "true"
 
 ASSISTANT_ENABLED = os.getenv("ASSISTANT_ENABLED", "true").lower() == "true"

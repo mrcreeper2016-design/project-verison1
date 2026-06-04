@@ -240,7 +240,12 @@ class ComputeNpsTests(TestCase):
         self.assertEqual(stats["promoters"], 6)
         self.assertEqual(stats["passives"], 2)
         self.assertEqual(stats["detractors"], 2)
-        self.assertAlmostEqual(stats["nps"], 40.0, places=1)
+        # Promoter/detractor split → classic NPS would be (60% - 20%) = 40.
+        self.assertAlmostEqual(stats["promoter_pct"], 60.0, places=1)
+        self.assertAlmostEqual(stats["detractor_pct"], 20.0, places=1)
+        # In this product the ``nps`` key is the average score (0–10 scale,
+        # the value the dashboards display), not the classic NPS percentage.
+        self.assertAlmostEqual(stats["nps"], 8.0, places=1)
         self.assertAlmostEqual(stats["avg_score"], 8.0, places=1)
 
     def test_empty_feedbacks_returns_zero_nps(self):
@@ -255,11 +260,14 @@ class ComputeNpsTests(TestCase):
                 self.score = score
 
         stats = analytics_lib.compute_nps([FakeFb(10), FakeFb(10), FakeFb(5)])
-        # promoters=2, detractors=1, total=3 -> NPS = (66.66 - 33.33) ≈ 33.3
+        # promoters=2, detractors=1, total=3 → classic NPS ≈ (66.7 - 33.3).
         self.assertEqual(stats["total"], 3)
         self.assertEqual(stats["promoters"], 2)
         self.assertEqual(stats["detractors"], 1)
-        self.assertAlmostEqual(stats["nps"], 33.3, places=1)
+        self.assertAlmostEqual(stats["promoter_pct"], 66.7, places=1)
+        self.assertAlmostEqual(stats["detractor_pct"], 33.3, places=1)
+        # ``nps`` key = average score (0–10), here (10+10+5)/3 ≈ 8.3.
+        self.assertAlmostEqual(stats["nps"], 8.3, places=1)
 
 
 class NominationCandidatesTests(TestCase):
@@ -362,7 +370,8 @@ class FilterParserTests(TestCase):
 
 class DashboardViewTests(TestCase):
     def setUp(self):
-        _login_member(self.client)
+        # analytics_view is staff-only (@role_required('admin', 'devrel')).
+        _login_admin(self.client)
 
     def test_analytics_page_renders_without_data(self):
         response = self.client.get(reverse("analytics"))
@@ -565,7 +574,7 @@ class HighloadParserTests(TestCase):
         self.assertEqual(r["company"], "ACME Corp")
         self.assertEqual(r["title"], "Talk One")
         self.assertEqual(r["date"], "12 марта")
-        self.assertEqual(r["stack"], "Python, Backend")
+        self.assertEqual(r["stack"], "Python | Backend")
         self.assertEqual(r["description"], "Abstract body")
         self.assertEqual(r["link"], "https://highload.ru/talk/one")
         self.assertTrue(r["author_avatar"].endswith("/static/jane.png"))

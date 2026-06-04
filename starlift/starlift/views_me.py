@@ -24,10 +24,10 @@ from django.views.decorators.http import require_POST
 from accounts.decorators import member_required
 
 from .models import Event, EventInvitation, EventPhoto, EventRequest, Feedback, Speaker, SpeakerEventRating, SpeakerLike
+from .permissions import get_speaker_for_user
 
-
-def _get_speaker(user):
-    return Speaker.objects.filter(user=user).first()
+# Backwards-compatible local alias (kept so existing call sites stay unchanged).
+_get_speaker = get_speaker_for_user
 
 
 def speaker_required(view_func):
@@ -597,7 +597,8 @@ def event_upload_view(request, pk=None):
                 event.speakers.add(speaker)
 
                 # Фото добавляются к существующим (не заменяют), чтобы при edit
-                # пользователь мог дозагрузить. Удаление отдельных фото — TODO.
+                # пользователь мог дозагрузить. Удаление отдельных фото пока не
+                # поддерживается (по дизайну — только добавление).
                 for f in cleaned_photos:
                     EventPhoto.objects.create(event=event, image=f)
 

@@ -53,11 +53,13 @@ class MeRoutesAuthGateTests(TestCase):
             self.assertEqual(resp.status_code, 302, name)
             self.assertIn("/auth/login/", resp.url, name)
 
-    def test_guest_redirected_to_explore(self):
+    def test_guest_redirected_to_application(self):
+        # A guest with no SpeakerApplication is nudged to the application form
+        # by GuestApplicationRedirectMiddleware before the /me/ view is reached.
         self.client.login(username="guesty", password="Guest!234")
         resp = self.client.get(reverse("me_dashboard"))
         self.assertEqual(resp.status_code, 302)
-        self.assertIn("/explore/", resp.url)
+        self.assertIn("/application/", resp.url)
 
     def test_linked_speaker_can_open_all_pages(self):
         self.client.login(username="speaker1", password="Secret!234")

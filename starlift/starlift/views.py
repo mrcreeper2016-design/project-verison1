@@ -1,4 +1,4 @@
-﻿import base64
+import base64
 import json
 import logging
 import os
@@ -23,6 +23,11 @@ from . import analytics as analytics_lib
 from . import home_metrics
 from .forms import FeedbackForm, SpeakerForm, SpeakerSelfEditForm
 from .models import Event, EventInvitation, EventRequest, Feedback, Speaker, SpeakerApplication, SpeakerEventRating, SpeakerLike
+from .permissions import get_speaker_for_user, is_platform_admin
+
+# Backwards-compatible local aliases (kept so existing call sites stay unchanged).
+_is_platform_admin = is_platform_admin
+_get_speaker_for_user = get_speaker_for_user
 
 RU_MONTHS_GEN = {
     "января": 1,
@@ -639,13 +644,6 @@ def speaker_delete(request, pk):
         return redirect('speakers')
     return render(request, 'speaker_confirm_delete.html', {'speaker': speaker})
 
-def _is_platform_admin(user) -> bool:
-    """True for admin or devrel (staff-level platform roles)."""
-    if user.is_superuser:
-        return True
-    profile = getattr(user, "profile", None)
-    return bool(profile and profile.role in ("admin", "devrel"))
-
 
 @member_required
 def qr_generator_view(request):
@@ -987,9 +985,6 @@ def qr_poster_view(request, speaker_id, event_id):
     return response
 
 
-def _get_speaker_for_user(user):
-    """Returns Speaker linked to user, or None."""
-    return Speaker.objects.filter(user=user).first()
 
 
 @member_required

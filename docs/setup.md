@@ -77,11 +77,21 @@ python manage.py runserver
 
 | Переменная | По умолчанию | Назначение |
 |------------|--------------|------------|
-| `SECRET_KEY` | небезопасный dev-ключ | **Обязательно задать** в проде |
+| `SECRET_KEY` | dev-ключ только при `DEBUG=True` | **Обязателен при `DEBUG=False`** — иначе приложение откажется стартовать |
 | `DEBUG` | `False` | `True` только для разработки |
-| `ALLOWED_HOSTS` | localhost + ngrok | Список хостов через запятую |
-| `CSRF_TRUSTED_ORIGINS` | ngrok | Доверенные origin для CSRF |
+| `ALLOWED_HOSTS` | localhost + ngrok **только при `DEBUG=True`** | При `DEBUG=False` дефолт пустой — задайте явно |
+| `CSRF_TRUSTED_ORIGINS` | ngrok **только при `DEBUG=True`** | При `DEBUG=False` дефолт пустой — задайте явно |
 | `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` | `True` при `DEBUG=False` | Secure-cookie |
+| `SECURE_SSL_REDIRECT` | `False` | Редирект HTTP→HTTPS (включайте, когда TLS на прокси) |
+| `SECURE_HSTS_SECONDS` | `0` | HSTS; `>0` включает (напр. `31536000`) |
+| `SECURE_HSTS_INCLUDE_SUBDOMAINS` / `SECURE_HSTS_PRELOAD` | `False` | Дополнения к HSTS |
+
+> **Поведение `SECRET_KEY`:** в dev (`DEBUG=True`) при отсутствии ключа используется
+> встроенный небезопасный ключ с предупреждением в логах. В проде (`DEBUG=False`)
+> отсутствие `SECRET_KEY` — фатальная ошибка запуска (`ImproperlyConfigured`). Аналогично
+> при `DEBUG=False` нужно явно задать `ALLOWED_HOSTS` (Django сам отвергнет запросы с
+> неизвестным `Host`). **Перед деплоем убедитесь, что в `.env.production` заданы
+> `SECRET_KEY` и `ALLOWED_HOSTS`.**
 
 ### 4.2 База данных
 
@@ -177,11 +187,12 @@ python manage.py migrate_avatars_to_object_storage
 
 ## 7. Production-чеклист
 
-- [ ] `SECRET_KEY` — собственный, из секретов окружения (не из репозитория).
+- [ ] `SECRET_KEY` — собственный, из секретов окружения (**иначе при `DEBUG=False` старт упадёт**).
 - [ ] `DEBUG=False`.
-- [ ] `ALLOWED_HOSTS` и `CSRF_TRUSTED_ORIGINS` — реальные домены.
-- [ ] HTTPS на уровне прокси; `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` = `True` (по умолчанию при `DEBUG=False`).
+- [ ] `ALLOWED_HOSTS` и `CSRF_TRUSTED_ORIGINS` — реальные домены (при `DEBUG=False` дефолты пустые).
+- [ ] HTTPS на уровне прокси; `SESSION_COOKIE_SECURE` / `CSRF_COOKIE_SECURE` = `True` (по умолчанию при `DEBUG=False`); по желанию `SECURE_SSL_REDIRECT=True`, `SECURE_HSTS_SECONDS=31536000`.
 - [ ] SMTP-backend для email и валидный `DEFAULT_FROM_EMAIL` / `SITE_URL`.
+- [ ] `GIGACHAT_VERIFY_SSL=true` при установленном корневом CA Минцифры (иначе остаётся `false`).
 - [ ] Прогнаны `migrate` и `collectstatic` (в Docker — автоматически на старте `web`).
 - [ ] Настроено резервное копирование Postgres (том `pgdata`).
 - [ ] (Опц.) object storage для медиа, если несколько инстансов/эфемерная ФС.

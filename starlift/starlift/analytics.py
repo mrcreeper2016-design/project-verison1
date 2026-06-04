@@ -162,7 +162,14 @@ def event_queryset(filters: AnalyticsFilters) -> QuerySet[Event]:
 # ---------------------------------------------------------------------------
 
 def compute_nps(feedbacks: Iterable[Feedback] | QuerySet[Feedback]) -> dict[str, Any]:
-    """Standard NPS: (promoters% - detractors%) * 100.
+    """Score breakdown for a set of feedbacks.
+
+    Note on naming: the returned ``nps`` key is the **average score on the
+    0–10 scale** (the value the dashboards display and what the ``nps_threshold``
+    filter, e.g. 9.4, compares against) — *not* the classic Net Promoter Score
+    percentage. Promoter/detractor counts and percentages (from which a classic
+    NPS could be derived as ``promoter_pct - detractor_pct``) are returned
+    alongside as separate keys.
 
     Accepts either a queryset (preferred, uses a single aggregate query) or any
     iterable of feedback-like objects with a ``score`` attribute.
